@@ -27,6 +27,9 @@
   "peerDependencies": {
     "wrangler": ">=4.80.0"
   },
+  "dependencies": {
+    "@cloudflare/workers-types": "^4.20260405.1"
+  },
   "devDependencies": {
     "@types/node": "^25.5.2",
     "executable-stories-vitest": "^8.1.4",

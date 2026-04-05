@@ -1,0 +1,30 @@
+---
+title: Impact Analysis
+description: See what depends on a worker before you change it
+---
+
+```bash
+wd impact workers/api
+```
+
+Shows three things for a given worker:
+
+1. Upstream -- what it depends on (resources, service bindings)
+2. Downstream -- what depends on it (other workers, queue consumers)
+3. Consequences -- what breaks if it goes down
+
+```
+  Impact analysis for workers/api
+
+  Upstream (depends on):
+    payments-db → shared with workers/batch, workers/events
+    token-kv → exclusive
+
+  Downstream (depended on by):
+    workers/batch → service binding WORKFLOWS
+
+  If workers/api is unavailable:
+    workers/batch cannot reach WORKFLOWS service binding
+```
+
+Useful before deploying breaking changes, during incidents, or when onboarding onto an unfamiliar codebase.

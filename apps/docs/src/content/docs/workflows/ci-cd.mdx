@@ -12,6 +12,12 @@ CLOUDFLARE_API_TOKEN=xxx    # required
 CLOUDFLARE_ACCOUNT_ID=xxx   # recommended (auto-detected if omitted)
 ```
 
+For PR comments and check runs, also set:
+
+```bash
+GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+```
+
 ## Pipeline
 
 ```bash
@@ -20,3 +26,42 @@ wd deploy --stage staging --verify
 ```
 
 `--verify` runs post-deploy coherence checks and fails the pipeline if anything is wrong.
+
+## Generate a workflow
+
+`wd ci init` generates a complete GitHub Actions workflow:
+
+```bash
+wd ci init --branch main
+```
+
+This creates `.github/workflows/wrangler-deploy.yml` with:
+
+- **PR preview**: apply + deploy + comment + check run on pull request
+- **Cleanup**: destroy preview on PR close
+- **Production**: apply + deploy on push to main
+
+The generated workflow includes explicit GitHub token permissions (`issues: write`, `checks: write`) so it works in repos with restricted default permissions.
+
+## CI subcommands
+
+### `wd ci comment --stage <name>`
+
+Posts or updates a PR comment with worker URLs, a Mermaid topology diagram, resource tables, and secret status. Uses a `<!-- wrangler-deploy -->` HTML marker to update the same comment on subsequent pushes instead of creating new ones.
+
+### `wd ci check --stage <name>`
+
+Posts a GitHub check run. If no state exists for the stage, the check reports failure and the command exits 1. Without this, CI would pass silently on a stage that was never deployed.
+
+## Permissions
+
+The generated workflow declares these permissions:
+
+```yaml
+permissions:
+  contents: read
+  issues: write
+  checks: write
+```
+
+If you write your own workflow, make sure to include these — without them, `ci comment` and `ci check` will fail with 403 errors in repos that restrict the default `GITHUB_TOKEN` scope.

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import { resolve, join } from "node:path";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { createInterface } from "node:readline";
 import { createWranglerRunner } from "../core/wrangler-runner.js";
 import { resolveStateProvider } from "../core/state.js";
@@ -18,6 +19,19 @@ import {
 import { gc } from "../core/gc.js";
 import { generateConfig } from "../core/init.js";
 import { introspect } from "../core/introspect.js";
+import { buildRichGraph } from "../core/graph-model.js";
+import { renderAscii, renderMermaid, renderDot, renderJson } from "../core/renderers/index.js";
+import { analyzeImpact } from "../core/impact.js";
+import { buildDevPlan, startDev } from "../core/dev.js";
+import { generateGitHubWorkflow } from "../core/ci/workflow-gen.js";
+import { detectCiEnvironment } from "../core/ci/detect.js";
+import { createGitHubProvider } from "../core/ci/github.js";
+import { buildPrComment } from "../core/ci/comment.js";
+import { postCheckRun } from "../core/ci/check.js";
+import { diffStages } from "../core/stage-diff.js";
+import { runDoctor } from "../core/doctor.js";
+import { validateConfig } from "../core/validate-config.js";
+import { generateCompletions } from "../core/completions.js";
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -71,6 +85,15 @@ async function main() {
     status   Show stage status
     secrets  Check which declared secrets are set/missing
     verify   Post-deploy coherence check
+    graph       [--stage <name>] [--format ascii|mermaid|dot|json]  Show topology
+    impact      <worker-path>                                       Show dependency impact
+    diff        <stage-a> <stage-b> [--format json]                 Compare stages
+    dev         [--filter <worker>] [--port <base>]                 Start local dev
+    ci init     [--provider github] [--branch main]                 Generate CI workflow
+    ci comment  --stage <name>                                      Post/update PR comment
+    ci check    --stage <name>                                      Post GitHub check runs
+    doctor                                                          Run diagnostic checks
+    completions --shell zsh|bash|fish                               Generate shell completions
 
   Secrets sub-commands:
     secrets --stage <name>                           Check secret status
@@ -395,6 +418,208 @@ async function main() {
         }
         console.log("");
       }
+      break;
+    }
+
+    case "graph": {
+  const format = getFlag("format") ?? "ascii";
+  const config = await loadConfig(rootDir);
+  let state;
+  if (stage) {
+    const stateProvider = resolveStateProvider(rootDir, config.state);
+    state = await stateProvider.read(stage) ?? undefined;
+    if (!state) {
+      console.log(`  ⚠ No state found for stage "${stage}" — showing config-only topology`);
+    }
+  }
+
+  const graph = buildRichGraph(config, state);
+  const renderers: Record<string, (g: typeof graph) => string> = { ascii: renderAscii, mermaid: renderMermaid, dot: renderDot, json: renderJson };
+  const renderer = renderers[format];
+  if (!renderer) {
+    console.error(`  ✗ Unknown format "${format}". Use: ascii, mermaid, dot, json`);
+    process.exit(1);
+  }
+  console.log(renderer(graph));
+  break;
+}
+
+    case "impact": {
+  const target = args[1];
+  if (!target) {
+    console.error("  ✗ Usage: wd impact <worker-path>");
+    process.exit(1);
+  }
+  const config = await loadConfig(rootDir);
+
+  const graph = buildRichGraph(config);
+  const result = analyzeImpact(graph, target);
+
+  console.log(`\n  Impact analysis for ${target}\n`);
+  if (result.upstream.length > 0) {
+    console.log("  Upstream (depends on):");
+    for (const dep of result.upstream) {
+      const shared = dep.sharedWith.length > 0 ? ` → shared with ${dep.sharedWith.join(", ")}` : " → exclusive";
+      console.log(`    ${dep.id}${shared}`);
+    }
+  }
+  if (result.downstream.length > 0) {
+    console.log("\n  Downstream (depended on by):");
+    for (const dep of result.downstream) {
+      const label = dep.label ? ` → ${dep.label} ${dep.relationship}` : ` → ${dep.relationship}`;
+      console.log(`    ${dep.id}${label}`);
+    }
+  }
+  if (result.consequences.length > 0) {
+    console.log(`\n  If ${target} is unavailable:`);
+    for (const c of result.consequences) {
+      console.log(`    ${c}`);
+    }
+  }
+  console.log("");
+  break;
+}
+
+    case "dev": {
+      const filter = getFlag("filter");
+      const basePort = getFlag("port") ? parseInt(getFlag("port")!, 10) : undefined;
+      const config = await loadConfig(rootDir);
+      const plan = buildDevPlan(config, rootDir, { basePort, filter: filter ?? undefined });
+      const handle = await startDev(plan);
+      const shutdown = async () => {
+        console.log("\n  Stopping all workers...");
+        await handle.stop();
+        process.exit(0);
+      };
+      process.on("SIGINT", shutdown);
+      process.on("SIGTERM", shutdown);
+      await new Promise(() => {});
+      break;
+    }
+
+    case "ci": {
+  const subCmd = args[1];
+  if (subCmd === "init") {
+    const provider = getFlag("provider") ?? "github";
+    if (provider !== "github") { console.error(`  ✗ Unknown provider "${provider}". Supported: github`); process.exit(1); }
+    const mainBranch = getFlag("branch") ?? "main";
+    const yaml = generateGitHubWorkflow({ mainBranch });
+    const dir = resolve(rootDir, ".github/workflows");
+    mkdirSync(dir, { recursive: true });
+    const path = resolve(dir, "wrangler-deploy.yml");
+    writeFileSync(path, yaml);
+    console.log(`  ✓ Generated ${path}`);
+    break;
+  }
+  if (!stage) { console.error("  ✗ --stage required for ci comment/check"); process.exit(1); }
+  if (subCmd === "comment") {
+    const ci = detectCiEnvironment(process.env as Record<string, string>);
+    if (!ci) { console.error("  ✗ Not in supported CI"); process.exit(1); }
+    if (!ci.prNumber) { console.log("  ⚠ Not a PR — skipping"); break; }
+    const config = await loadConfig(rootDir);
+    const stateProvider = resolveStateProvider(rootDir, config.state);
+    const state = await stateProvider.read(stage);
+    if (!state) { console.error(`  ✗ No state for "${stage}"`); process.exit(1); }
+    const comment = buildPrComment(config, state);
+    const ghProvider = createGitHubProvider(ci);
+    await ghProvider.updateComment(ci.prNumber, comment, "<!-- wrangler-deploy -->");
+    console.log(`  ✓ PR #${ci.prNumber} comment updated`);
+    break;
+  }
+  if (subCmd === "check") {
+    const ci = detectCiEnvironment(process.env as Record<string, string>);
+    if (!ci) { console.error("  ✗ Not in supported CI"); process.exit(1); }
+    const config = await loadConfig(rootDir);
+    const stateProvider = resolveStateProvider(rootDir, config.state);
+    const state = await stateProvider.read(stage);
+    const ghProvider = createGitHubProvider(ci);
+    const result = await postCheckRun(ghProvider, stage, state);
+    if (result.status === "success") {
+      console.log(`  ✓ Check run posted for ${stage}`);
+    } else {
+      console.error(`  ✗ ${result.detail}`);
+      process.exit(1);
+    }
+    break;
+  }
+  console.error(`  ✗ Unknown ci subcommand "${subCmd}". Use: init, comment, check`);
+  process.exit(1);
+}
+
+    case "diff": {
+  const stageA = args[1];
+  const stageB = args[2];
+  if (!stageA || !stageB) {
+    console.error("  ✗ Usage: wd diff <stage-a> <stage-b>");
+    process.exit(1);
+  }
+  const config = await loadConfig(rootDir);
+  const stateProvider = resolveStateProvider(rootDir, config.state);
+  const a = await stateProvider.read(stageA);
+  const b = await stateProvider.read(stageB);
+  if (!a) { console.error(`  ✗ No state found for stage "${stageA}"`); process.exit(1); }
+  if (!b) { console.error(`  ✗ No state found for stage "${stageB}"`); process.exit(1); }
+
+  const result = diffStages(a, b);
+  const format = getFlag("format");
+
+  if (format === "json") {
+    console.log(JSON.stringify(result, null, 2));
+    break;
+  }
+
+  console.log(`\n  Diff: ${stageA} vs ${stageB}\n`);
+  if (result.resources.length > 0) {
+    console.log("  Resources:");
+    for (const r of result.resources) {
+      const icon = r.status === "same" ? "=" : r.status === "only-in-a" ? "+" : r.status === "only-in-b" ? "-" : "~";
+      console.log(`    ${icon} ${r.name} (${r.type}) — ${r.status}`);
+    }
+  }
+  if (result.workers.length > 0) {
+    console.log("\n  Workers:");
+    for (const w of result.workers) {
+      const icon = w.status === "same" ? "=" : w.status === "only-in-a" ? "+" : "-";
+      console.log(`    ${icon} ${w.path} — ${w.status}`);
+    }
+  }
+  if (result.secrets.length > 0) {
+    console.log("\n  Secrets:");
+    for (const s of result.secrets) {
+      console.log(`    ~ ${s.worker}/${s.name}: ${stageA}=${s.inA}, ${stageB}=${s.inB}`);
+    }
+  }
+  console.log("");
+  break;
+}
+
+    case "doctor": {
+      const config = await loadConfig(rootDir);
+      const deps = {
+        wranglerVersion: () => execFileSync("npx", ["wrangler", "--version"], { encoding: "utf-8" }).trim(),
+        wranglerAuth: () => execFileSync("npx", ["wrangler", "whoami"], { encoding: "utf-8" }).trim(),
+        workerExists: (p: string) => existsSync(resolve(rootDir, p, "wrangler.jsonc")) || existsSync(resolve(rootDir, p, "wrangler.json")),
+        configErrors: validateConfig(config),
+      };
+
+      const checks = runDoctor(config, deps);
+      console.log("\n  wrangler-deploy doctor\n");
+      for (const check of checks) {
+        const icon = check.status === "pass" ? "✓" : check.status === "warn" ? "⚠" : "✗";
+        console.log(`  ${icon} ${check.name}: ${check.message}`);
+        if (check.details) console.log(`    ${check.details}`);
+      }
+      console.log("");
+      break;
+    }
+
+    case "completions": {
+      const shell = getFlag("shell");
+      if (!shell || !["zsh", "bash", "fish"].includes(shell)) {
+        console.error("  ✗ Usage: wd completions --shell zsh|bash|fish");
+        process.exit(1);
+      }
+      console.log(generateCompletions(shell as "zsh" | "bash" | "fish"));
       break;
     }
 

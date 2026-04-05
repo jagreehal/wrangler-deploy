@@ -72,3 +72,89 @@ Bulk set secrets from a `.dev.vars`-style file.
 ## `wd gc`
 
 Destroy stages past their TTL. Only affects unprotected stages.
+
+## `wd graph [--stage <name>] [--format ascii|mermaid|dot|json]`
+
+Show the topology graph of workers, resources, and bindings. Default format is `ascii`.
+
+When `--stage` is provided, overlays live state (resource IDs, worker URLs, sync status).
+
+```bash
+wd graph                          # ASCII to terminal
+wd graph --format mermaid         # Mermaid for Markdown/PRs
+wd graph --stage staging          # Include live state
+wd graph --format json            # Machine-readable
+```
+
+## `wd impact <worker-path>`
+
+Show upstream dependencies, downstream dependents, and consequences if the worker is unavailable.
+
+```bash
+wd impact workers/api
+```
+
+## `wd diff <stage-a> <stage-b> [--format json]`
+
+Compare two stages. Shows resource, worker, and secret differences.
+
+```bash
+wd diff staging production
+wd diff staging production --format json
+```
+
+## `wd dev [--filter <worker>] [--port <base>]`
+
+Start all workers in local dev mode. Automatically resolves available dev and inspector ports so multi-worker setups work without conflicts.
+
+`--filter` starts only the target worker and its transitive service-binding dependencies.
+
+```bash
+wd dev                            # Start all workers
+wd dev --filter workers/api       # Start api + its deps
+wd dev --port 9000                # Override base port
+```
+
+## `wd ci init [--provider github] [--branch main]`
+
+Generate a GitHub Actions workflow file at `.github/workflows/wrangler-deploy.yml`. The generated workflow includes apply, deploy, PR comments, check runs, cleanup on PR close, and production deploy on push to main.
+
+```bash
+wd ci init
+wd ci init --branch main
+```
+
+## `wd ci comment --stage <name>`
+
+Post or update a PR comment with deployment status, topology diagram, resource table, and worker URLs. Uses the `<!-- wrangler-deploy -->` marker to update in place on subsequent runs.
+
+Requires `GITHUB_TOKEN` environment variable.
+
+## `wd ci check --stage <name>`
+
+Post a GitHub check run with success/failure status based on whether the stage has been deployed. Exits with code 1 if no state is found.
+
+Requires `GITHUB_TOKEN` environment variable.
+
+## `wd doctor`
+
+Run diagnostic checks: wrangler version, authentication, config validation, and worker config existence.
+
+```bash
+wd doctor
+```
+
+## `wd completions --shell zsh|bash|fish`
+
+Generate shell completion scripts. Pipe into a file or eval directly.
+
+```bash
+# Zsh
+wd completions --shell zsh > ~/.zfunc/_wd
+
+# Bash
+wd completions --shell bash > /etc/bash_completion.d/wd
+
+# Fish
+wd completions --shell fish > ~/.config/fish/completions/wd.fish
+```
