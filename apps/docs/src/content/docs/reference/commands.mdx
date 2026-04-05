@@ -1,152 +1,331 @@
 ---
 title: CLI Commands
-description: Full CLI reference
+description: Full CLI reference with example output
 ---
 
-Both `wrangler-deploy` and the short alias `wd` are available after install.
+Both `wrangler-deploy` and the short alias `wd` are available after install. The CLI is built for existing Wrangler projects, so the default assumption is that you already have `wrangler.jsonc` files and want to keep them.
 
 ## `wd init`
 
-Scan local wrangler configs and generate `wrangler-deploy.config.ts` from what it finds in your filesystem.
+Scan your local Wrangler configs and generate `wrangler-deploy.config.ts`. Run this once when adopting wrangler-deploy in a repo that already has `wrangler.jsonc` or `wrangler.json`.
+
+```bash
+$ wd init
+  ✓ Found workers/api/wrangler.jsonc
+  ✓ Found workers/batch-workflow/wrangler.jsonc
+  ✓ Found workers/event-router/wrangler.jsonc
+  ✓ Generated wrangler-deploy.config.ts
+```
+
+Your checked-in Wrangler files are not modified.
 
 ## `wd introspect [--filter <prefix>] [--dry-run]`
 
-Scan your live Cloudflare account and generate `wrangler-deploy.config.ts` from existing resources. Lists all D1 databases, KV namespaces, Queues, R2 buckets, Hyperdrive configs, and Vectorize indexes in your account.
+Scan your live Cloudflare account and generate `wrangler-deploy.config.ts` from existing resources. Use this instead of `init` when you already have Workers and resources running in production.
 
-If `CLOUDFLARE_API_TOKEN` is set, it also discovers Workers and their bindings, wiring up which worker uses which resource automatically. Without the token, it uses `wrangler login` credentials to list resources (but cannot fetch worker bindings).
-
-`--filter <prefix>` limits results to resources and workers whose names start with the given prefix. Useful for large accounts with many unrelated resources.
-
-`--dry-run` prints the generated config to stdout without writing the file.
+If `CLOUDFLARE_API_TOKEN` is set, it discovers Workers and their bindings automatically. Without it, uses `wrangler login` credentials (but can't fetch worker bindings).
 
 ```bash
-# Using wrangler login (no token needed)
-wd introspect
-
-# With full worker binding discovery
-CLOUDFLARE_API_TOKEN=your-token wd introspect
-
-# Preview without writing
-wd introspect --dry-run
+# Pull everything from your account
+$ wd introspect
+  Found 3 workers, 2 KV namespaces, 1 D1 database, 1 queue
+  ✓ Generated wrangler-deploy.config.ts
 
 # Only resources starting with "payments-"
-wd introspect --filter payments-
+$ wd introspect --filter payments-
+
+# Preview without writing the file
+$ wd introspect --dry-run
 ```
 
 ## `wd plan --stage <name>`
 
-Dry-run. Shows what resources would be created, are in sync, drifted, or orphaned.
+Dry-run. Shows what resources would be created, are in sync, drifted, or orphaned. Run this before `apply` to preview changes.
+
+```bash
+$ wd plan --stage pr-42
+  wrangler-deploy plan --stage pr-42
+
+  + payments-db-pr-42 (d1) create
+  + token-kv-pr-42 (kv) create
+  + cache-kv-pr-42 (kv) create
+  + payment-outbox-pr-42 (queue) create
+  + payment-outbox-dlq-pr-42 (queue) create
+
+  5 to create, 0 in sync, 0 drifted, 0 orphaned
+```
 
 ## `wd apply --stage <name> [--database-url <url>]`
 
-Provision resources. `--database-url` required for Hyperdrive on first apply. Idempotent and resumable.
+Provision resources in Cloudflare. This step is idempotent, so it is safe to run again if it fails partway through. State is written after each resource, and deploy-time `wrangler.rendered.jsonc` files are generated with the real IDs for that stage.
+
+```bash
+$ wd apply --stage pr-42
+  + payments-db-pr-42 (d1) created
+  + token-kv-pr-42 (kv) created
+  + cache-kv-pr-42 (kv) created
+  + payment-outbox-pr-42 (queue) created
+  + payment-outbox-dlq-pr-42 (queue) created
+
+  ✓ 5 resources applied
+```
+
+`--database-url` is required for Hyperdrive on first apply (it needs a Postgres connection string).
 
 ## `wd deploy --stage <name> [--verify]`
 
-Deploy workers using rendered configs. `--verify` runs post-deploy coherence checks. Blocks if secrets are missing.
+Deploy workers using rendered configs with real resource IDs. Workers are deployed in dependency order, so service-binding targets go first. Deploy blocks if declared secrets are missing.
+
+```bash
+$ wd deploy --stage pr-42
+  Deploying workers/batch-workflow...
+  ✓ payment-batch-workflow-pr-42 deployed
+  Deploying workers/event-router...
+  ✓ payment-event-router-pr-42 deployed
+  Deploying workers/api...
+  ✓ payment-api-pr-42 deployed
+```
+
+`--verify` runs post-deploy coherence checks and fails the pipeline if anything is wrong:
+
+```bash
+$ wd deploy --stage pr-42 --verify
+  ...deployed...
+  Verification: 8 passed, 0 failed
+```
 
 ## `wd destroy --stage <name> [--force]`
 
-Tear down all resources. Requires `--force` for protected stages. Removes queue consumers before workers.
+Tear down all resources for a stage. Removes queue consumers first, then workers, then resources — in the right order. Requires `--force` for protected stages.
+
+```bash
+$ wd destroy --stage pr-42
+  Removing queue consumers...
+  Deleting workers...
+  Deleting resources...
+  ✓ Stage "pr-42" destroyed
+```
 
 ## `wd status [--stage <name>]`
 
-Without stage: list all known stages. With stage: show resources, workers, drift.
+Without `--stage`: list all known stages. With `--stage`: show resources, workers, and drift for that stage.
+
+```bash
+$ wd status
+  Stages:
+    staging    (3 resources, 3 workers)
+    pr-42      (5 resources, 3 workers)
+    production (5 resources, 3 workers) [protected]
+
+$ wd status --stage staging
+  Resources:
+    payments-db-staging (d1) — in-sync
+    cache-kv-staging (kv) — in-sync
+    outbox-staging (queue) — drifted
+
+  Workers:
+    payment-api-staging — deployed
+    payment-batch-workflow-staging — deployed
+```
 
 ## `wd verify --stage <name>`
 
-Read-only coherence check. Validates state, rendered configs, resources, workers, secrets, service bindings.
+Read-only coherence check. Validates state against live resources, rendered configs, workers, secrets, and service bindings. Use this in CI after deploy, or manually to check if everything is still consistent.
+
+```bash
+$ wd verify --stage staging
+  ✓ State file exists
+  ✓ All resources in sync
+  ✓ All workers deployed
+  ✓ All secrets set
+  ✓ Service bindings valid
+  Verification: 5 passed, 0 failed
+```
 
 ## `wd secrets --stage <name>`
 
-Check which declared secrets are set or missing.
+Check which declared secrets are set or missing. Use before deploy to see what's needed.
+
+```bash
+$ wd secrets --stage staging
+  workers/api:
+    AUTH_SECRET — set
+    API_KEY — missing
+```
 
 ## `wd secrets set --stage <name>`
 
-Set missing secrets interactively.
+Set missing secrets interactively. Prompts for each missing value.
+
+```bash
+$ wd secrets set --stage staging
+  workers/api / API_KEY: ****
+  ✓ 1 secret set
+```
 
 ## `wd secrets sync --to <name> --from-env-file <path>`
 
-Bulk set secrets from a `.dev.vars`-style file.
+Bulk set secrets from a `.dev.vars`-style file. Useful for syncing local dev secrets to a staging environment.
+
+```bash
+$ wd secrets sync --to staging --from-env-file .dev.vars
+  ✓ Synced 3 secrets to staging
+```
 
 ## `wd gc`
 
-Destroy stages past their TTL. Only affects unprotected stages.
+Destroy stages past their TTL. Only affects unprotected stages. Typically run on a daily cron in CI to clean up old PR preview environments.
+
+```bash
+$ wd gc
+  pr-38 expired (7d TTL, created 2026-03-28) — destroying
+  pr-39 expired (7d TTL, created 2026-03-29) — destroying
+  ✓ 2 stages destroyed
+```
 
 ## `wd graph [--stage <name>] [--format ascii|mermaid|dot|json]`
 
-Show the topology graph of workers, resources, and bindings. Default format is `ascii`.
+Show the topology graph. Default format is `ascii`. Use when you want to see how workers, resources, and bindings connect.
+
+```bash
+$ wd graph
+[worker] api
+├── (binding: DB) [d1] payments-db
+├── (binding: TOKEN_KV) [kv] token-kv
+├── (producer: OUTBOX_QUEUE) [queue] payment-outbox
+└── (service-binding: WORKFLOWS) [worker] batch-workflow
+[worker] batch-workflow
+├── (binding: DB) [d1] payments-db
+├── (binding: CACHE_KV) [kv] cache-kv
+└── (producer: OUTBOX_QUEUE) [queue] payment-outbox
+[worker] event-router
+├── (binding: DB) [d1] payments-db
+├── (producer: OUTBOX_QUEUE) [queue] payment-outbox
+└── (consumer) [queue] payment-outbox
+[queue] payment-outbox
+└── (dead-letter) [queue] payment-outbox-dlq
+```
+
+Mermaid output you can paste into a PR comment:
+
+```bash
+$ wd graph --format mermaid
+graph TD
+  subgraph Workers
+    workers_api([api])
+    workers_batch_workflow([batch-workflow])
+    workers_event_router([event-router])
+  end
+  subgraph Queues
+    payment_outbox[/payment-outbox\]
+    payment_outbox_dlq[/payment-outbox-dlq\]
+  end
+  workers_api -->|WORKFLOWS| workers_batch_workflow
+  workers_api -->|OUTBOX_QUEUE| payment_outbox
+  payment_outbox -. DLQ .-> payment_outbox_dlq
+```
 
 When `--stage` is provided, overlays live state (resource IDs, worker URLs, sync status).
 
-```bash
-wd graph                          # ASCII to terminal
-wd graph --format mermaid         # Mermaid for Markdown/PRs
-wd graph --stage staging          # Include live state
-wd graph --format json            # Machine-readable
-```
-
 ## `wd impact <worker-path>`
 
-Show upstream dependencies, downstream dependents, and consequences if the worker is unavailable.
+Show what depends on a worker and what breaks if it goes down. Run this before making breaking changes.
 
 ```bash
-wd impact workers/api
+$ wd impact workers/api
+  Impact analysis for workers/api
+
+  Upstream (depends on):
+    payments-db → shared with workers/batch-workflow, workers/event-router
+    token-kv → exclusive
+    payment-outbox → shared with workers/batch-workflow, workers/event-router
+
+  If workers/api is unavailable:
+    workers/batch-workflow is unaffected (no direct dependency)
+    workers/event-router is unaffected (no direct dependency)
 ```
 
 ## `wd diff <stage-a> <stage-b> [--format json]`
 
-Compare two stages. Shows resource, worker, and secret differences.
+Compare two stages side by side. Use before promoting staging to production, or to audit what a PR preview added.
 
 ```bash
-wd diff staging production
-wd diff staging production --format json
+$ wd diff staging production
+  Diff: staging vs production
+
+  Resources:
+    = payments-db (d1) — same
+    + cache-kv (kv) — only-in-a
+    ~ token-kv (kv) — different
+
+  Workers:
+    = workers/api — same
+    + workers/experiment — only-in-a
 ```
+
+`--format json` for machine-readable output you can pipe into other tools.
 
 ## `wd dev [--filter <worker>] [--port <base>]`
 
-Start all workers in local dev mode. Automatically resolves available dev and inspector ports so multi-worker setups work without conflicts.
-
-`--filter` starts only the target worker and its transitive service-binding dependencies.
+Start all workers in local dev mode. Reads your existing `wrangler.jsonc` files as-is. Automatically resolves available dev and inspector ports so multi-worker setups work without conflicts.
 
 ```bash
-wd dev                            # Start all workers
-wd dev --filter workers/api       # Start api + its deps
-wd dev --port 9000                # Override base port
+$ wd dev
+Starting dev servers:
+  workers/api            -> http://localhost:8787
+  workers/batch-workflow -> http://localhost:8788
+  workers/event-router   -> http://localhost:8789
 ```
+
+`--filter` starts only the target worker and its transitive service-binding deps. Use when you only need part of the system running:
+
+```bash
+$ wd dev --filter workers/api
+Starting dev servers:
+  workers/batch-workflow -> http://localhost:8787
+  workers/api            -> http://localhost:8788
+```
+
+(batch-workflow is included because api has a service binding to it.)
 
 ## `wd ci init [--provider github] [--branch main]`
 
-Generate a GitHub Actions workflow file at `.github/workflows/wrangler-deploy.yml`. The generated workflow includes apply, deploy, PR comments, check runs, cleanup on PR close, and production deploy on push to main.
+Generate a GitHub Actions workflow. Run this once to set up CI/CD for your project.
 
 ```bash
-wd ci init
-wd ci init --branch main
+$ wd ci init
+  ✓ Generated .github/workflows/wrangler-deploy.yml
 ```
+
+The generated workflow includes apply, deploy, PR comments, check runs, cleanup on PR close, production deploy on push to main, and the right GitHub token permissions.
 
 ## `wd ci comment --stage <name>`
 
-Post or update a PR comment with deployment status, topology diagram, resource table, and worker URLs. Uses the `<!-- wrangler-deploy -->` marker to update in place on subsequent runs.
-
-Requires `GITHUB_TOKEN` environment variable.
+Post or update a PR comment with worker URLs, topology diagram, resource tables, and secret status. Uses `<!-- wrangler-deploy -->` to update the same comment on each push. Requires `GITHUB_TOKEN`.
 
 ## `wd ci check --stage <name>`
 
-Post a GitHub check run with success/failure status based on whether the stage has been deployed. Exits with code 1 if no state is found.
-
-Requires `GITHUB_TOKEN` environment variable.
+Post a GitHub check run with success/failure status. If no state exists for the stage, the check reports failure and the command exits 1 — so your CI pipeline fails instead of passing silently. Requires `GITHUB_TOKEN`.
 
 ## `wd doctor`
 
-Run diagnostic checks: wrangler version, authentication, config validation, and worker config existence.
+Run diagnostic checks. Use when setting up a new project, after upgrading wrangler, or when CI fails unexpectedly.
 
 ```bash
-wd doctor
+$ wd doctor
+  wrangler-deploy doctor
+
+  ✓ wrangler installed: wrangler 4.80.0
+  ✓ wrangler auth: logged in as jag.reehal@gmail.com
+  ✓ worker path: workers/api exists
+  ✓ worker path: workers/batch-workflow exists
+  ✓ worker path: workers/event-router exists
+  ✓ config valid: No config errors
 ```
 
 ## `wd completions --shell zsh|bash|fish`
 
-Generate shell completion scripts. Pipe into a file or eval directly.
+Generate shell completion scripts for tab-completion of commands and flags.
 
 ```bash
 # Zsh

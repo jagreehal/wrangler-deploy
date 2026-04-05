@@ -3,9 +3,11 @@ title: CI/CD
 description: Using wrangler-deploy in CI/CD pipelines
 ---
 
+wrangler-deploy uses wrangler under the hood. CI runs the same `wrangler.jsonc` configs your local dev uses, unchanged. This page covers setting up pipelines that create PR preview environments automatically and clean them up on merge.
+
 ## Authentication
 
-Set these environment variables:
+Set these environment variables in your CI:
 
 ```bash
 CLOUDFLARE_API_TOKEN=xxx    # required
@@ -20,28 +22,37 @@ GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
 
 ## Pipeline
 
+A minimal CI pipeline is two commands:
+
 ```bash
-wd apply --stage staging
-wd deploy --stage staging --verify
+$ wd apply --stage pr-42
+  + payments-db-pr-42 (d1) created
+  + token-kv-pr-42 (kv) created
+  + payment-outbox-pr-42 (queue) created
+  ✓ 3 resources applied
+
+$ wd deploy --stage pr-42 --verify
+  ✓ payment-api-pr-42 deployed
+  ✓ payment-batch-workflow-pr-42 deployed
+  Verification: 8 passed, 0 failed
 ```
 
 `--verify` runs post-deploy coherence checks and fails the pipeline if anything is wrong.
 
 ## Generate a workflow
 
-`wd ci init` generates a complete GitHub Actions workflow:
+Run this once to set up CI/CD:
 
 ```bash
-wd ci init --branch main
+$ wd ci init --branch main
+  ✓ Generated .github/workflows/wrangler-deploy.yml
 ```
 
-This creates `.github/workflows/wrangler-deploy.yml` with:
+The generated workflow has three jobs:
 
-- **PR preview**: apply + deploy + comment + check run on pull request
-- **Cleanup**: destroy preview on PR close
-- **Production**: apply + deploy on push to main
-
-The generated workflow includes explicit GitHub token permissions (`issues: write`, `checks: write`) so it works in repos with restricted default permissions.
+- **preview** (on PR open/sync) — `wd apply` + `wd deploy --verify` + `wd ci comment` + `wd ci check`
+- **cleanup** (on PR close) — `wd destroy`
+- **deploy** (on push to main) — `wd apply` + `wd deploy --verify` for production
 
 ## CI subcommands
 
@@ -51,7 +62,20 @@ Posts or updates a PR comment with worker URLs, a Mermaid topology diagram, reso
 
 ### `wd ci check --stage <name>`
 
-Posts a GitHub check run. If no state exists for the stage, the check reports failure and the command exits 1. Without this, CI would pass silently on a stage that was never deployed.
+Posts a GitHub check run. If no state exists for the stage, the check reports failure and the command exits 1:
+
+```bash
+# Stage deployed successfully
+$ wd ci check --stage pr-42
+  ✓ Check run posted for pr-42
+
+# Stage was never applied
+$ wd ci check --stage pr-99
+  ✗ No state found for stage "pr-99"
+  (exit code 1)
+```
+
+Without this, CI would pass silently on a stage that was never deployed.
 
 ## Permissions
 
@@ -64,4 +88,4 @@ permissions:
   checks: write
 ```
 
-If you write your own workflow, make sure to include these — without them, `ci comment` and `ci check` will fail with 403 errors in repos that restrict the default `GITHUB_TOKEN` scope.
+If you write your own workflow, include these — without them, `ci comment` and `ci check` fail with 403 errors in repos that restrict the default `GITHUB_TOKEN` scope.

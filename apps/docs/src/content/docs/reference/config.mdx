@@ -5,7 +5,46 @@ description: wrangler-deploy.config.ts reference
 
 ## Location
 
-`wrangler-deploy.config.ts` at the project root (next to `wrangler.jsonc`).
+Put `wrangler-deploy.config.ts` at the project root.
+
+This file sits alongside your existing Wrangler config. It does not replace `wrangler.jsonc`. Think of the split like this:
+
+- `wrangler.jsonc`: local dev and normal Wrangler config
+- `wrangler-deploy.config.ts`: project-level resource, stage, and binding model
+- `wrangler.rendered.jsonc`: generated deploy-time config with real IDs for a stage
+
+## Minimal example
+
+```ts
+import { defineConfig, d1, kv } from "wrangler-deploy";
+
+export default defineConfig({
+  version: 1,
+  workers: ["workers/api"],
+  resources: {
+    DB: d1({ name: "payments-db" }),
+    CACHE: kv({ title: "cache-kv" }),
+  },
+});
+```
+
+With a worker config like this:
+
+```jsonc
+// workers/api/wrangler.jsonc
+{
+  "name": "payments-api",
+  "main": "src/index.ts",
+  "d1_databases": [
+    { "binding": "DB", "database_name": "placeholder", "database_id": "placeholder" }
+  ],
+  "kv_namespaces": [
+    { "binding": "CACHE", "id": "placeholder" }
+  ]
+}
+```
+
+You keep the checked-in JSONC for development. wrangler-deploy reads it, renders a deploy-time config with real IDs, and uses that rendered file during `wd deploy`.
 
 ## Schema
 
@@ -40,6 +79,8 @@ export default defineConfig({
 });
 ```
 
+Every worker listed in `workers` should point at a directory that already contains `wrangler.jsonc` or `wrangler.json`.
+
 ## Resource types
 
 | Type         | Key          | Provisioned via                |
@@ -53,10 +94,10 @@ export default defineConfig({
 ## State backend
 
 ```ts
-// Local (default, omit or set explicitly)
+// Local state on disk (default, omit or set explicitly)
 state: { backend: "local" }
 
-// Remote KV (shared across team and CI)
+// Remote KV state shared across your team and CI
 state: {
   backend: "kv",
   namespaceId: "your-kv-namespace-id",
@@ -68,7 +109,7 @@ See [Remote State](/wrangler-deploy/features/remote-state/) for setup and migrat
 
 ## Deploy order
 
-`deployOrder` is optional. When omitted, it's inferred from `serviceBindings`. Workers that are depended on deploy first. The graph is validated:
+`deployOrder` is optional. If you omit it, wrangler-deploy infers order from `serviceBindings`. Workers that are depended on deploy first. The graph is validated:
 
 - Cycles are rejected with a full cycle path
 - Unknown targets are rejected

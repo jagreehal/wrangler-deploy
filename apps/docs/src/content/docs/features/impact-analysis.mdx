@@ -3,28 +3,28 @@ title: Impact Analysis
 description: See what depends on a worker before you change it
 ---
 
+Before you push a breaking change to a worker, you should know what it'll affect. `wd impact` tells you. It's also useful during incidents when you need to quickly figure out what depends on the thing that's failing.
+
+## Usage
+
 ```bash
-wd impact workers/api
-```
-
-Shows three things for a given worker:
-
-1. Upstream -- what it depends on (resources, service bindings)
-2. Downstream -- what depends on it (other workers, queue consumers)
-3. Consequences -- what breaks if it goes down
-
-```
+$ wd impact workers/api
   Impact analysis for workers/api
 
   Upstream (depends on):
-    payments-db → shared with workers/batch, workers/events
+    payments-db → shared with workers/batch-workflow, workers/event-router
     token-kv → exclusive
-
-  Downstream (depended on by):
-    workers/batch → service binding WORKFLOWS
+    payment-outbox → shared with workers/batch-workflow, workers/event-router
 
   If workers/api is unavailable:
-    workers/batch cannot reach WORKFLOWS service binding
+    workers/batch-workflow is unaffected (no direct dependency)
+    workers/event-router is unaffected (no direct dependency)
 ```
 
-Useful before deploying breaking changes, during incidents, or when onboarding onto an unfamiliar codebase.
+Three sections:
+
+1. **Upstream** — resources and workers this one depends on, and whether they're shared with other workers or exclusive
+2. **Downstream** — other workers that depend on this one (via service bindings or queue consumption)
+3. **Consequences** — what breaks if this worker goes down
+
+In this example, `workers/api` shares `payments-db` with two other workers, but `token-kv` is exclusive to it. Neither batch-workflow nor event-router calls api directly, so they're unaffected if api goes down.

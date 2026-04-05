@@ -3,7 +3,7 @@ title: wrangler-deploy
 description: One command to spin up a full Cloudflare Workers environment per branch. Tear it down when you're done.
 template: splash
 hero:
-  tagline: "Your wrangler.jsonc already describes what you need. wrangler-deploy reads it, creates the D1 databases and KV namespaces and queues, deploys your workers, and cleans everything up when the PR closes."
+  tagline: "Keep your wrangler.jsonc. Use Wrangler for local dev. Use wrangler-deploy to create resources, render stage-aware JSONC, deploy your workers in order, and clean everything up when the branch is done."
   actions:
     - text: Get started
       link: /wrangler-deploy/getting-started/quick-start/
@@ -91,7 +91,7 @@ hero:
 <span class="section-label">The problem</span>
 <h2 class="section-title">Setting up a staging environment today</h2>
 <p class="section-desc">
-  You need a PR environment. Here's what that looks like with wrangler alone vs. wrangler-deploy.
+  Most Workers projects already have <code>wrangler.jsonc</code>. The problem starts when one worker turns into several workers, shared resources, and per-branch environments.
 </p>
 
 <div class="before-after-labels">
@@ -154,32 +154,32 @@ hero:
 ---
 
 <span class="section-label">What you get</span>
-<h2 class="section-title">Keeps your existing setup. Adds what's missing.</h2>
+<h2 class="section-title">A better deploy workflow without throwing away your Wrangler workflow.</h2>
 
 <div class="feature-rows">
   <div class="feature-cell">
-    <h3>Works with your wrangler.jsonc</h3>
-    <p>Point it at your existing config files. No rewriting, no data migration. <code>wrangler dev</code> still works. Already have Workers running? Run <code>wd introspect</code> to <a href="/wrangler-deploy/getting-started/migrating/">generate a config from your live account</a>.</p>
+    <h3>JSONC stays first-class</h3>
+    <p>Your existing <code>wrangler.jsonc</code> files stay in the repo and stay readable. No rewrite step, no migration away from Wrangler. <code>wd init</code> reads them, <code>wrangler dev</code> still uses them, and <code>wd deploy</code> uses rendered JSONC built for the target stage.</p>
+  </div>
+  <div class="feature-cell">
+    <h3>One tool for dev and deploy</h3>
+    <p>Keep using Wrangler locally, or run <code>wd dev</code> to start every worker together with sane ports and dependency order. Then use the same project definition to apply, deploy, verify, and destroy full stages.</p>
   </div>
   <div class="feature-cell">
     <h3>Types without codegen</h3>
-    <p>Import your Env type directly from the config file. D1Database, KVNamespace, Queue types resolve at compile time. No generated files to commit.</p>
+    <p>Import your Env type directly from the config file. <code>D1Database</code>, <code>KVNamespace</code>, <code>Queue</code>, and service binding types resolve at compile time. No generated files to commit.</p>
   </div>
   <div class="feature-cell">
     <h3>Shared state across the team</h3>
-    <p>Store state in a Cloudflare KV namespace. One person creates the stage, another deploys to it, CI tears it down. Everyone sees the same thing.</p>
+    <p>Store state in a Cloudflare KV namespace and stop relying on one laptop having the latest stage metadata. One person can apply, another can deploy, CI can verify or destroy, and everyone sees the same state.</p>
   </div>
   <div class="feature-cell">
-    <h3>Production stages are protected</h3>
-    <p><code>wd destroy --stage production</code> won't work without <code>--force</code>. PR stages get a TTL and auto-expire. Queue consumers are removed before workers, in the right order.</p>
+    <h3>Safer staged deploys</h3>
+    <p>Protected stages refuse destroy without <code>--force</code>. Service bindings decide deploy order. Queue consumers are removed before workers on teardown. Missing secrets block deploy before you get half a release.</p>
   </div>
   <div class="feature-cell">
-    <h3>Drift detection</h3>
-    <p>Someone deleted a KV namespace from the dashboard? <code>wd status</code> tells you what changed. Compares local state against live resources.</p>
-  </div>
-  <div class="feature-cell">
-    <h3>Secrets that block deploys</h3>
-    <p>Declare which secrets each worker needs. If any are missing, deploy stops. Sync them from <code>.dev.vars</code> or set them interactively. They never touch state files.</p>
+    <h3>More visibility, less guessing</h3>
+    <p><code>wd plan</code> shows what a stage will create. <code>wd status</code> shows what drifted. <code>wd verify</code> checks rendered config, workers, bindings, and secrets after deploy. It is much easier to explain what the tool is doing because it tells you.</p>
   </div>
 </div>
 
@@ -187,13 +187,13 @@ hero:
 
 <div class="cta-section">
   <span class="section-label">Get started</span>
-  <h2 class="section-title">Three commands to a staging environment.</h2>
+  <h2 class="section-title">Start from the Wrangler project you already have.</h2>
   <div class="install-cmd">
     <span class="dollar">$</span> npm install -D wrangler-deploy
   </div>
   <p class="section-desc" style="margin-inline: auto; text-align: center;">
-    <strong>New project?</strong> Run <code>wd init</code> to scan your wrangler configs.<br/>
-    <strong>Existing Workers?</strong> Run <code>wd introspect</code> to pull config from your live Cloudflare account.<br/>
-    Then <code>wd apply --stage staging</code> to create everything.
+    <strong>Repo already has <code>wrangler.jsonc</code>?</strong> Run <code>wd init</code> to generate project config from local files.<br/>
+    <strong>Already deployed in Cloudflare?</strong> Run <code>wd introspect</code> to generate config from the live account.<br/>
+    Then run <code>wd apply --stage staging</code> and <code>wd deploy --stage staging</code>. Local dev stays on Wrangler. Stage deploys get rendered JSONC with the right IDs.
   </p>
 </div>
