@@ -1,0 +1,100 @@
+---
+title: Config File
+description: wrangler-deploy.config.ts reference
+---
+
+## Location
+
+`wrangler-deploy.config.ts` at the project root (next to `wrangler.jsonc`).
+
+## Schema
+
+```ts
+import { defineConfig } from "wrangler-deploy";
+
+export default defineConfig({
+  version: 1, // required, must be 1
+  workers: ["apps/api", "apps/worker"], // worker directories ("." for root)
+  deployOrder: ["apps/worker", "apps/api"], // optional, inferred from serviceBindings
+  resources: {
+    /* ... */
+  }, // KV, Queue, D1, Hyperdrive, R2
+  serviceBindings: {
+    /* ... */
+  }, // cross-worker bindings
+  stages: {
+    /* ... */
+  }, // protection and TTL rules
+  secrets: {
+    /* ... */
+  }, // declared secret names per worker
+  routes: {
+    /* ... */
+  }, // stage-aware URL patterns
+  verify: {
+    /* ... */
+  }, // post-deploy health checks
+  state: {
+    /* ... */
+  }, // remote state backend (KV)
+});
+```
+
+## Resource types
+
+| Type         | Key          | Provisioned via                |
+| ------------ | ------------ | ------------------------------ |
+| D1 Database  | `d1`         | `wrangler d1 create`           |
+| KV Namespace | `kv`         | `wrangler kv namespace create` |
+| Queue        | `queue`      | `wrangler queues create`       |
+| Hyperdrive   | `hyperdrive` | `wrangler hyperdrive create`   |
+| R2 Bucket    | `r2`         | `wrangler r2 bucket create`    |
+
+## State backend
+
+```ts
+// Local (default, omit or set explicitly)
+state: { backend: "local" }
+
+// Remote KV (shared across team and CI)
+state: {
+  backend: "kv",
+  namespaceId: "your-kv-namespace-id",
+  keyPrefix: "wrangler-deploy/",        // optional, default shown
+}
+```
+
+See [Remote State](/wrangler-deploy/features/remote-state/) for setup and migration.
+
+## Deploy order
+
+`deployOrder` is optional. When omitted, it's inferred from `serviceBindings`. Workers that are depended on deploy first. The graph is validated:
+
+- Cycles are rejected with a full cycle path
+- Unknown targets are rejected
+- Explicit `deployOrder` is validated against service binding dependencies
+
+## Stage rules
+
+```ts
+stages: {
+  production: { protected: true },
+  staging: { protected: true },
+  "pr-*": { protected: false, ttl: "7d" },
+}
+```
+
+- Protected stages require `--force` to destroy
+- Unmatched stages default to protected (safe default)
+- TTL is enforced by `wd gc`
+
+## Secrets
+
+```ts
+secrets: {
+  "apps/api": ["AUTH_SECRET", "API_KEY"],
+  "apps/worker": ["API_KEY"],
+}
+```
+
+Declared by name only. Values never stored. Deploy blocks if any are missing.

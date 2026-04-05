@@ -1,0 +1,74 @@
+---
+title: CLI Commands
+description: Full CLI reference
+---
+
+Both `wrangler-deploy` and the short alias `wd` are available after install.
+
+## `wd init`
+
+Scan local wrangler configs and generate `wrangler-deploy.config.ts` from what it finds in your filesystem.
+
+## `wd introspect [--filter <prefix>] [--dry-run]`
+
+Scan your live Cloudflare account and generate `wrangler-deploy.config.ts` from existing resources. Lists all D1 databases, KV namespaces, Queues, R2 buckets, Hyperdrive configs, and Vectorize indexes in your account.
+
+If `CLOUDFLARE_API_TOKEN` is set, it also discovers Workers and their bindings, wiring up which worker uses which resource automatically. Without the token, it uses `wrangler login` credentials to list resources (but cannot fetch worker bindings).
+
+`--filter <prefix>` limits results to resources and workers whose names start with the given prefix. Useful for large accounts with many unrelated resources.
+
+`--dry-run` prints the generated config to stdout without writing the file.
+
+```bash
+# Using wrangler login (no token needed)
+wd introspect
+
+# With full worker binding discovery
+CLOUDFLARE_API_TOKEN=your-token wd introspect
+
+# Preview without writing
+wd introspect --dry-run
+
+# Only resources starting with "payments-"
+wd introspect --filter payments-
+```
+
+## `wd plan --stage <name>`
+
+Dry-run. Shows what resources would be created, are in sync, drifted, or orphaned.
+
+## `wd apply --stage <name> [--database-url <url>]`
+
+Provision resources. `--database-url` required for Hyperdrive on first apply. Idempotent and resumable.
+
+## `wd deploy --stage <name> [--verify]`
+
+Deploy workers using rendered configs. `--verify` runs post-deploy coherence checks. Blocks if secrets are missing.
+
+## `wd destroy --stage <name> [--force]`
+
+Tear down all resources. Requires `--force` for protected stages. Removes queue consumers before workers.
+
+## `wd status [--stage <name>]`
+
+Without stage: list all known stages. With stage: show resources, workers, drift.
+
+## `wd verify --stage <name>`
+
+Read-only coherence check. Validates state, rendered configs, resources, workers, secrets, service bindings.
+
+## `wd secrets --stage <name>`
+
+Check which declared secrets are set or missing.
+
+## `wd secrets set --stage <name>`
+
+Set missing secrets interactively.
+
+## `wd secrets sync --to <name> --from-env-file <path>`
+
+Bulk set secrets from a `.dev.vars`-style file.
+
+## `wd gc`
+
+Destroy stages past their TTL. Only affects unprotected stages.

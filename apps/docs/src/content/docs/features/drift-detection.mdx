@@ -1,0 +1,15 @@
+---
+title: Drift Detection
+description: Detect changes made outside wrangler-deploy
+---
+
+## How it works
+
+`wd status --stage staging` compares state to live Cloudflare resources:
+
+| State says      | Live API says  | Status   |
+| --------------- | -------------- | -------- |
+| Resource exists | Exists         | in-sync  |
+| Resource exists | Deleted        | orphaned |
+| Resource exists | Config changed | drifted  |
+| Not in state    | Should exist   | missing  |

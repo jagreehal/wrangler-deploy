@@ -1,0 +1,71 @@
+---
+title: Vectorize
+description: Provision Vectorize vector databases for AI-powered search
+---
+
+import { LinkButton } from "@astrojs/starlight/components";
+
+Vectorize is Cloudflare's vector database. wrangler-deploy creates and manages Vectorize indexes per stage alongside your Workers.
+
+## Config
+
+```ts
+// wrangler-deploy.config.ts
+export default defineConfig({
+  version: 1,
+  workers: ["apps/api"],
+  resources: {
+    embeddings: {
+      type: "vectorize",
+      dimensions: 1536,
+      metric: "cosine",
+    },
+    "embeddings-large": {
+      type: "vectorize",
+      dimensions: 4096,
+      metric: "euclidean",
+      description: "High-dimension embeddings for semantic search",
+    },
+    // Or use a preset
+    "fast-embeddings": {
+      type: "vectorize",
+      preset: "fast-embeddings-default",
+    },
+  },
+});
+```
+
+## Options
+
+| Option        | Type                                       | Description                                      |
+| ------------- | ------------------------------------------ | ------------------------------------------------ |
+| `dimensions`  | `number`                                   | Vector dimensions (required without preset)      |
+| `metric`      | `"euclidean" \| "cosine" \| "dot-product"` | Similarity metric                                |
+| `preset`      | `string`                                   | Use a preset config instead of manual dimensions |
+| `description` | `string`                                   | Optional description                             |
+
+## CLI
+
+```bash
+# Apply creates the vectorize index
+wd apply --stage production
+
+# State shows the index ID
+wd status --stage production
+```
+
+## Usage in Workers
+
+Once provisioned, use the binding in your Worker:
+
+```ts
+export default {
+  async fetch(request, env) {
+    const vectors = await env.EMBEDDINGS.query(...)
+  }
+}
+```
+
+<LinkButton href="/wrangler-deploy/reference/config/" variant="secondary">
+  Config Reference
+</LinkButton>

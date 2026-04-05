@@ -1,0 +1,36 @@
+{
+  "name": "wrangler-deploy-monorepo",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.15.1",
+  "author": {
+    "name": "Jag Reehal",
+    "email": "jag@jagreehal.com",
+    "url": "https://github.com/jagreehal"
+  },
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "test": "turbo test",
+    "typecheck": "turbo typecheck",
+    "lint": "turbo lint",
+    "lint:fix": "turbo lint:fix",
+    "format": "turbo format",
+    "format:check": "turbo format:check",
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test",
+    "quality": "turbo run build --concurrency=1 && turbo run lint && turbo run typecheck && turbo run format:check && turbo run test",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "pnpm build && changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.30.0",
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.2.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.8.1",
+    "turbo": "^2.9.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.58.0"
+  }
+}

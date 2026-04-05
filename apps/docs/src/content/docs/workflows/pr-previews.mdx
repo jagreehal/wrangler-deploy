@@ -1,0 +1,50 @@
+---
+title: PR Preview Environments
+description: Ephemeral environments per pull request
+---
+
+## GitHub Action
+
+```yaml
+name: Preview
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm install
+      - name: Deploy
+        if: github.event.action != 'closed'
+        run: |
+          wd apply --stage pr-${{ github.event.pull_request.number }}
+          wd deploy --stage pr-${{ github.event.pull_request.number }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Destroy
+        if: github.event.action == 'closed'
+        run: wd destroy --stage pr-${{ github.event.pull_request.number }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+```
+
+## Cleanup
+
+Add a daily cron to catch orphaned stages:
+
+```yaml
+on:
+  schedule:
+    - cron: "0 3 * * *"
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm install && wd gc
+```

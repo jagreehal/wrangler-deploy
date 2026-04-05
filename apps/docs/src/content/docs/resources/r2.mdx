@@ -1,0 +1,42 @@
+---
+title: R2 Bucket
+description: Using R2 object storage with wrangler-deploy
+---
+
+## Config
+
+```ts
+import { defineConfig, r2, workerEnv } from "wrangler-deploy";
+
+const uploads = r2("user-uploads");
+
+export const api = workerEnv({
+  UPLOADS: uploads,
+});
+
+export default defineConfig({
+  version: 1,
+  workers: ["."],
+  resources: {
+    "user-uploads": {
+      type: "r2",
+      bindings: { ".": "UPLOADS" },
+    },
+  },
+});
+```
+
+## Worker code
+
+```ts
+import type { api } from "../wrangler-deploy.config.ts";
+type Env = typeof api.Env;
+// Env.UPLOADS is typed as R2Bucket
+
+export default {
+  async fetch(req: Request, env: Env) {
+    const object = await env.UPLOADS.get("file.txt");
+    return new Response(object?.body);
+  },
+};
+```

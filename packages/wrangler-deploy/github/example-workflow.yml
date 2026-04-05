@@ -1,0 +1,42 @@
+# .github/workflows/preview.yml
+# Copy this to your repo and update the paths.
+
+name: Preview Environment
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+  schedule:
+    - cron: "0 3 * * *"
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy preview
+        if: github.event.action != 'closed'
+        uses: wrangler-deploy/action@v1
+        with:
+          stage: pr-${{ github.event.pull_request.number }}
+          command: apply-and-deploy
+          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          database-url: ${{ secrets.STAGING_DATABASE_URL }}
+
+      - name: Destroy preview
+        if: github.event.action == 'closed'
+        uses: wrangler-deploy/action@v1
+        with:
+          stage: pr-${{ github.event.pull_request.number }}
+          command: destroy
+          cloudflare-api-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+  # Daily cleanup of expired stages
+  cleanup:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+      - run: npx wrangler-deploy gc
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

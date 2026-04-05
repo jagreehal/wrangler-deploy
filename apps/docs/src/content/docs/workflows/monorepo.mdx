@@ -1,0 +1,40 @@
+---
+title: Monorepo Setup
+description: Multiple workers in one repository
+---
+
+## Structure
+
+```
+apps/
+  api/wrangler.jsonc
+  worker/wrangler.jsonc
+  router/wrangler.jsonc
+wrangler-deploy.config.ts
+```
+
+## Config
+
+```ts
+import { defineConfig, d1, kv, queue, worker, workerEnv } from "wrangler-deploy";
+
+const db = d1("app-db");
+const cache = kv("cache");
+const events = queue("events");
+const backend = worker("backend");
+
+export const api = workerEnv({ DB: db, CACHE: cache, EVENTS: events, BACKEND: backend });
+export const backendEnv = workerEnv({ DB: db, EVENTS: events });
+export const router = workerEnv({ DB: db, EVENTS: events });
+
+export default defineConfig({
+  version: 1,
+  workers: ["apps/api", "apps/worker", "apps/router"],
+  resources: {
+    /* ... */
+  },
+  serviceBindings: { "apps/api": { BACKEND: "apps/worker" } },
+});
+```
+
+wrangler-deploy infers deploy order from service bindings.

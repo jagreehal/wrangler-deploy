@@ -1,0 +1,25 @@
+{
+  "name": "payment-event-router",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-03-18",
+  "compatibility_flags": ["nodejs_compat"],
+  "dev": { "port": 8788 },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "payments-db", "database_id": "placeholder" }
+  ],
+  "queues": {
+    "consumers": [
+      {
+        "queue": "payment-outbox",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "retry_delay": 10,
+        "dead_letter_queue": "payment-outbox-dlq"
+      }
+    ],
+    "producers": [
+      { "queue": "payment-outbox", "binding": "OUTBOX_QUEUE" }
+    ]
+  }
+}

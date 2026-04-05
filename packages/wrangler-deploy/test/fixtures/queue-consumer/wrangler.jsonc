@@ -1,0 +1,19 @@
+{
+  "name": "my-router",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-03-18",
+  "queues": {
+    "consumers": [
+      {
+        "queue": "events",
+        "max_batch_size": 10,
+        "max_retries": 3,
+        "retry_delay": 5,
+        "dead_letter_queue": "events-dlq"
+      }
+    ],
+    "producers": [
+      { "queue": "events", "binding": "EVENT_QUEUE" }
+    ]
+  }
+}

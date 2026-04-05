@@ -1,0 +1,199 @@
+---
+title: wrangler-deploy
+description: One command to spin up a full Cloudflare Workers environment per branch. Tear it down when you're done.
+template: splash
+hero:
+  tagline: "Your wrangler.jsonc already describes what you need. wrangler-deploy reads it, creates the D1 databases and KV namespaces and queues, deploys your workers, and cleans everything up when the PR closes."
+  actions:
+    - text: Get started
+      link: /wrangler-deploy/getting-started/quick-start/
+      icon: right-arrow
+      variant: primary
+    - text: Migrate existing project
+      link: /wrangler-deploy/getting-started/migrating/
+      icon: right-arrow
+      variant: minimal
+    - text: GitHub
+      link: https://github.com/jag-reehal/cf-stage
+      icon: external
+      variant: minimal
+---
+
+<div class="terminal-demo">
+  <div class="terminal-bar">
+    <span class="terminal-dot"></span>
+    <span class="terminal-dot"></span>
+    <span class="terminal-dot"></span>
+    <span class="terminal-title">~/my-project</span>
+  </div>
+  <div class="terminal-body">
+    <div>
+      <span class="prompt">$</span> <span class="cmd">wd</span>{" "}
+      <span class="flag">apply --stage pr-42</span>
+    </div>
+    <div class="output">
+      <span class="success">+</span> <span class="resource">payments-db-pr-42</span> (d1) created
+      <br />
+      <span class="success">+</span> <span class="resource">cache-kv-pr-42</span> (kv) created
+      <br />
+      <span class="success">+</span> <span class="resource">outbox-pr-42</span> (queue) created
+    </div>
+    <div style="margin-top: 0.75rem">
+      <span class="prompt">$</span> <span class="cmd">wd</span>{" "}
+      <span class="flag">deploy --stage pr-42 --verify</span>
+    </div>
+    <div class="output">
+      <span class="success">+</span> payment-api-pr-42 deployed
+      <br />
+      <span class="success">+</span> batch-workflow-pr-42 deployed
+      <br />
+      <span class="success">+</span> event-router-pr-42 deployed
+      <br />
+      Verification: <span class="success">8 passed</span>, 0 failed
+    </div>
+    <div style="margin-top: 0.75rem">
+      <span class="comment"># PR merged, clean up</span>
+    </div>
+    <div>
+      <span class="prompt">$</span> <span class="cmd">wd</span>{" "}
+      <span class="flag">destroy --stage pr-42</span>
+    </div>
+    <div class="output">Stage "pr-42" destroyed.</div>
+  </div>
+</div>
+
+<div class="resource-strip">
+  <a class="resource-pill" href="/wrangler-deploy/getting-started/introduction/">
+    <span class="dot"></span> Workers
+  </a>
+  <a class="resource-pill" href="/wrangler-deploy/resources/d1/">
+    <span class="dot"></span> D1
+  </a>
+  <a class="resource-pill" href="/wrangler-deploy/resources/kv/">
+    <span class="dot"></span> KV
+  </a>
+  <a class="resource-pill" href="/wrangler-deploy/resources/queue/">
+    <span class="dot"></span> Queues
+  </a>
+  <a class="resource-pill" href="/wrangler-deploy/resources/hyperdrive/">
+    <span class="dot"></span> Hyperdrive
+  </a>
+  <a class="resource-pill" href="/wrangler-deploy/resources/r2/">
+    <span class="dot"></span> R2
+  </a>
+  <a class="resource-pill" href="/wrangler-deploy/resources/vectorize/">
+    <span class="dot"></span> Vectorize
+  </a>
+</div>
+
+---
+
+<span class="section-label">The problem</span>
+<h2 class="section-title">Setting up a staging environment today</h2>
+<p class="section-desc">
+  You need a PR environment. Here's what that looks like with wrangler alone vs. wrangler-deploy.
+</p>
+
+<div class="before-after-labels">
+  <span class="before-after-label before-label">Without wrangler-deploy</span>
+  <span class="before-after-label after-label">With wrangler-deploy</span>
+</div>
+<div class="before-after">
+  <div class="terminal-demo terminal-sm">
+    <div class="terminal-bar">
+      <span class="terminal-dot"></span>
+      <span class="terminal-dot"></span>
+      <span class="terminal-dot"></span>
+    </div>
+    <div class="terminal-body">
+      <div><span class="prompt">$</span> <span class="cmd">wrangler</span> <span class="flag">d1 create payments-db-pr-42</span></div>
+      <div class="output"><span class="text-dim">database_id = "8a7b..."</span></div>
+      <div><span class="prompt">$</span> <span class="cmd">wrangler</span> <span class="flag">kv namespace create cache-kv-pr-42</span></div>
+      <div class="output"><span class="text-dim">namespace_id = "3f2c..."</span></div>
+      <div><span class="prompt">$</span> <span class="cmd">wrangler</span> <span class="flag">queues create outbox-pr-42</span></div>
+      <div class="output"><span class="text-dim">queue_id = "e91d..."</span></div>
+      <div style="margin-top: 0.5rem"><span class="comment"># now paste each ID into wrangler.jsonc...</span></div>
+      <div><span class="comment"># then deploy workers one by one...</span></div>
+      <div><span class="prompt">$</span> <span class="cmd">wrangler</span> <span class="flag">deploy --config workers/api/wrangler.jsonc</span></div>
+      <div><span class="prompt">$</span> <span class="cmd">wrangler</span> <span class="flag">deploy --config workers/batch/wrangler.jsonc</span></div>
+      <div><span class="prompt">$</span> <span class="cmd">wrangler</span> <span class="flag">deploy --config workers/router/wrangler.jsonc</span></div>
+      <div style="margin-top: 0.5rem"><span class="comment"># PR merged — now tear it all down manually</span></div>
+      <div><span class="prompt">$</span> <span class="cmd">wrangler</span> <span class="flag">d1 delete payments-db-pr-42</span></div>
+      <div><span class="prompt">$</span> <span class="cmd">wrangler</span> <span class="flag">kv namespace delete --namespace-id 3f2c...</span></div>
+      <div><span class="prompt">$</span> <span class="cmd">wrangler</span> <span class="flag">queues delete outbox-pr-42</span></div>
+      <div><span class="prompt">$</span> <span class="cmd">wrangler</span> <span class="flag">delete --config workers/api/wrangler.jsonc</span></div>
+      <div><span class="comment"># ...and the other two workers</span></div>
+    </div>
+  </div>
+  <div class="terminal-demo terminal-sm">
+    <div class="terminal-bar">
+      <span class="terminal-dot"></span>
+      <span class="terminal-dot"></span>
+      <span class="terminal-dot"></span>
+    </div>
+    <div class="terminal-body">
+      <div><span class="prompt">$</span> <span class="cmd">wd</span> <span class="flag">apply --stage pr-42</span></div>
+      <div class="output">
+        <span class="success">+</span> <span class="resource">payments-db-pr-42</span> (d1) created<br/>
+        <span class="success">+</span> <span class="resource">cache-kv-pr-42</span> (kv) created<br/>
+        <span class="success">+</span> <span class="resource">outbox-pr-42</span> (queue) created
+      </div>
+      <div style="margin-top: 0.5rem"><span class="prompt">$</span> <span class="cmd">wd</span> <span class="flag">deploy --stage pr-42</span></div>
+      <div class="output">
+        <span class="success">+</span> payment-api-pr-42 deployed<br/>
+        <span class="success">+</span> batch-workflow-pr-42 deployed<br/>
+        <span class="success">+</span> event-router-pr-42 deployed
+      </div>
+      <div style="margin-top: 0.5rem"><span class="comment"># PR merged</span></div>
+      <div><span class="prompt">$</span> <span class="cmd">wd</span> <span class="flag">destroy --stage pr-42</span></div>
+      <div class="output">Stage "pr-42" destroyed.</div>
+    </div>
+  </div>
+</div>
+
+---
+
+<span class="section-label">What you get</span>
+<h2 class="section-title">Keeps your existing setup. Adds what's missing.</h2>
+
+<div class="feature-rows">
+  <div class="feature-cell">
+    <h3>Works with your wrangler.jsonc</h3>
+    <p>Point it at your existing config files. No rewriting, no data migration. <code>wrangler dev</code> still works. Already have Workers running? Run <code>wd introspect</code> to <a href="/wrangler-deploy/getting-started/migrating/">generate a config from your live account</a>.</p>
+  </div>
+  <div class="feature-cell">
+    <h3>Types without codegen</h3>
+    <p>Import your Env type directly from the config file. D1Database, KVNamespace, Queue types resolve at compile time. No generated files to commit.</p>
+  </div>
+  <div class="feature-cell">
+    <h3>Shared state across the team</h3>
+    <p>Store state in a Cloudflare KV namespace. One person creates the stage, another deploys to it, CI tears it down. Everyone sees the same thing.</p>
+  </div>
+  <div class="feature-cell">
+    <h3>Production stages are protected</h3>
+    <p><code>wd destroy --stage production</code> won't work without <code>--force</code>. PR stages get a TTL and auto-expire. Queue consumers are removed before workers, in the right order.</p>
+  </div>
+  <div class="feature-cell">
+    <h3>Drift detection</h3>
+    <p>Someone deleted a KV namespace from the dashboard? <code>wd status</code> tells you what changed. Compares local state against live resources.</p>
+  </div>
+  <div class="feature-cell">
+    <h3>Secrets that block deploys</h3>
+    <p>Declare which secrets each worker needs. If any are missing, deploy stops. Sync them from <code>.dev.vars</code> or set them interactively. They never touch state files.</p>
+  </div>
+</div>
+
+---
+
+<div class="cta-section">
+  <span class="section-label">Get started</span>
+  <h2 class="section-title">Three commands to a staging environment.</h2>
+  <div class="install-cmd">
+    <span class="dollar">$</span> npm install -D wrangler-deploy
+  </div>
+  <p class="section-desc" style="margin-inline: auto; text-align: center;">
+    <strong>New project?</strong> Run <code>wd init</code> to scan your wrangler configs.<br/>
+    <strong>Existing Workers?</strong> Run <code>wd introspect</code> to pull config from your live Cloudflare account.<br/>
+    Then <code>wd apply --stage staging</code> to create everything.
+  </p>
+</div>

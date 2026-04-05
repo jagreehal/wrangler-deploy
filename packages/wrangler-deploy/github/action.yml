@@ -1,0 +1,111 @@
+name: "wrangler-deploy"
+description: "Provision and deploy Cloudflare Workers environments with cf-stage"
+author: "wrangler-deploy"
+
+inputs:
+  stage:
+    description: "Stage name (e.g., pr-123, staging)"
+    required: true
+  command:
+    description: "Command to run: apply-and-deploy, destroy"
+    required: true
+    default: "apply-and-deploy"
+  cloudflare-api-token:
+    description: "Cloudflare API token"
+    required: true
+  cloudflare-account-id:
+    description: "Cloudflare account ID (optional — auto-detected from token)"
+    required: false
+  database-url:
+    description: "PostgreSQL connection string for Hyperdrive"
+    required: false
+  working-directory:
+    description: "Directory containing wrangler-deploy.config.ts"
+    required: false
+    default: "."
+
+outputs:
+  urls:
+    description: "JSON object of deployed worker URLs"
+    value: ${{ steps.deploy.outputs.urls }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: "22"
+
+    - name: Install dependencies
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: npm install
+
+    - name: Apply and Deploy
+      if: inputs.command == 'apply-and-deploy'
+      id: deploy
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare-api-token }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare-account-id }}
+      run: |
+        npx wrangler-deploy apply --stage ${{ inputs.stage }} ${{ inputs.database-url && format('--database-url "{0}"', inputs.database-url) || '' }}
+        npx wrangler-deploy deploy --stage ${{ inputs.stage }}
+        node <<'EOF' >> "$GITHUB_OUTPUT"
+        const fs = require("node:fs");
+        const path = require("node:path");
+        const statePath = path.resolve("${{ inputs.working-directory }}", ".cf-stage", "${{ inputs.stage }}", "state.json");
+        let urls = {};
+        if (fs.existsSync(statePath)) {
+          const state = JSON.parse(fs.readFileSync(statePath, "utf-8"));
+          urls = Object.fromEntries(
+            Object.entries(state.workers ?? {}).flatMap(([workerPath, worker]) =>
+              worker && worker.url ? [[workerPath, worker.url]] : []
+            )
+          );
+        }
+        console.log(`urls=${JSON.stringify(urls)}`);
+        EOF
+
+    - name: Destroy
+      if: inputs.command == 'destroy'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare-api-token }}
+        CLOUDFLARE_ACCOUNT_ID: ${{ inputs.cloudflare-account-id }}
+      run: npx wrangler-deploy destroy --stage ${{ inputs.stage }}
+
+    - name: Comment PR with preview URLs
+      if: inputs.command == 'apply-and-deploy' && github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const stage = '${{ inputs.stage }}';
+          const body = `### Preview Environment: \`${stage}\`\n\nDeployed by wrangler-deploy. Resources will be cleaned up when this PR is closed.\n\nRun \`wrangler-deploy status --stage ${stage}\` to see details.`;
+
+          // Find existing comment
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+          const existing = comments.find(c => c.body.includes('Preview Environment:'));
+
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body,
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+          }

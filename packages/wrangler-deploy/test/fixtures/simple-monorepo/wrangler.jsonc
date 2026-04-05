@@ -1,0 +1,24 @@
+{
+  "name": "my-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-03-18",
+  "compatibility_flags": ["nodejs_compat"],
+  "kv_namespaces": [
+    { "binding": "CACHE", "id": "placeholder" }
+  ],
+  "queues": {
+    "producers": [
+      { "queue": "events", "binding": "EVENT_QUEUE" }
+    ]
+  },
+  "services": [
+    { "binding": "BACKEND", "service": "my-backend" }
+  ],
+  "hyperdrive": [
+    {
+      "binding": "DB",
+      "id": "placeholder-hd",
+      "localConnectionString": "postgresql://test:test@localhost:5433/mydb"
+    }
+  ]
+}

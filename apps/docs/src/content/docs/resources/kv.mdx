@@ -1,0 +1,66 @@
+---
+title: KV Namespace
+description: Using KV namespaces with wrangler-deploy
+---
+
+## Config
+
+```ts
+import { defineConfig, kv, workerEnv } from "wrangler-deploy";
+
+const cache = kv("app-cache");
+
+export const api = workerEnv({
+  CACHE: cache,
+});
+
+export default defineConfig({
+  version: 1,
+  workers: ["."],
+  resources: {
+    "app-cache": {
+      type: "kv",
+      bindings: { ".": "CACHE" },
+    },
+  },
+});
+```
+
+## Wrangler config
+
+```jsonc
+{
+  "kv_namespaces": [{ "binding": "CACHE", "id": "placeholder" }],
+}
+```
+
+## Worker code
+
+```ts
+import type { api } from "../wrangler-deploy.config.ts";
+type Env = typeof api.Env;
+// Env.CACHE is typed as KVNamespace
+
+export default {
+  async fetch(req: Request, env: Env) {
+    const value = await env.CACHE.get("key");
+    return new Response(value ?? "not found");
+  },
+};
+```
+
+## Multiple workers sharing a KV namespace
+
+```ts
+resources: {
+  "shared-cache": {
+    type: "kv",
+    bindings: {
+      "apps/api": "CACHE",
+      "apps/worker": "CACHE",
+    },
+  },
+}
+```
+
+Both workers bind to the same namespace per stage.

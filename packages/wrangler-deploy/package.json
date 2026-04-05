@@ -1,0 +1,56 @@
+{
+  "name": "wrangler-deploy",
+  "version": "1.0.0",
+  "description": "Create, deploy, and tear down full Cloudflare Workers environments per stage",
+  "type": "module",
+  "bin": {
+    "wrangler-deploy": "./dist/cli/index.js",
+    "wd": "./dist/cli/index.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "import": "./dist/config.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "dev": "tsc -p tsconfig.build.json --watch",
+    "prepublishOnly": "pnpm build"
+  },
+  "peerDependencies": {
+    "wrangler": ">=3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "executable-stories-vitest": "^8.1.4",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "github"
+  ],
+  "keywords": [
+    "cloudflare",
+    "workers",
+    "wrangler",
+    "staging",
+    "preview",
+    "environment",
+    "infrastructure",
+    "monorepo"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jag-reehal/cf-stage"
+  },
+  "license": "MIT"
+}

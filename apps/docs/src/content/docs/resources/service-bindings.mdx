@@ -1,0 +1,52 @@
+---
+title: Service Bindings
+description: Cross-worker communication with wrangler-deploy
+---
+
+Service bindings let one worker call another without HTTP overhead.
+
+## Config
+
+```ts
+import { defineConfig, worker, workerEnv } from "wrangler-deploy";
+
+const backend = worker("backend-worker");
+
+export const api = workerEnv({
+  BACKEND: backend,
+});
+
+export default defineConfig({
+  version: 1,
+  workers: ["apps/api", "apps/backend"],
+  resources: {},
+  serviceBindings: {
+    "apps/api": {
+      BACKEND: "apps/backend",
+    },
+  },
+});
+```
+
+## Worker code
+
+```ts
+import type { api } from "../../wrangler-deploy.config.ts";
+type Env = typeof api.Env;
+// Env.BACKEND is typed as Fetcher
+
+export default {
+  async fetch(req: Request, env: Env) {
+    const res = await env.BACKEND.fetch(new Request("https://internal/data"));
+    return res;
+  },
+};
+```
+
+## Deploy order
+
+wrangler-deploy infers deploy order from service bindings. The target worker deploys before the worker that depends on it. No manual `deployOrder` needed.
+
+## Stage suffixing
+
+Service binding targets are automatically stage-suffixed. If `apps/backend` has worker name `my-backend`, the staging rendered config will reference `my-backend-staging`.

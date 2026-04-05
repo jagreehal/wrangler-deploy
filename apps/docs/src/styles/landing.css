@@ -1,0 +1,599 @@
+/* Landing page overrides for Starlight splash template */
+
+/* ===== Custom Properties ===== */
+:root {
+  --ws-orange: #f6821f;
+  --ws-amber: #fbad41;
+  --ws-dark: #09090b;
+  --ws-darker: #050507;
+  --ws-surface: #111114;
+  --ws-surface-2: #19191e;
+  --ws-text: #e4e4e9;
+  --ws-text-muted: #7c7c8a;
+  --ws-border: #27272a;
+  --ws-green: #34d399;
+  --ws-blue: #60a5fa;
+  --ws-orange-faint: rgba(246, 130, 31, 0.06);
+  --ws-orange-glow: rgba(246, 130, 31, 0.12);
+}
+
+:root[data-theme="light"] {
+  --ws-orange: #c45500;
+  --ws-amber: #a86200;
+  --ws-dark: #fafafa;
+  --ws-darker: #f4f4f5;
+  --ws-surface: #ffffff;
+  --ws-surface-2: #f4f4f5;
+  --ws-text: #18181b;
+  --ws-text-muted: #52525b;
+  --ws-border: #e4e4e7;
+  --ws-green: #16a34a;
+  --ws-blue: #2563eb;
+  --ws-orange-faint: rgba(196, 85, 0, 0.04);
+  --ws-orange-glow: rgba(196, 85, 0, 0.08);
+}
+
+/* ===== Cloudflare Orange Accent for Starlight ===== */
+:root {
+  --sl-color-accent-low: #1c1000;
+  --sl-color-accent: #f6821f;
+  --sl-color-accent-high: #ffdcb8;
+  --sl-color-bg: var(--ws-dark);
+  --sl-color-bg-nav: var(--ws-darker);
+  --sl-color-bg-sidebar: var(--ws-darker);
+}
+
+:root[data-theme="light"] {
+  --sl-color-accent-low: #fff4e8;
+  --sl-color-accent: #c45500;
+  --sl-color-accent-high: #3d2200;
+}
+
+/* ===== Splash Hero — Left-aligned, asymmetric ===== */
+[data-page-type="splash"] .hero {
+  padding-block: 5rem 1rem;
+  text-align: left;
+  max-width: 72rem;
+  margin-inline: auto;
+}
+
+[data-page-type="splash"] .hero h1 {
+  font-size: clamp(2.4rem, 5vw, 3.6rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+  color: var(--ws-text);
+}
+
+[data-page-type="splash"] .hero .tagline {
+  font-size: clamp(1rem, 2vw, 1.15rem);
+  line-height: 1.7;
+  color: var(--ws-text-muted);
+  max-width: 48ch;
+  margin-top: 1rem;
+}
+
+/* Primary CTA — Cloudflare-orange fill */
+[data-page-type="splash"] .hero .action.primary a {
+  background: var(--ws-orange);
+  border-color: var(--ws-orange);
+  color: #fff;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+[data-page-type="splash"] .hero .action.primary a:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(246, 130, 31, 0.3);
+}
+
+[data-page-type="splash"] .hero .action.primary a:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* ===== Terminal Demo Block ===== */
+.terminal-demo {
+  background: var(--ws-darker);
+  border: 1px solid var(--ws-border);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-block: 3rem 1rem;
+  box-shadow:
+    0 0 0 1px var(--ws-orange-faint),
+    0 24px 48px -12px rgba(0, 0, 0, 0.4),
+    0 0 80px -20px var(--ws-orange-glow);
+  position: relative;
+}
+
+/* Subtle top-edge gradient line */
+.terminal-demo::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--ws-orange) 30%,
+    var(--ws-amber) 70%,
+    transparent
+  );
+  opacity: 0.5;
+  z-index: 1;
+}
+
+.terminal-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--ws-surface);
+  border-bottom: 1px solid var(--ws-border);
+}
+
+.terminal-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--ws-border);
+}
+
+.terminal-dot:nth-child(1) { background: #ff5f57; }
+.terminal-dot:nth-child(2) { background: #febc2e; }
+.terminal-dot:nth-child(3) { background: #28c840; }
+
+.terminal-title {
+  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.72rem;
+  color: var(--ws-text-muted);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.terminal-body {
+  padding: 1.5rem 1.75rem;
+  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.82rem;
+  line-height: 1.8;
+  overflow-x: auto;
+}
+
+.terminal-body .prompt {
+  color: var(--ws-green);
+  user-select: none;
+}
+
+.terminal-body .cmd {
+  color: var(--ws-text);
+  font-weight: 600;
+}
+
+.terminal-body .flag {
+  color: var(--ws-amber);
+}
+
+.terminal-body .comment {
+  color: var(--ws-text-muted);
+  font-style: italic;
+}
+
+.terminal-body .output {
+  color: var(--ws-text-muted);
+  padding-left: 1rem;
+  border-left: 2px solid var(--ws-border);
+  margin-block: 0.4rem;
+}
+
+.terminal-body .success {
+  color: var(--ws-green);
+}
+
+.terminal-body .resource {
+  color: var(--ws-blue);
+}
+
+/* ===== Resource Strip ===== */
+.resource-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-block: 2.5rem;
+}
+
+a.resource-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.85rem;
+  background: transparent;
+  border: 1px solid var(--ws-border);
+  border-radius: 100px;
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--ws-text-muted);
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+a.resource-pill:hover {
+  border-color: var(--ws-orange);
+  color: var(--ws-text);
+  background: var(--ws-orange-faint);
+  transform: translateY(-1px);
+  text-decoration: none;
+}
+
+a.resource-pill:focus-visible {
+  outline: 2px solid var(--ws-orange);
+  outline-offset: 2px;
+}
+
+.resource-pill .dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ws-orange);
+}
+
+/* ===== Section Headers ===== */
+.section-label {
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--ws-orange);
+  margin-bottom: 0.75rem;
+  display: block;
+}
+
+.section-title {
+  font-size: clamp(1.5rem, 3.5vw, 2.2rem);
+  font-weight: 800;
+  color: var(--ws-text);
+  margin: 0 0 0.75rem 0;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+}
+
+.section-desc {
+  color: var(--ws-text-muted);
+  font-size: 0.95rem;
+  max-width: 52ch;
+  line-height: 1.7;
+}
+
+/* ===== Feature Rows — 2-column grid with border lines ===== */
+.feature-rows {
+  margin-block: 3rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--ws-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.feature-cell {
+  padding: 2rem 2.25rem;
+  border-bottom: 1px solid var(--ws-border);
+  transition: background 0.2s ease;
+}
+
+/* Right-column cells get a left border */
+.feature-cell:nth-child(even) {
+  border-left: 1px solid var(--ws-border);
+}
+
+/* Remove bottom border from last row */
+.feature-cell:nth-last-child(1),
+.feature-cell:nth-last-child(2):nth-child(odd) {
+  border-bottom: none;
+}
+
+.feature-cell:hover {
+  background: var(--ws-surface-2);
+}
+
+.feature-cell h3 {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--ws-text);
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.01em;
+}
+
+.feature-cell p {
+  font-size: 0.8rem;
+  color: var(--ws-text-muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.feature-cell code {
+  font-size: 0.75rem;
+  background: var(--ws-orange-faint);
+  border: 1px solid var(--ws-border);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  color: var(--ws-orange);
+}
+
+/* Responsive: stack on mobile */
+@media (max-width: 640px) {
+  .feature-rows {
+    grid-template-columns: 1fr;
+  }
+  .feature-cell:nth-child(even) {
+    border-left: none;
+  }
+  .feature-cell {
+    border-bottom: 1px solid var(--ws-border);
+  }
+  .feature-cell:last-child {
+    border-bottom: none;
+  }
+}
+
+/* ===== Before / After comparison ===== */
+.before-after {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin-block: 0 2.5rem;
+  align-items: start;
+}
+
+/* Labels row — sits above both terminals, aligned as a pair */
+.before-after-labels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin-bottom: 0;
+}
+
+.before-after-label {
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 0.55rem 1rem;
+  border-radius: 12px 12px 0 0;
+  background: var(--ws-surface);
+  border: 1px solid var(--ws-border);
+  border-bottom: none;
+  margin-bottom: -1px;
+}
+
+.before-label {
+  color: var(--ws-text-muted);
+}
+
+.after-label {
+  color: var(--ws-green);
+}
+
+/* Terminals — each column is just a terminal, no wrapper needed */
+.before-after .terminal-demo {
+  margin-block: 0;
+  border-radius: 0 0 12px 12px;
+}
+
+/* Smaller terminal variant for before/after */
+.terminal-sm .terminal-body {
+  padding: 1rem 1.25rem;
+  font-size: 0.75rem;
+  line-height: 1.7;
+}
+
+.terminal-sm .terminal-bar {
+  padding: 8px 12px;
+}
+
+.terminal-sm .terminal-dot {
+  width: 10px;
+  height: 10px;
+}
+
+.terminal-body .text-dim {
+  color: var(--ws-text-muted);
+  opacity: 0.6;
+}
+
+/* "Before" terminal — muted, less prominent */
+.before-after .terminal-demo:first-child {
+  opacity: 0.85;
+  box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.3);
+}
+
+.before-after .terminal-demo:first-child::before {
+  display: none;
+}
+
+/* "After" terminal — orange glow */
+.before-after .terminal-demo:last-child {
+  box-shadow:
+    0 0 0 1px var(--ws-orange-faint),
+    0 16px 40px -8px rgba(0, 0, 0, 0.4),
+    0 0 60px -16px var(--ws-orange-glow);
+}
+
+@media (max-width: 768px) {
+  .before-after,
+  .before-after-labels {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===== The "how it works" flow ===== */
+.flow-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  margin-block: 3rem;
+  border: 1px solid var(--ws-border);
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+}
+
+.flow-step {
+  padding: 1.75rem 1.5rem;
+  border-right: 1px solid var(--ws-border);
+  position: relative;
+}
+
+.flow-step:last-child {
+  border-right: none;
+}
+
+.flow-step .step-num {
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--ws-orange);
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+  display: block;
+}
+
+.flow-step .step-cmd {
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ws-text);
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.flow-step p {
+  font-size: 0.78rem;
+  color: var(--ws-text-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .flow-strip {
+    grid-template-columns: 1fr;
+  }
+  .flow-step {
+    border-right: none;
+    border-bottom: 1px solid var(--ws-border);
+  }
+  .flow-step:last-child {
+    border-bottom: none;
+  }
+}
+
+/* ===== Comparison Table ===== */
+.comparison {
+  margin-block: 3rem;
+  overflow-x: auto;
+}
+
+.comparison table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.comparison th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  color: var(--ws-text);
+  border-bottom: 2px solid var(--ws-border);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.comparison td {
+  padding: 0.75rem 1rem;
+  color: var(--ws-text-muted);
+  border-bottom: 1px solid var(--ws-border);
+}
+
+.comparison tr:hover td {
+  color: var(--ws-text);
+  background: var(--ws-surface);
+}
+
+.comparison .check {
+  color: var(--ws-green);
+  font-weight: 700;
+}
+
+.comparison .cross {
+  color: var(--ws-text-muted);
+  opacity: 0.4;
+}
+
+/* ===== CTA Section ===== */
+.cta-section {
+  text-align: center;
+  padding-block: 5rem 4rem;
+  margin-block: 2rem;
+  border-top: 1px solid var(--ws-border);
+  position: relative;
+}
+
+/* Radial glow behind CTA */
+.cta-section::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 400px;
+  height: 200px;
+  background: radial-gradient(ellipse, var(--ws-orange-glow) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.cta-section .install-cmd {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--ws-surface);
+  border: 1px solid var(--ws-border);
+  border-radius: 8px;
+  padding: 0.85rem 1.75rem;
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-size: 0.88rem;
+  color: var(--ws-text);
+  margin-block: 1.5rem;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  position: relative;
+}
+
+.cta-section .install-cmd:hover {
+  border-color: var(--ws-orange);
+  box-shadow: 0 0 24px -8px var(--ws-orange-glow);
+}
+
+.cta-section .install-cmd .dollar {
+  color: var(--ws-green);
+  user-select: none;
+}
+
+/* ===== Override Starlight defaults on splash ===== */
+[data-page-type="splash"] .sl-markdown-content > :not(.not-content) {
+  max-width: 72rem;
+  margin-inline: auto;
+}
+
+[data-page-type="splash"] .card-grid {
+  display: none;
+}
+
+/* ===== Horizontal rule as section divider ===== */
+[data-page-type="splash"] .sl-markdown-content hr {
+  border: none;
+  border-top: 1px solid var(--ws-border);
+  margin-block: 3rem 3.5rem;
+}

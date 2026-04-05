@@ -1,0 +1,18 @@
+{
+  "name": "payment-batch-workflow",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-03-18",
+  "compatibility_flags": ["nodejs_compat"],
+  "dev": { "port": 8789 },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "payments-db", "database_id": "placeholder" }
+  ],
+  "kv_namespaces": [
+    { "binding": "CACHE_KV", "id": "placeholder" }
+  ],
+  "queues": {
+    "producers": [
+      { "queue": "payment-outbox", "binding": "OUTBOX_QUEUE" }
+    ]
+  }
+}

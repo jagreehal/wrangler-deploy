@@ -1,0 +1,21 @@
+{
+  "name": "payment-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-03-18",
+  "compatibility_flags": ["nodejs_compat"],
+  "dev": { "port": 8787 },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "payments-db", "database_id": "placeholder" }
+  ],
+  "kv_namespaces": [
+    { "binding": "TOKEN_KV", "id": "placeholder" }
+  ],
+  "queues": {
+    "producers": [
+      { "queue": "payment-outbox", "binding": "OUTBOX_QUEUE" }
+    ]
+  },
+  "services": [
+    { "binding": "WORKFLOWS", "service": "payment-batch-workflow" }
+  ]
+}

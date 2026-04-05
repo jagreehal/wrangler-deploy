@@ -1,0 +1,72 @@
+---
+title: Quick Start
+sidebar:
+  order: 2
+description: Get wrangler-deploy running in 2 minutes
+---
+
+## Install
+
+```bash
+npm install -D wrangler-deploy
+# or
+pnpm add -D wrangler-deploy
+```
+
+## Initialize
+
+In any project with a `wrangler.jsonc`:
+
+```bash
+wd init
+```
+
+This scans your wrangler configs and generates a `wrangler-deploy.config.ts` with your resources and bindings.
+
+## Plan
+
+See what would be created:
+
+```bash
+wd plan --stage staging
+```
+
+```
++ payments-db-staging (d1) create
++ cache-kv-staging (kv) create
++ outbox-staging (queue) create
+
+3 to create, 0 in sync
+```
+
+## Apply
+
+Provision the resources:
+
+```bash
+wd apply --stage staging
+```
+
+## Deploy
+
+Deploy workers with the provisioned IDs:
+
+```bash
+wd deploy --stage staging
+```
+
+## Destroy
+
+Tear everything down:
+
+```bash
+wd destroy --stage staging --force
+```
+
+## Local dev
+
+`wrangler dev` still works as before. No wrangler-deploy needed for local development:
+
+```bash
+wrangler dev
+```

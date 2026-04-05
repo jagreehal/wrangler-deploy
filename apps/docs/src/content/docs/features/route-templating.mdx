@@ -1,0 +1,20 @@
+---
+title: Route Templating
+description: Stage-aware URL patterns
+---
+
+## Config
+
+```ts
+export default defineConfig({
+  routes: {
+    "apps/api": {
+      pattern: "api-{stage}.example.com/*",
+      zone: "example.com",
+    },
+  },
+});
+```
+
+Rendered for staging: `api-staging.example.com/*`
+Rendered for pr-123: `api-pr-123.example.com/*`

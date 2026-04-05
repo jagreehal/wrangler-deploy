@@ -1,0 +1,152 @@
+---
+title: Migrating an existing project
+sidebar:
+  order: 4
+description: Add wrangler-deploy to a project that already has Workers, D1 databases, and KV namespaces running in production
+---
+
+You already have Workers deployed. You have D1 databases with data in them, KV namespaces your workers read from, maybe a queue or two. You are not starting from scratch.
+
+wrangler-deploy does not ask you to recreate any of that. It adopts what exists.
+
+## What "migration" actually means
+
+There is no data migration. Your existing resources stay where they are. You are adding a config file and a CLI on top of what you already have. Your `wrangler.jsonc` files do not change. `wrangler dev` keeps working.
+
+The goal: after setup, you can run `wd apply --stage pr-123` to spin up a copy of your entire stack for a PR, and `wd destroy --stage pr-123` to tear it down. Your production resources are untouched.
+
+## Step 1: Install and generate config
+
+```bash
+npm install -D wrangler-deploy
+```
+
+You have two ways to generate the config:
+
+**Option A: From local files** -- if you have wrangler.jsonc files in your repo:
+
+```bash
+wd init
+```
+
+This scans your wrangler configs and generates `wrangler-deploy.config.ts` from what it finds locally. If you have resources that are not referenced in any wrangler config (an old KV namespace, a database used by a cron), add them manually.
+
+**Option B: From your live account** -- if you want to pull in everything that exists on Cloudflare:
+
+```bash
+wd introspect
+```
+
+This hits the Cloudflare API, finds all your D1 databases, KV namespaces, Queues, R2 buckets, and more, then generates the config from what is actually deployed. If you set `CLOUDFLARE_API_TOKEN`, it also discovers your Workers and wires up their bindings automatically.
+
+For large accounts with many projects, use `--filter` to scope it:
+
+```bash
+wd introspect --filter payments-
+```
+
+## Step 2: Review the generated config
+
+The config describes your resources and which workers use them. It does not contain any resource IDs from your existing environment. That is intentional — IDs are per-stage and tracked in state.
+
+```ts
+import { defineConfig, d1, kv, queue } from "wrangler-deploy";
+
+export default defineConfig({
+  version: 1,
+  workers: {
+    api: { wranglerConfig: "./workers/api/wrangler.jsonc" },
+    batch: { wranglerConfig: "./workers/batch/wrangler.jsonc" },
+  },
+  resources: {
+    paymentsDb: d1("payments-db"),
+    cacheKv: kv("cache-kv"),
+    outbox: queue("outbox"),
+  },
+});
+```
+
+## Step 3: Protect production
+
+Before doing anything else, add stage protection so `wd destroy --stage production` refuses to run:
+
+```ts
+export default defineConfig({
+  // ...
+  stages: {
+    rules: [
+      { pattern: "production", protected: true },
+      { pattern: "staging", protected: true },
+      { pattern: "pr-*", ttl: "7d" },
+    ],
+  },
+});
+```
+
+## Step 4: Try it on a new stage
+
+Do not run `wd apply` against production. There is no reason to. Your production resources already exist and are managed by your current workflow.
+
+Instead, create a new stage:
+
+```bash
+wd plan --stage test-migration
+```
+
+This shows what would be created — new D1 databases, KV namespaces, and queues, all suffixed with `test-migration`. Nothing is shared with production.
+
+If the plan looks right:
+
+```bash
+wd apply --stage test-migration
+wd deploy --stage test-migration
+```
+
+You now have a full copy of your stack running alongside production. Test it. When you are done:
+
+```bash
+wd destroy --stage test-migration
+```
+
+## Step 5: Wire up CI
+
+Once you trust the workflow, add it to your CI pipeline. A typical GitHub Actions setup:
+
+```yaml
+- name: Apply stage
+  run: wd apply --stage pr-${{ github.event.pull_request.number }}
+
+- name: Deploy
+  run: wd deploy --stage pr-${{ github.event.pull_request.number }}
+```
+
+And on PR close:
+
+```yaml
+- name: Cleanup
+  run: wd destroy --stage pr-${{ github.event.pull_request.number }}
+```
+
+See the [PR preview environments](/wrangler-deploy/workflows/pr-previews/) guide for a complete workflow file.
+
+## What about production deploys?
+
+You have two options:
+
+**Keep your current production deploy as-is.** wrangler-deploy is additive. If your CI already runs `wrangler deploy` for production, that still works. Use wrangler-deploy only for ephemeral stages (PRs, staging, QA).
+
+**Use wrangler-deploy for production too.** Run `wd apply --stage production` once to have it adopt your existing resources into its state. It will detect that the D1 database and KV namespace already exist and record their IDs without recreating them. From then on, `wd deploy --stage production` handles the full deploy.
+
+## Common questions
+
+**Will it delete my production database?**
+No. `wd apply` on a new stage creates new resources. It does not touch existing ones. And if you set `protected: true` on your production stage, `wd destroy` will refuse to run without `--force`.
+
+**What if my wrangler.jsonc has hardcoded IDs?**
+wrangler-deploy ignores hardcoded IDs in your wrangler configs. It manages IDs through its own state. Your wrangler.jsonc stays the same, and `wrangler dev` still uses those hardcoded IDs for local development.
+
+**Can I migrate one worker at a time?**
+Yes. Only include the workers you want to manage in `wrangler-deploy.config.ts`. Add more later. There is no all-or-nothing requirement.
+
+**What if I have D1 migrations to run?**
+wrangler-deploy creates the database but does not run migrations. After `wd apply`, run your migrations against the new database the same way you do today (`wrangler d1 migrations apply`). The database name is in the apply output.

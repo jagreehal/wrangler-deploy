@@ -1,0 +1,109 @@
+---
+title: Remote State
+description: Share state across team members and CI using Cloudflare KV
+---
+
+By default, wrangler-deploy stores state locally in `.wrangler-deploy/<stage>/state.json`. This works for solo developers but breaks when multiple people or CI pipelines manage the same stage.
+
+## The problem
+
+| Scenario                     | What happens with local state       |
+| ---------------------------- | ----------------------------------- |
+| Dev A applies, Dev B deploys | B has no state, deploy fails        |
+| Dev applies, CI deploys      | CI has no state                     |
+| Multiple devs on same stage  | Each has their own copy, they drift |
+
+## Remote KV state
+
+Store state in a shared Cloudflare KV namespace:
+
+```ts
+// wrangler-deploy.config.ts
+export default defineConfig({
+  version: 1,
+  state: {
+    backend: "kv",
+    namespaceId: "your-kv-namespace-id",
+  },
+  // ...
+});
+```
+
+### Setup
+
+1. Create a KV namespace for state:
+
+   ```bash
+   wrangler kv namespace create wrangler-deploy-state
+   ```
+
+2. Copy the namespace ID into your config.
+
+3. Every command now reads/writes state from KV, shared across all team members and CI.
+
+### How it works
+
+- `wd apply` reads state from KV, provisions resources, writes updated state back to KV
+- `wd deploy` reads state from KV before deploying
+- `wd destroy` reads state from KV, deletes resources, removes state from KV
+- `wd status` reads state from KV
+- `wd secrets` reads/writes state from KV
+- `wd gc` lists all stages from KV, checks TTLs
+
+All commands go through the `StateProvider` interface. Switching between local and KV is a config change, not a code change.
+
+### Authentication
+
+Remote state uses the same auth as all other wrangler-deploy operations:
+
+- **Local**: `wrangler login` (account ID auto-resolved from `wrangler whoami`)
+- **CI**: `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`
+
+### Key format
+
+State is stored in KV with keys like `wrangler-deploy/<stage-name>`. You can customise the prefix:
+
+```ts
+state: {
+  backend: "kv",
+  namespaceId: "your-namespace-id",
+  keyPrefix: "my-project/",  // default: "wrangler-deploy/"
+}
+```
+
+## Local state (default)
+
+If you omit the `state` config or set `backend: "local"`, state is stored on disk:
+
+```
+.wrangler-deploy/
+  staging/
+    state.json
+  pr-123/
+    state.json
+```
+
+This is fine for:
+
+- Solo development
+- CI that runs apply + deploy in the same step
+- Ephemeral stages managed from a single machine
+
+## Migration
+
+To move from local to remote state:
+
+```ts
+import { LocalStateProvider, KvStateProvider } from "wrangler-deploy";
+
+const local = new LocalStateProvider(".");
+const kv = new KvStateProvider(".", "your-namespace-id");
+
+for (const stage of await local.list()) {
+  const state = await local.read(stage);
+  if (state) {
+    await kv.write(stage, state);
+    console.log(`Migrated ${stage}`);
+  }
+}
+```

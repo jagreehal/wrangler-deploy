@@ -1,0 +1,75 @@
+---
+title: Queue
+description: Using Cloudflare Queues with wrangler-deploy
+---
+
+## Config
+
+Queues have three binding types: producer, consumer, and dead-letter queue.
+
+```ts
+import { defineConfig, queue, workerEnv } from "wrangler-deploy";
+
+const taskQueue = queue<{ type: string; data: unknown }>("task-queue");
+const taskDlq = queue("task-dlq");
+
+export const producer = workerEnv({
+  TASKS: taskQueue,
+});
+
+export const consumer = workerEnv({
+  TASKS: taskQueue,
+});
+
+export default defineConfig({
+  version: 1,
+  workers: ["apps/producer", "apps/consumer"],
+  resources: {
+    "task-queue": {
+      type: "queue",
+      bindings: {
+        "apps/producer": { producer: "TASKS" },
+        "apps/consumer": { producer: "TASKS", consumer: true },
+      },
+    },
+    "task-dlq": {
+      type: "queue",
+      bindings: {
+        "apps/consumer": { deadLetterFor: "task-queue" },
+      },
+    },
+  },
+});
+```
+
+## Wrangler config (consumer)
+
+Consumer settings stay in your wrangler.jsonc. wrangler-deploy only replaces the queue name:
+
+```jsonc
+{
+  "queues": {
+    "consumers": [
+      {
+        "queue": "task-queue",
+        "max_batch_size": 10,
+        "max_retries": 3,
+        "retry_delay": 10,
+        "dead_letter_queue": "task-dlq",
+      },
+    ],
+    "producers": [{ "queue": "task-queue", "binding": "TASKS" }],
+  },
+}
+```
+
+## Typed queue messages
+
+```ts
+const taskQueue = queue<{ userId: string; action: string }>("tasks");
+// Env.TASKS is typed as Queue<{ userId: string; action: string }>
+```
+
+## Destroy ordering
+
+wrangler-deploy removes queue consumers before deleting workers, then deletes queues. Cloudflare's API requires this order.

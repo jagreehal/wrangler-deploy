@@ -1,0 +1,22 @@
+---
+title: CI/CD
+description: Using wrangler-deploy in CI/CD pipelines
+---
+
+## Authentication
+
+Set these environment variables:
+
+```bash
+CLOUDFLARE_API_TOKEN=xxx    # required
+CLOUDFLARE_ACCOUNT_ID=xxx   # recommended (auto-detected if omitted)
+```
+
+## Pipeline
+
+```bash
+wd apply --stage staging
+wd deploy --stage staging --verify
+```
+
+`--verify` runs post-deploy coherence checks and fails the pipeline if anything is wrong.

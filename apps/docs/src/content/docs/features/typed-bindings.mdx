@@ -1,0 +1,54 @@
+---
+title: Typed Bindings
+description: Zero-codegen phantom Env types
+---
+
+Declare resources in config, get Worker Env types automatically. No codegen step, no generated files.
+
+## How it works
+
+```ts
+// wrangler-deploy.config.ts
+import { kv, queue, d1, worker, workerEnv } from "wrangler-deploy";
+
+export const api = workerEnv({
+  DB: d1("database"),
+  CACHE: kv("cache"),
+  QUEUE: queue<{ type: string }>("tasks"),
+  BACKEND: worker("backend"),
+});
+```
+
+```ts
+// src/index.ts
+import type { api } from "../wrangler-deploy.config.ts";
+type Env = typeof api.Env;
+```
+
+`Env` resolves to:
+
+```ts
+{
+  readonly DB: D1Database;
+  readonly CACHE: KVNamespace;
+  readonly QUEUE: Queue<{ type: string }>;
+  readonly BACKEND: Fetcher;
+}
+```
+
+## Type mapping
+
+| Resource   | Marker          | Runtime type  |
+| ---------- | --------------- | ------------- |
+| D1         | `d1()`          | `D1Database`  |
+| KV         | `kv()`          | `KVNamespace` |
+| Queue      | `queue<T>()`    | `Queue<T>`    |
+| Hyperdrive | `hyperdrive()`  | `Hyperdrive`  |
+| R2         | `r2()`          | `R2Bucket`    |
+| Worker     | `worker()`      | `Fetcher`     |
+| Workflow   | `workflow<P>()` | `Workflow<P>` |
+| Secret     | `secret()`      | `string`      |
+
+## No codegen
+
+The types are resolved at compile time through TypeScript's conditional type system. No build step, no generated files. Change a binding name in the config and TypeScript catches mismatches everywhere.

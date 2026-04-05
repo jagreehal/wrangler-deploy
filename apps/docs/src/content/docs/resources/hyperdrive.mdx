@@ -1,0 +1,83 @@
+---
+title: Hyperdrive
+description: Using Hyperdrive with wrangler-deploy for external databases
+---
+
+Hyperdrive provides connection pooling for external PostgreSQL and MySQL databases. Unlike D1, it requires a publicly reachable database.
+
+## Config
+
+```ts
+import { defineConfig, hyperdrive, workerEnv } from "wrangler-deploy";
+
+const db = hyperdrive("payments-db");
+
+export const api = workerEnv({
+  DB: db,
+});
+
+export default defineConfig({
+  version: 1,
+  workers: ["."],
+  resources: {
+    "payments-db": {
+      type: "hyperdrive",
+      bindings: { ".": "DB" },
+    },
+  },
+});
+```
+
+## Wrangler config
+
+```jsonc
+{
+  "hyperdrive": [
+    {
+      "binding": "DB",
+      "id": "placeholder",
+      "localConnectionString": "postgresql://user:pass@localhost:5432/mydb",
+    },
+  ],
+}
+```
+
+The `localConnectionString` is used by `wrangler dev` for local development. wrangler-deploy replaces the `id` with the real Hyperdrive config ID.
+
+## Apply
+
+Hyperdrive needs a connection string on first apply:
+
+```bash
+wd apply --stage staging --database-url "postgresql://user:pass@db.example.com:5432/mydb"
+```
+
+## Worker code
+
+```ts
+import type { api } from "../wrangler-deploy.config.ts";
+import pg from "pg";
+
+type Env = typeof api.Env;
+// Env.DB is typed as Hyperdrive
+
+export default {
+  async fetch(req: Request, env: Env) {
+    const client = new pg.Client(env.DB.connectionString);
+    await client.connect();
+    const { rows } = await client.query("SELECT * FROM users LIMIT 10");
+    await client.end();
+    return Response.json(rows);
+  },
+};
+```
+
+## When to use D1 vs Hyperdrive
+
+|                          | D1                        | Hyperdrive                          |
+| ------------------------ | ------------------------- | ----------------------------------- |
+| External database needed | No                        | Yes                                 |
+| Database provisioning    | Automatic                 | Manual                              |
+| Ephemeral environments   | Full isolation            | Shared database (or Neon branching) |
+| SQL dialect              | SQLite                    | PostgreSQL / MySQL                  |
+| Best for                 | New projects, simple data | Existing databases, complex queries |

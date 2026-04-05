@@ -1,0 +1,19 @@
+---
+title: Stage Protection
+description: Prevent accidental destruction of important environments
+---
+
+## Config
+
+```ts
+stages: {
+  production: { protected: true },
+  staging: { protected: true },
+  "pr-*": { protected: false, ttl: "7d" },
+}
+```
+
+- `wd destroy --stage production` → **refuses** unless `--force`
+- `wd destroy --stage pr-123` → succeeds (matches `pr-*`)
+- `wd gc` → only destroys unprotected stages past their TTL
+- Unmatched stages default to **protected** (safe default)

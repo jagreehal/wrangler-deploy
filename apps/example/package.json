@@ -1,0 +1,28 @@
+{
+  "name": "example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -n api,batch,events -c blue,magenta,cyan \"pnpm dev:api\" \"pnpm dev:batch\" \"pnpm dev:events\"",
+    "dev:api": "cd workers/api && wrangler dev --port 8787",
+    "dev:batch": "cd workers/batch-workflow && wrangler dev --port 8789",
+    "dev:events": "cd workers/event-router && wrangler dev --port 8788",
+    "stage:plan": "npx tsx ../../packages/wrangler-deploy/src/cli/index.ts plan",
+    "stage:apply": "npx tsx ../../packages/wrangler-deploy/src/cli/index.ts apply",
+    "stage:deploy": "npx tsx ../../packages/wrangler-deploy/src/cli/index.ts deploy",
+    "stage:destroy": "npx tsx ../../packages/wrangler-deploy/src/cli/index.ts destroy",
+    "stage:status": "npx tsx ../../packages/wrangler-deploy/src/cli/index.ts status",
+    "db:init": "wrangler d1 execute payments-db --local --file=sql/init.sql"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250805.0",
+    "@types/node": "^22.19.17",
+    "wrangler-deploy": "workspace:*",
+    "concurrently": "^9.0.0",
+    "tsx": "^4.0.0",
+    "wrangler": "^4.0.0"
+  },
+  "dependencies": {
+    "hono": "^4.7.0"
+  }
+}

@@ -1,0 +1,71 @@
+---
+title: D1 Database
+description: Using D1 databases with wrangler-deploy
+---
+
+D1 is Cloudflare's serverless SQL database. wrangler-deploy creates a separate D1 database per stage. No external database needed.
+
+## Config
+
+```ts
+// wrangler-deploy.config.ts
+import { defineConfig, d1, workerEnv } from "wrangler-deploy";
+
+const db = d1("my-database");
+
+export const api = workerEnv({
+  DB: db,
+});
+
+export default defineConfig({
+  version: 1,
+  workers: ["."],
+  resources: {
+    "my-database": {
+      type: "d1",
+      bindings: { ".": "DB" },
+    },
+  },
+});
+```
+
+## Wrangler config
+
+```jsonc
+// wrangler.jsonc
+{
+  "d1_databases": [
+    { "binding": "DB", "database_name": "my-database", "database_id": "placeholder" },
+  ],
+}
+```
+
+The `database_id` placeholder works for `wrangler dev`. wrangler-deploy replaces it with the real ID in rendered configs.
+
+## Worker code
+
+```ts
+import type { api } from "../wrangler-deploy.config.ts";
+type Env = typeof api.Env;
+// Env.DB is typed as D1Database
+
+export default {
+  async fetch(req: Request, env: Env) {
+    const { results } = await env.DB.prepare("SELECT * FROM users LIMIT 10").all();
+    return Response.json(results);
+  },
+};
+```
+
+## Migrations
+
+After applying, run migrations against the stage's D1:
+
+```bash
+wd apply --stage staging
+wrangler d1 migrations apply my-database-staging
+```
+
+## Ephemeral
+
+Each stage gets its own D1 database. `wd destroy` deletes it completely.
