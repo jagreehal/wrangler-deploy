@@ -13,7 +13,7 @@ export default defineConfig({
         {
           icon: "github",
           label: "GitHub",
-          href: "https://github.com/jag-reehal/cf-stage",
+          href: "https://github.com/jagreehal/wrangler-deploy",
         },
       ],
       sidebar: [

@@ -1,7 +1,7 @@
 import type { CfStageConfig } from "./types.js";
 
 /**
- * Define a cf-stage configuration with full type safety and autocomplete.
+ * Define a wrangler-deploy configuration with full type safety and autocomplete.
  *
  * @example
  * ```ts

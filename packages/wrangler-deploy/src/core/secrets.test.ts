@@ -169,7 +169,7 @@ describe("secrets", () => {
   it("syncs declared secrets from an env file and updates state", async ({ task }) => {
     story.init(task);
 
-    const tempDir = mkdtempSync(join(tmpdir(), "cf-stage-secrets-"));
+    const tempDir = mkdtempSync(join(tmpdir(), "wd-secrets-"));
     tempDirs.push(tempDir);
     const envFile = join(tempDir, ".dev.vars");
 

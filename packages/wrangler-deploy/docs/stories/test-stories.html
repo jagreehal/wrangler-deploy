@@ -1712,7 +1712,7 @@ body {
         <button type="button" class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme"></button>
       </div>
     </header>
-    <dl class="meta-info"><dt>Started:</dt><dd>2026-04-05T19:05:01.941Z</dd><dt>Duration:</dt><dd>0.55s</dd><dt>Version:</dt><dd>1.0.0</dd><dt>Git:</dt><dd>236dede</dd></dl>
+    <dl class="meta-info"><dt>Started:</dt><dd>2026-04-05T19:18:08.360Z</dd><dt>Duration:</dt><dd>0.51s</dd><dt>Version:</dt><dd>1.0.1</dd><dt>Git:</dt><dd>f38839a</dd></dl>
 
 <div class="summary">
   <div class="summary-card">
@@ -1846,392 +1846,6 @@ body {
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Then</span>
   <span class="step-text">the workflow must declare a schedule trigger</span>
-  <span class="step-duration"></span>
-</div></div>
-    
-    
-    
-  </div>
-</div>
-  </div>
-</div>
-
-<div class="feature">
-  <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
-    <div class="feature-info">
-      <div class="feature-title">cloudflare-api</div>
-      <div class="feature-path">src/providers/cloudflare-api.test.ts</div>
-    </div>
-    <div class="feature-stats">
-      <span class="stat passed">✓ 3</span>
-      <span class="stat failed">✗ 0</span>
-      <span class="stat skipped">○ 0</span>
-      <span class="chevron">▼</span>
-    </div>
-  </div>
-  <div class="feature-content">
-    
-<div class="scenario" id="scenario-e6225f0bd953">
-  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
-    <div class="scenario-info">
-      <div class="scenario-title">
-        <span class="status-icon status-passed">✓</span>
-        <span class="scenario-name">uses CLOUDFLARE_ACCOUNT_ID without fetching</span>
-      </div>
-      <div class="scenario-meta"></div>
-    </div>
-    <span class="scenario-duration"></span>
-  </div>
-  <div class="scenario-content">
-    
-    <div class="steps"><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">Given</span>
-  <span class="step-text">CLOUDFLARE_ACCOUNT_ID is set in the environment</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">When</span>
-  <span class="step-text">resolveAccountId is called</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">Then</span>
-  <span class="step-text">it returns the env var value without making any API calls</span>
-  <span class="step-duration"></span>
-</div></div>
-    
-    
-    
-  </div>
-</div>
-
-<div class="scenario" id="scenario-4e34fc65fccc">
-  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
-    <div class="scenario-info">
-      <div class="scenario-title">
-        <span class="status-icon status-passed">✓</span>
-        <span class="scenario-name">caches resolved account ids between calls</span>
-      </div>
-      <div class="scenario-meta"></div>
-    </div>
-    <span class="scenario-duration"></span>
-  </div>
-  <div class="scenario-content">
-    
-    <div class="steps"><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">Given</span>
-  <span class="step-text">no CLOUDFLARE_ACCOUNT_ID in the environment</span>
-  <span class="step-duration"></span>
-</div><div class="step continuation">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">And</span>
-  <span class="step-text">the API returns an account ID</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">When</span>
-  <span class="step-text">resolveAccountId is called twice</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">Then</span>
-  <span class="step-text">only one API call is made</span>
-  <span class="step-duration"></span>
-</div></div>
-    
-    
-    
-  </div>
-</div>
-
-<div class="scenario" id="scenario-d9b193f8f88a">
-  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
-    <div class="scenario-info">
-      <div class="scenario-title">
-        <span class="status-icon status-passed">✓</span>
-        <span class="scenario-name">formats API errors from cfApiResult</span>
-      </div>
-      <div class="scenario-meta"></div>
-    </div>
-    <span class="scenario-duration"></span>
-  </div>
-  <div class="scenario-content">
-    
-    <div class="steps"><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">Given</span>
-  <span class="step-text">an API response with multiple error codes</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">When</span>
-  <span class="step-text">cfApiResult parses the response</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">Then</span>
-  <span class="step-text">it throws with all error codes and messages formatted</span>
-  <span class="step-duration"></span>
-</div></div>
-    
-    
-    
-  </div>
-</div>
-  </div>
-</div>
-
-<div class="feature">
-  <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
-    <div class="feature-info">
-      <div class="feature-title">local CLI-backed providers</div>
-      <div class="feature-path">src/providers/local-cli.test.ts</div>
-    </div>
-    <div class="feature-stats">
-      <span class="stat passed">✓ 2</span>
-      <span class="stat failed">✗ 0</span>
-      <span class="stat skipped">○ 0</span>
-      <span class="chevron">▼</span>
-    </div>
-  </div>
-  <div class="feature-content">
-    
-<div class="scenario" id="scenario-228d55e9fd33">
-  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
-    <div class="scenario-info">
-      <div class="scenario-title">
-        <span class="status-icon status-passed">✓</span>
-        <span class="scenario-name">extracts the created D1 database id from wrangler output</span>
-      </div>
-      <div class="scenario-meta"></div>
-    </div>
-    <span class="scenario-duration"></span>
-  </div>
-  <div class="scenario-content">
-    
-    <div class="steps"><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">Given</span>
-  <span class="step-text">wrangler output containing a D1 database UUID</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">When</span>
-  <span class="step-text">the UUID regex runs against the output</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">Then</span>
-  <span class="step-text">the database ID is extracted</span>
-  <span class="step-duration"></span>
-</div></div>
-    
-    
-    
-  </div>
-</div>
-
-<div class="scenario" id="scenario-8d52912889b3">
-  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
-    <div class="scenario-info">
-      <div class="scenario-title">
-        <span class="status-icon status-passed">✓</span>
-        <span class="scenario-name">treats existing R2 buckets as non-fatal based on error message matching</span>
-      </div>
-      <div class="scenario-meta"></div>
-    </div>
-    <span class="scenario-duration"></span>
-  </div>
-  <div class="scenario-content">
-    
-    <div class="steps"><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">Given</span>
-  <span class="step-text">an error message indicating a bucket already exists</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">When</span>
-  <span class="step-text">the error is checked for the &#039;already exists&#039; pattern</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">Then</span>
-  <span class="step-text">the match succeeds, allowing the error to be treated as non-fatal</span>
-  <span class="step-duration"></span>
-</div></div>
-    
-    
-    
-  </div>
-</div>
-  </div>
-</div>
-
-<div class="feature">
-  <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
-    <div class="feature-info">
-      <div class="feature-title">providers</div>
-      <div class="feature-path">src/providers/resources.test.ts</div>
-    </div>
-    <div class="feature-stats">
-      <span class="stat passed">✓ 4</span>
-      <span class="stat failed">✗ 0</span>
-      <span class="stat skipped">○ 0</span>
-      <span class="chevron">▼</span>
-    </div>
-  </div>
-  <div class="feature-content">
-    
-<div class="scenario" id="scenario-56369a6775db">
-  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
-    <div class="scenario-info">
-      <div class="scenario-title">
-        <span class="status-icon status-passed">✓</span>
-        <span class="scenario-name">adopts an existing KV namespace when create reports conflict</span>
-      </div>
-      <div class="scenario-meta"></div>
-    </div>
-    <span class="scenario-duration"></span>
-  </div>
-  <div class="scenario-content">
-    
-    <div class="steps"><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">Given</span>
-  <span class="step-text">the Cloudflare API rejects KV creation with a conflict error</span>
-  <span class="step-duration"></span>
-</div><div class="step continuation">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">And</span>
-  <span class="step-text">a subsequent list call returns the existing namespace</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">When</span>
-  <span class="step-text">createKvNamespace is called</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">Then</span>
-  <span class="step-text">the existing namespace is adopted</span>
-  <span class="step-duration"></span>
-</div></div>
-    
-    
-    
-  </div>
-</div>
-
-<div class="scenario" id="scenario-330018a4a97a">
-  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
-    <div class="scenario-info">
-      <div class="scenario-title">
-        <span class="status-icon status-passed">✓</span>
-        <span class="scenario-name">adopts an existing queue when create returns conflict</span>
-      </div>
-      <div class="scenario-meta"></div>
-    </div>
-    <span class="scenario-duration"></span>
-  </div>
-  <div class="scenario-content">
-    
-    <div class="steps"><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">Given</span>
-  <span class="step-text">the Cloudflare API rejects queue creation with a <span class="step-param">409</span> conflict</span>
-  <span class="step-duration"></span>
-</div><div class="step continuation">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">And</span>
-  <span class="step-text">a subsequent list call returns the existing queue</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">When</span>
-  <span class="step-text">createQueue is called</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">Then</span>
-  <span class="step-text">the existing queue is adopted</span>
-  <span class="step-duration"></span>
-</div></div>
-    
-    
-    
-  </div>
-</div>
-
-<div class="scenario" id="scenario-4e8d2f9685bd">
-  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
-    <div class="scenario-info">
-      <div class="scenario-title">
-        <span class="status-icon status-passed">✓</span>
-        <span class="scenario-name">adopts an existing Hyperdrive config when create returns conflict</span>
-      </div>
-      <div class="scenario-meta"></div>
-    </div>
-    <span class="scenario-duration"></span>
-  </div>
-  <div class="scenario-content">
-    
-    <div class="steps"><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">Given</span>
-  <span class="step-text">the Cloudflare API rejects Hyperdrive creation with a <span class="step-param">409</span> conflict</span>
-  <span class="step-duration"></span>
-</div><div class="step continuation">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">And</span>
-  <span class="step-text">a subsequent list call returns the existing config</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">When</span>
-  <span class="step-text">createHyperdrive is called</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">Then</span>
-  <span class="step-text">the existing Hyperdrive config is adopted</span>
-  <span class="step-duration"></span>
-</div></div>
-    
-    
-    
-  </div>
-</div>
-
-<div class="scenario" id="scenario-a143242edc4a">
-  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
-    <div class="scenario-info">
-      <div class="scenario-title">
-        <span class="status-icon status-passed">✓</span>
-        <span class="scenario-name">treats worker deletion as idempotent on 404</span>
-      </div>
-      <div class="scenario-meta"></div>
-    </div>
-    <span class="scenario-duration"></span>
-  </div>
-  <div class="scenario-content">
-    
-    <div class="steps"><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">Given</span>
-  <span class="step-text">the Cloudflare API returns <span class="step-param">404</span> for a worker deletion</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">When</span>
-  <span class="step-text">deleteWorker is called</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">Then</span>
-  <span class="step-text">it resolves without error</span>
   <span class="step-duration"></span>
 </div></div>
     
@@ -5490,6 +5104,392 @@ body {
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Then</span>
   <span class="step-text">verification should fail because state contains undeclared workers</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+  </div>
+</div>
+
+<div class="feature">
+  <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="feature-info">
+      <div class="feature-title">cloudflare-api</div>
+      <div class="feature-path">src/providers/cloudflare-api.test.ts</div>
+    </div>
+    <div class="feature-stats">
+      <span class="stat passed">✓ 3</span>
+      <span class="stat failed">✗ 0</span>
+      <span class="stat skipped">○ 0</span>
+      <span class="chevron">▼</span>
+    </div>
+  </div>
+  <div class="feature-content">
+    
+<div class="scenario" id="scenario-e6225f0bd953">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">uses CLOUDFLARE_ACCOUNT_ID without fetching</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">CLOUDFLARE_ACCOUNT_ID is set in the environment</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">resolveAccountId is called</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">it returns the env var value without making any API calls</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-4e34fc65fccc">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">caches resolved account ids between calls</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">no CLOUDFLARE_ACCOUNT_ID in the environment</span>
+  <span class="step-duration"></span>
+</div><div class="step continuation">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">And</span>
+  <span class="step-text">the API returns an account ID</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">resolveAccountId is called twice</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">only one API call is made</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-d9b193f8f88a">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">formats API errors from cfApiResult</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">an API response with multiple error codes</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">cfApiResult parses the response</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">it throws with all error codes and messages formatted</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+  </div>
+</div>
+
+<div class="feature">
+  <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="feature-info">
+      <div class="feature-title">local CLI-backed providers</div>
+      <div class="feature-path">src/providers/local-cli.test.ts</div>
+    </div>
+    <div class="feature-stats">
+      <span class="stat passed">✓ 2</span>
+      <span class="stat failed">✗ 0</span>
+      <span class="stat skipped">○ 0</span>
+      <span class="chevron">▼</span>
+    </div>
+  </div>
+  <div class="feature-content">
+    
+<div class="scenario" id="scenario-228d55e9fd33">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">extracts the created D1 database id from wrangler output</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">wrangler output containing a D1 database UUID</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">the UUID regex runs against the output</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the database ID is extracted</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-8d52912889b3">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">treats existing R2 buckets as non-fatal based on error message matching</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">an error message indicating a bucket already exists</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">the error is checked for the &#039;already exists&#039; pattern</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the match succeeds, allowing the error to be treated as non-fatal</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+  </div>
+</div>
+
+<div class="feature">
+  <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="feature-info">
+      <div class="feature-title">providers</div>
+      <div class="feature-path">src/providers/resources.test.ts</div>
+    </div>
+    <div class="feature-stats">
+      <span class="stat passed">✓ 4</span>
+      <span class="stat failed">✗ 0</span>
+      <span class="stat skipped">○ 0</span>
+      <span class="chevron">▼</span>
+    </div>
+  </div>
+  <div class="feature-content">
+    
+<div class="scenario" id="scenario-56369a6775db">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">adopts an existing KV namespace when create reports conflict</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">the Cloudflare API rejects KV creation with a conflict error</span>
+  <span class="step-duration"></span>
+</div><div class="step continuation">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">And</span>
+  <span class="step-text">a subsequent list call returns the existing namespace</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">createKvNamespace is called</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the existing namespace is adopted</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-330018a4a97a">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">adopts an existing queue when create returns conflict</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">the Cloudflare API rejects queue creation with a <span class="step-param">409</span> conflict</span>
+  <span class="step-duration"></span>
+</div><div class="step continuation">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">And</span>
+  <span class="step-text">a subsequent list call returns the existing queue</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">createQueue is called</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the existing queue is adopted</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-4e8d2f9685bd">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">adopts an existing Hyperdrive config when create returns conflict</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">the Cloudflare API rejects Hyperdrive creation with a <span class="step-param">409</span> conflict</span>
+  <span class="step-duration"></span>
+</div><div class="step continuation">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">And</span>
+  <span class="step-text">a subsequent list call returns the existing config</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">createHyperdrive is called</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the existing Hyperdrive config is adopted</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-a143242edc4a">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">treats worker deletion as idempotent on 404</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">the Cloudflare API returns <span class="step-param">404</span> for a worker deletion</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">deleteWorker is called</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">it resolves without error</span>
   <span class="step-duration"></span>
 </div></div>
     

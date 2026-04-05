@@ -122,7 +122,7 @@ Uses wrangler's auth. Locally: `wrangler login`. In CI: `CLOUDFLARE_API_TOKEN` a
 
 ## Docs
 
-[Full documentation](https://cf-stage-docs.pages.dev/) with guides for PR previews, CI/CD, each resource type, and config reference.
+[Full documentation](https://jagreehal.github.io/wrangler-deploy/) with guides for PR previews, CI/CD, each resource type, and config reference.
 
 ## License
 

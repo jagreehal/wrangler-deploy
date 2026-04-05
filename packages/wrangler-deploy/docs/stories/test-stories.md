@@ -2,9 +2,9 @@
 
 | Key | Value |
 | --- | --- |
-| Date | 2026-04-05T19:05:01.941Z |
-| Version | 1.0.0 |
-| Git SHA | 236dede |
+| Date | 2026-04-05T19:18:08.360Z |
+| Version | 1.0.1 |
+| Git SHA | f38839a |
 
 ## src/github.test.ts
 
@@ -27,76 +27,6 @@
 - **Given** the example workflow source
 - **When** the workflow has a schedule-conditional cleanup job
 - **Then** the workflow must declare a schedule trigger
-
-## src/providers/cloudflare-api.test.ts
-
-### cloudflare-api
-
-### ✅ uses CLOUDFLARE_ACCOUNT_ID without fetching
-
-- **Given** CLOUDFLARE_ACCOUNT_ID is set in the environment
-- **When** resolveAccountId is called
-- **Then** it returns the env var value without making any API calls
-
-### ✅ caches resolved account ids between calls
-
-- **Given** no CLOUDFLARE_ACCOUNT_ID in the environment
-- **And** the API returns an account ID
-- **When** resolveAccountId is called twice
-- **Then** only one API call is made
-
-### ✅ formats API errors from cfApiResult
-
-- **Given** an API response with multiple error codes
-- **When** cfApiResult parses the response
-- **Then** it throws with all error codes and messages formatted
-
-## src/providers/local-cli.test.ts
-
-### local CLI-backed providers
-
-### ✅ extracts the created D1 database id from wrangler output
-
-- **Given** wrangler output containing a D1 database UUID
-- **When** the UUID regex runs against the output
-- **Then** the database ID is extracted
-
-### ✅ treats existing R2 buckets as non-fatal based on error message matching
-
-- **Given** an error message indicating a bucket already exists
-- **When** the error is checked for the 'already exists' pattern
-- **Then** the match succeeds, allowing the error to be treated as non-fatal
-
-## src/providers/resources.test.ts
-
-### providers
-
-### ✅ adopts an existing KV namespace when create reports conflict
-
-- **Given** the Cloudflare API rejects KV creation with a conflict error
-- **And** a subsequent list call returns the existing namespace
-- **When** createKvNamespace is called
-- **Then** the existing namespace is adopted
-
-### ✅ adopts an existing queue when create returns conflict
-
-- **Given** the Cloudflare API rejects queue creation with a 409 conflict
-- **And** a subsequent list call returns the existing queue
-- **When** createQueue is called
-- **Then** the existing queue is adopted
-
-### ✅ adopts an existing Hyperdrive config when create returns conflict
-
-- **Given** the Cloudflare API rejects Hyperdrive creation with a 409 conflict
-- **And** a subsequent list call returns the existing config
-- **When** createHyperdrive is called
-- **Then** the existing Hyperdrive config is adopted
-
-### ✅ treats worker deletion as idempotent on 404
-
-- **Given** the Cloudflare API returns 404 for a worker deletion
-- **When** deleteWorker is called
-- **Then** it resolves without error
 
 ## src/core/apply.test.ts
 
@@ -683,3 +613,73 @@
 - **Given** state containing an extra worker not declared in config.workers
 - **When** verification runs
 - **Then** verification should fail because state contains undeclared workers
+
+## src/providers/cloudflare-api.test.ts
+
+### cloudflare-api
+
+### ✅ uses CLOUDFLARE_ACCOUNT_ID without fetching
+
+- **Given** CLOUDFLARE_ACCOUNT_ID is set in the environment
+- **When** resolveAccountId is called
+- **Then** it returns the env var value without making any API calls
+
+### ✅ caches resolved account ids between calls
+
+- **Given** no CLOUDFLARE_ACCOUNT_ID in the environment
+- **And** the API returns an account ID
+- **When** resolveAccountId is called twice
+- **Then** only one API call is made
+
+### ✅ formats API errors from cfApiResult
+
+- **Given** an API response with multiple error codes
+- **When** cfApiResult parses the response
+- **Then** it throws with all error codes and messages formatted
+
+## src/providers/local-cli.test.ts
+
+### local CLI-backed providers
+
+### ✅ extracts the created D1 database id from wrangler output
+
+- **Given** wrangler output containing a D1 database UUID
+- **When** the UUID regex runs against the output
+- **Then** the database ID is extracted
+
+### ✅ treats existing R2 buckets as non-fatal based on error message matching
+
+- **Given** an error message indicating a bucket already exists
+- **When** the error is checked for the 'already exists' pattern
+- **Then** the match succeeds, allowing the error to be treated as non-fatal
+
+## src/providers/resources.test.ts
+
+### providers
+
+### ✅ adopts an existing KV namespace when create reports conflict
+
+- **Given** the Cloudflare API rejects KV creation with a conflict error
+- **And** a subsequent list call returns the existing namespace
+- **When** createKvNamespace is called
+- **Then** the existing namespace is adopted
+
+### ✅ adopts an existing queue when create returns conflict
+
+- **Given** the Cloudflare API rejects queue creation with a 409 conflict
+- **And** a subsequent list call returns the existing queue
+- **When** createQueue is called
+- **Then** the existing queue is adopted
+
+### ✅ adopts an existing Hyperdrive config when create returns conflict
+
+- **Given** the Cloudflare API rejects Hyperdrive creation with a 409 conflict
+- **And** a subsequent list call returns the existing config
+- **When** createHyperdrive is called
+- **Then** the existing Hyperdrive config is adopted
+
+### ✅ treats worker deletion as idempotent on 404
+
+- **Given** the Cloudflare API returns 404 for a worker deletion
+- **When** deleteWorker is called
+- **Then** it resolves without error

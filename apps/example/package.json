@@ -16,13 +16,13 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260405.1",
-    "@types/node": "^22.19.17",
+    "@types/node": "^25.5.2",
     "wrangler-deploy": "workspace:*",
-    "concurrently": "^9.0.0",
-    "tsx": "^4.0.0",
-    "wrangler": "^4.0.0"
+    "concurrently": "^9.2.1",
+    "tsx": "^4.21.0",
+    "wrangler": "^4.80.0"
   },
   "dependencies": {
-    "hono": "^4.7.0"
+    "hono": "^4.12.10"
   }
 }
