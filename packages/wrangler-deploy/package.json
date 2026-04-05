@@ -1,6 +1,6 @@
 {
   "name": "wrangler-deploy",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Create, deploy, and tear down full Cloudflare Workers environments per stage",
   "type": "module",
   "bin": {
