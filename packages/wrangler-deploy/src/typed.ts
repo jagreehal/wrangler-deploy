@@ -101,11 +101,11 @@ export type ResourceMarker =
 //
 // These are declared as interfaces so they merge with the global types from
 // @cloudflare/workers-types when present in the consumer's project.
-// In cf-stage's own compilation (no workers-types), they compile as empty
+// In wrangler-deploy's own compilation (no workers-types), they compile as empty
 // interfaces — the phantom type still works, it just can't resolve members.
 // ============================================================================
 
-// Fallback types — minimal compatible interfaces for cf-stage's own build.
+// Fallback types — minimal compatible interfaces for wrangler-deploy's own build.
 // In consumer projects with @cloudflare/workers-types, the consumer's
 // wrangler-deploy.config.ts sees the REAL Cloudflare types via the Bound<T> mapping
 // because the consumer's tsconfig includes @cloudflare/workers-types globals.
@@ -124,13 +124,13 @@ type CfWorkflow<Params = unknown> = {
 };
 
 /**
- * Maps a cf-stage resource marker to the corresponding Cloudflare Workers
+ * Maps a wrangler-deploy resource marker to the corresponding Cloudflare Workers
  * runtime binding type. This is the phantom type magic — the mapping exists
  * only at the type level.
  *
  * When @cloudflare/workers-types is loaded (in the consumer's project),
  * these resolve to the full Cloudflare types (KVNamespace, Queue, etc.).
- * When it's not loaded (in cf-stage's own build), they resolve to minimal
+ * When it's not loaded (in wrangler-deploy's own build), they resolve to minimal
  * compatible interfaces.
  */
 export type Bound<T> = T extends KvMarker

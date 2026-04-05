@@ -104,7 +104,7 @@ export interface CfStageConfig {
 }
 
 // ============================================================================
-// State types — what cf-stage writes to .wrangler-deploy/<stage>/state.json
+// State types — what wrangler-deploy writes to .wrangler-deploy/<stage>/state.json
 // ============================================================================
 
 export interface ResourceState {

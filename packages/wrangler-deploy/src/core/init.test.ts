@@ -8,7 +8,7 @@ import { generateConfig } from "./init.js";
 const tempDirs: string[] = [];
 
 function makeTempDir(): string {
-  const dir = mkdtempSync(join(tmpdir(), "cf-stage-init-"));
+  const dir = mkdtempSync(join(tmpdir(), "wd-init-"));
   tempDirs.push(dir);
   return dir;
 }

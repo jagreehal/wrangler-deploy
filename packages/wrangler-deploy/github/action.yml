@@ -1,5 +1,5 @@
 name: "wrangler-deploy"
-description: "Provision and deploy Cloudflare Workers environments with cf-stage"
+description: "Provision and deploy Cloudflare Workers environments with wrangler-deploy"
 author: "wrangler-deploy"
 
 inputs:
@@ -56,7 +56,7 @@ runs:
         node <<'EOF' >> "$GITHUB_OUTPUT"
         const fs = require("node:fs");
         const path = require("node:path");
-        const statePath = path.resolve("${{ inputs.working-directory }}", ".cf-stage", "${{ inputs.stage }}", "state.json");
+        const statePath = path.resolve("${{ inputs.working-directory }}", ".wrangler-deploy", "${{ inputs.stage }}", "state.json");
         let urls = {};
         if (fs.existsSync(statePath)) {
           const state = JSON.parse(fs.readFileSync(statePath, "utf-8"));
