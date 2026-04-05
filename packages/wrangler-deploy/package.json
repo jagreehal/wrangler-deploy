@@ -28,7 +28,7 @@
     "wrangler": ">=3.0.0"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^25.5.2",
     "executable-stories-vitest": "^8.1.4",
     "typescript": "^5.9.3",
     "vitest": "^4.0.0"
