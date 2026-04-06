@@ -40,12 +40,17 @@ export default defineConfig({
         {
           label: "Features",
           items: [
+            { label: "Local Dev", slug: "features/dev-mode" },
+            { label: "Topology Graph", slug: "features/graph" },
+            { label: "Impact Analysis", slug: "features/impact-analysis" },
+            { label: "Stage Diff", slug: "features/stage-diff" },
             { label: "Typed Bindings", slug: "features/typed-bindings" },
             { label: "Secrets", slug: "features/secrets" },
             { label: "Remote State", slug: "features/remote-state" },
             { label: "Drift Detection", slug: "features/drift-detection" },
             { label: "Route Templating", slug: "features/route-templating" },
             { label: "Stage Protection", slug: "features/stage-protection" },
+            { label: "Doctor", slug: "features/doctor" },
           ],
         },
         {

@@ -11,6 +11,7 @@ Environment orchestration for Cloudflare Workers. Reads existing `wrangler.jsonc
 
 ```
 wd init                           # scan wrangler configs, generate wrangler-deploy.config.ts
+wd introspect [--filter] [--dry-run]  # scan live account, generate config from existing resources
 wd plan     --stage <name>        # dry-run: what would change
 wd apply    --stage <name>        # provision resources
 wd deploy   --stage <name>        # deploy workers (--verify for health checks)
@@ -19,6 +20,15 @@ wd status   [--stage <name>]      # inspect resources and drift
 wd verify   --stage <name>        # post-deploy coherence check
 wd secrets  --stage <name>        # check/set/sync secrets
 wd gc                             # destroy expired unprotected stages
+wd graph    [--stage] [--format ascii|mermaid|dot|json]  # topology visualisation
+wd impact   <worker-path>         # upstream/downstream dependency analysis
+wd diff     <stage-a> <stage-b>   # compare two stages
+wd dev      [--filter <worker>] [--port <base>]  # start local dev servers
+wd ci init  [--provider github]   # generate GitHub Actions workflow
+wd ci comment --stage <name>      # post/update PR comment with deploy status
+wd ci check   --stage <name>      # post GitHub check run (exits 1 on failure)
+wd doctor                         # diagnostic checks (wrangler, auth, config, workers)
+wd completions --shell zsh|bash|fish  # generate shell completions
 ```
 
 ## Config structure
@@ -81,6 +91,28 @@ type Env = typeof api.Env;
 | `workflow<P>()` | `Workflow<P>` |
 | `secret()`      | `string`      |
 
+## Local dev
+
+`wd dev` starts all workers with automatic port resolution — no port conflicts even with multiple workers or other local services. Wrangler's file watcher handles hot reload.
+
+```bash
+wd dev                        # start all workers
+wd dev --filter workers/api   # start api + its service-binding deps only
+wd dev --port 9000            # override base port
+```
+
+Unknown `--filter` values fail immediately with a clear error.
+
+## CI integration
+
+`wd ci init` generates a GitHub Actions workflow with:
+- PR preview: apply + deploy + comment + check run
+- Cleanup: destroy on PR close
+- Production: apply + deploy on push to main
+- Explicit permissions: `contents: read`, `issues: write`, `checks: write`
+
+`wd ci check` posts a real GitHub check run and exits 1 on failure (not a silent success).
+
 ## Key behaviors
 
 - `wrangler.jsonc` files stay untouched. Placeholder IDs work for `wrangler dev`.
@@ -90,6 +122,8 @@ type Env = typeof api.Env;
 - Protected stages require `--force` to destroy. Unmatched stages default to protected.
 - Deploy order inferred from service bindings. Cycles rejected.
 - Hyperdrive needs `--database-url` on first apply.
+- `deadLetterFor` must reference another queue, not just any resource.
+- Config validation catches unknown workers, DLQ targets, and service binding errors upfront.
 
 ## Auth
 

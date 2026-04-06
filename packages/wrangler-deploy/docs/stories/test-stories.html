@@ -1712,16 +1712,16 @@ body {
         <button type="button" class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme"></button>
       </div>
     </header>
-    <dl class="meta-info"><dt>Started:</dt><dd>2026-04-05T19:18:08.360Z</dd><dt>Duration:</dt><dd>0.51s</dd><dt>Version:</dt><dd>1.0.1</dd><dt>Git:</dt><dd>f38839a</dd></dl>
+    <dl class="meta-info"><dt>Started:</dt><dd>2026-04-06T08:16:43.875Z</dd><dt>Duration:</dt><dd>1.16s</dd><dt>Version:</dt><dd>1.0.2</dd><dt>Git:</dt><dd>5a741ba</dd></dl>
 
 <div class="summary">
   <div class="summary-card">
     <div class="label">Total</div>
-    <div class="value">100</div>
+    <div class="value">190</div>
   </div>
   <div class="summary-card passed">
     <div class="label">Passed</div>
-    <div class="value">100</div>
+    <div class="value">190</div>
   </div>
   <div class="summary-card failed">
     <div class="label">Failed</div>
@@ -1846,6 +1846,392 @@ body {
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Then</span>
   <span class="step-text">the workflow must declare a schedule trigger</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+  </div>
+</div>
+
+<div class="feature">
+  <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="feature-info">
+      <div class="feature-title">cloudflare-api</div>
+      <div class="feature-path">src/providers/cloudflare-api.test.ts</div>
+    </div>
+    <div class="feature-stats">
+      <span class="stat passed">✓ 3</span>
+      <span class="stat failed">✗ 0</span>
+      <span class="stat skipped">○ 0</span>
+      <span class="chevron">▼</span>
+    </div>
+  </div>
+  <div class="feature-content">
+    
+<div class="scenario" id="scenario-e6225f0bd953">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">uses CLOUDFLARE_ACCOUNT_ID without fetching</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">CLOUDFLARE_ACCOUNT_ID is set in the environment</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">resolveAccountId is called</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">it returns the env var value without making any API calls</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-4e34fc65fccc">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">caches resolved account ids between calls</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">no CLOUDFLARE_ACCOUNT_ID in the environment</span>
+  <span class="step-duration"></span>
+</div><div class="step continuation">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">And</span>
+  <span class="step-text">the API returns an account ID</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">resolveAccountId is called twice</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">only one API call is made</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-d9b193f8f88a">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">formats API errors from cfApiResult</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">an API response with multiple error codes</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">cfApiResult parses the response</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">it throws with all error codes and messages formatted</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+  </div>
+</div>
+
+<div class="feature">
+  <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="feature-info">
+      <div class="feature-title">local CLI-backed providers</div>
+      <div class="feature-path">src/providers/local-cli.test.ts</div>
+    </div>
+    <div class="feature-stats">
+      <span class="stat passed">✓ 2</span>
+      <span class="stat failed">✗ 0</span>
+      <span class="stat skipped">○ 0</span>
+      <span class="chevron">▼</span>
+    </div>
+  </div>
+  <div class="feature-content">
+    
+<div class="scenario" id="scenario-228d55e9fd33">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">extracts the created D1 database id from wrangler output</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">wrangler output containing a D1 database UUID</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">the UUID regex runs against the output</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the database ID is extracted</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-8d52912889b3">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">treats existing R2 buckets as non-fatal based on error message matching</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">an error message indicating a bucket already exists</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">the error is checked for the &#039;already exists&#039; pattern</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the match succeeds, allowing the error to be treated as non-fatal</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+  </div>
+</div>
+
+<div class="feature">
+  <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="feature-info">
+      <div class="feature-title">providers</div>
+      <div class="feature-path">src/providers/resources.test.ts</div>
+    </div>
+    <div class="feature-stats">
+      <span class="stat passed">✓ 4</span>
+      <span class="stat failed">✗ 0</span>
+      <span class="stat skipped">○ 0</span>
+      <span class="chevron">▼</span>
+    </div>
+  </div>
+  <div class="feature-content">
+    
+<div class="scenario" id="scenario-56369a6775db">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">adopts an existing KV namespace when create reports conflict</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">the Cloudflare API rejects KV creation with a conflict error</span>
+  <span class="step-duration"></span>
+</div><div class="step continuation">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">And</span>
+  <span class="step-text">a subsequent list call returns the existing namespace</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">createKvNamespace is called</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the existing namespace is adopted</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-330018a4a97a">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">adopts an existing queue when create returns conflict</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">the Cloudflare API rejects queue creation with a <span class="step-param">409</span> conflict</span>
+  <span class="step-duration"></span>
+</div><div class="step continuation">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">And</span>
+  <span class="step-text">a subsequent list call returns the existing queue</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">createQueue is called</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the existing queue is adopted</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-4e8d2f9685bd">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">adopts an existing Hyperdrive config when create returns conflict</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">the Cloudflare API rejects Hyperdrive creation with a <span class="step-param">409</span> conflict</span>
+  <span class="step-duration"></span>
+</div><div class="step continuation">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">And</span>
+  <span class="step-text">a subsequent list call returns the existing config</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">createHyperdrive is called</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the existing Hyperdrive config is adopted</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-a143242edc4a">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">treats worker deletion as idempotent on 404</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">the Cloudflare API returns <span class="step-param">404</span> for a worker deletion</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">deleteWorker is called</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">it resolves without error</span>
   <span class="step-duration"></span>
 </div></div>
     
@@ -2266,6 +2652,128 @@ body {
 <div class="feature">
   <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
     <div class="feature-info">
+      <div class="feature-title">generateCompletions</div>
+      <div class="feature-path">src/core/completions.test.ts</div>
+    </div>
+    <div class="feature-stats">
+      <span class="stat passed">✓ 3</span>
+      <span class="stat failed">✗ 0</span>
+      <span class="stat skipped">○ 0</span>
+      <span class="chevron">▼</span>
+    </div>
+  </div>
+  <div class="feature-content">
+    
+<div class="scenario" id="scenario-5b17724bbd13">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">zsh output contains compdef and command names</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">zsh shell requested</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">output contains compdef directive</span>
+  <span class="step-duration"></span>
+</div><div class="step continuation">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">And</span>
+  <span class="step-text">output contains expected command names</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-e7e3188109c8">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">bash output contains complete -F and command names</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">bash shell requested</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">output contains complete -F directive</span>
+  <span class="step-duration"></span>
+</div><div class="step continuation">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">And</span>
+  <span class="step-text">output contains expected command names</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-f17a8a3403b5">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">fish output contains complete -c wd lines and command names</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">fish shell requested</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">output contains complete -c wd directive</span>
+  <span class="step-duration"></span>
+</div><div class="step continuation">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">And</span>
+  <span class="step-text">output contains expected command names</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+  </div>
+</div>
+
+<div class="feature">
+  <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="feature-info">
       <div class="feature-title">deploy</div>
       <div class="feature-path">src/core/deploy.test.ts</div>
     </div>
@@ -2507,6 +3015,574 @@ body {
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Then</span>
   <span class="step-text">the queue consumer should still be detached before deletion proceeds</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+  </div>
+</div>
+
+<div class="feature">
+  <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="feature-info">
+      <div class="feature-title">createLogMultiplexer</div>
+      <div class="feature-path">src/core/dev-logs.test.ts</div>
+    </div>
+    <div class="feature-stats">
+      <span class="stat passed">✓ 3</span>
+      <span class="stat failed">✗ 0</span>
+      <span class="stat skipped">○ 0</span>
+      <span class="chevron">▼</span>
+    </div>
+  </div>
+  <div class="feature-content">
+    
+<div class="scenario" id="scenario-c27c9b8378b0">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">prefixes lines with the worker label</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a writer for apps/api</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">a line of output is written</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the output is prefixed with the worker label</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-b624e2879a4f">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">different workers get different prefixes</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">writers for apps/api and apps/worker</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">each writes a line</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the prefixes are visually distinct</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-3b68d94d6685">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">multi-line output splits into individually prefixed lines</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a writer for apps/auth</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">multi-line data is written at once</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">each line is emitted separately with the prefix</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+  </div>
+</div>
+
+<div class="feature">
+  <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="feature-info">
+      <div class="feature-title">assignPorts</div>
+      <div class="feature-path">src/core/dev-ports.test.ts</div>
+    </div>
+    <div class="feature-stats">
+      <span class="stat passed">✓ 3</span>
+      <span class="stat failed">✗ 0</span>
+      <span class="stat skipped">○ 0</span>
+      <span class="chevron">▼</span>
+    </div>
+  </div>
+  <div class="feature-content">
+    
+<div class="scenario" id="scenario-7c21dfb0edf3">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">assigns unique ports &gt;= basePort to all workers</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a config with three workers and basePort <span class="step-param">8787</span></span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">every worker gets a unique port starting at <span class="step-param">8787</span></span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-d14a76c98275">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">respects explicit port overrides</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a config with an explicit override for apps/api</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">apps/api uses the overridden port <span class="step-param">9000</span></span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-91fdfe36009d">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">skips overridden ports when auto-assigning remaining workers</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">apps/worker is overridden to <span class="step-param">8788</span>, basePort is <span class="step-param">8787</span></span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">apps/worker uses <span class="step-param">8788</span>, other workers skip <span class="step-param">8788</span></span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+  </div>
+</div>
+
+<div class="feature">
+  <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="feature-info">
+      <div class="feature-title">buildDevPlan</div>
+      <div class="feature-path">src/core/dev.test.ts</div>
+    </div>
+    <div class="feature-stats">
+      <span class="stat passed">✓ 6</span>
+      <span class="stat failed">✗ 0</span>
+      <span class="stat skipped">○ 0</span>
+      <span class="chevron">▼</span>
+    </div>
+  </div>
+  <div class="feature-content">
+    
+<div class="scenario" id="scenario-aa8213f4d2bd">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">creates plan for all workers in dependency order</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a config with api depending on worker</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">plan contains both workers in dependency order (worker before api)</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-d8d9f7df4e95">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">each worker has a unique port assigned</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a config with two workers</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">each worker has a port &gt;= basePort and all ports are unique</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-73e278a844c4">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">filter includes only target and transitive deps</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">api -&gt; worker -&gt; auth, plus an unrelated worker</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">plan only contains apps/api, apps/worker, apps/auth</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-7008e606ada7">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">custom devArgs are included in worker args</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">workerOptions with custom devArgs for apps/api</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the worker args include the custom devArgs</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-46c2f74b155d">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">throws when filter references an unknown worker</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a filter for a worker path that is not declared in the config</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">building the plan fails fast instead of producing an empty dev session</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-a83ce4f5c609">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">startDev preserves explicit planned ports instead of compacting them</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a plan with non-consecutive explicit worker ports</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the resolved dev ports still match the per-worker planned ports</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+  </div>
+</div>
+
+<div class="feature">
+  <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="feature-info">
+      <div class="feature-title">runDoctor</div>
+      <div class="feature-path">src/core/doctor.test.ts</div>
+    </div>
+    <div class="feature-stats">
+      <span class="stat passed">✓ 4</span>
+      <span class="stat failed">✗ 0</span>
+      <span class="stat skipped">○ 0</span>
+      <span class="chevron">▼</span>
+    </div>
+  </div>
+  <div class="feature-content">
+    
+<div class="scenario" id="scenario-2766ff320567">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">all checks pass when system is healthy</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">wrangler is installed, auth is valid, all worker paths exist, config is valid</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">all checks have status pass</span>
+  <span class="step-duration"></span>
+</div><div class="step continuation">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">And</span>
+  <span class="step-text">wrangler version is reported</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-fe7552786fcb">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">fails when wrangler is not installed</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">wranglerVersion throws an error</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the wrangler installed check fails</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-50f510dd260f">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">fails when worker paths are missing</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">workerExists returns false for all paths</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">worker path checks fail</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-041cd33b1314">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">fails when config has errors</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">configErrors contains validation errors</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">a config error check is present with fail status</span>
   <span class="step-duration"></span>
 </div></div>
     
@@ -2861,6 +3937,268 @@ body {
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Then</span>
   <span class="step-text">the stage is treated as protected</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+  </div>
+</div>
+
+<div class="feature">
+  <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="feature-info">
+      <div class="feature-title">buildRichGraph</div>
+      <div class="feature-path">src/core/graph-model.test.ts</div>
+    </div>
+    <div class="feature-stats">
+      <span class="stat passed">✓ 8</span>
+      <span class="stat failed">✗ 0</span>
+      <span class="stat skipped">○ 0</span>
+      <span class="chevron">▼</span>
+    </div>
+  </div>
+  <div class="feature-content">
+    
+<div class="scenario" id="scenario-d1d2c3817492">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">creates nodes for all workers and resources</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a config with <span class="step-param">3</span> workers and <span class="step-param">4</span> resources</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">graph has <span class="step-param">7</span> nodes total</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-351e674d7d0c">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">sets worker node labels to the last path segment</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">workers with path-based ids</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">label is the last segment of the path</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-a715b0e1cb74">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">creates service-binding edges with binding name as label</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">apps/api has a service binding WORKFLOWS -&gt; apps/batch-workflow</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">a service-binding edge exists from api to batch-workflow with label WORKFLOWS</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-f71e1b7d0c42">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">creates producer edges for queue producer bindings</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">apps/api binds to payment-outbox as a producer</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">a producer edge exists from apps/api to payment-outbox</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-f9b18915944e">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">creates consumer edges for queue consumer bindings</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">apps/event-router binds to payment-outbox with consumer: true</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">a consumer edge exists from apps/event-router to payment-outbox</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-2de952ea4f05">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">creates dead-letter edges for DLQ bindings</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">payment-outbox-dlq has a deadLetterFor binding referencing payment-outbox</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">a dead-letter edge exists from payment-outbox to payment-outbox-dlq</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-4161c131e764">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">creates binding edges for shared D1 resource bound to multiple workers</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">payments-db is bound to both apps/api and apps/batch-workflow</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">two binding edges exist from each worker to payments-db</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-82768e31f787">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">overlays state when provided</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a StageState with resource ids, statuses, and worker deployed names</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">resource nodes have resourceId and status from state</span>
+  <span class="step-duration"></span>
+</div><div class="step continuation">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">And</span>
+  <span class="step-text">worker nodes have deployedName from state</span>
   <span class="step-duration"></span>
 </div></div>
     
@@ -3461,6 +4799,238 @@ body {
 <div class="feature">
   <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
     <div class="feature-info">
+      <div class="feature-title">analyzeImpact</div>
+      <div class="feature-path">src/core/impact.test.ts</div>
+    </div>
+    <div class="feature-stats">
+      <span class="stat passed">✓ 7</span>
+      <span class="stat failed">✗ 0</span>
+      <span class="stat skipped">○ 0</span>
+      <span class="chevron">▼</span>
+    </div>
+  </div>
+  <div class="feature-content">
+    
+<div class="scenario" id="scenario-05e8d10e472e">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">returns upstream deps with sharedWith for a shared resource</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a graph where api and batch both bind payments-hyperdrive</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">upstream includes payments-hyperdrive sharedWith apps/api</span>
+  <span class="step-duration"></span>
+</div><div class="step continuation">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">And</span>
+  <span class="step-text">upstream includes cache-kv with empty sharedWith (exclusive to batch)</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-79a27896cad2">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">returns downstream deps for workers that depend on target via service-binding</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">apps/api has a service-binding to apps/batch-workflow</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">downstream includes apps/api with relationship service-binding</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-c4185e8d87a2">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">returns consequences for each downstream dep</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">apps/api depends on apps/batch-workflow via service-binding</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">consequences includes a message about apps/api losing service-binding</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-fce2318f3dd5">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">returns consequences for unaffected workers</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">apps/event-router has no dependency on apps/batch-workflow</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">consequences includes unaffected message for event-router</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-5c395c0aad10">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">returns queue producer as upstream dep (not downstream)</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">apps/api produces to payment-queue</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">upstream includes payment-queue</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-cb28537fd3df">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">throws when targetId is not found in graph</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a graph without a node called apps/unknown</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">analyzeImpact throws an error</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-9eb2847958ee">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">sets target to the targetId</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a valid target node</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">result.target equals the targetId</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+  </div>
+</div>
+
+<div class="feature">
+  <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="feature-info">
       <div class="feature-title">generateConfig</div>
       <div class="feature-path">src/core/init.test.ts</div>
     </div>
@@ -3890,6 +5460,270 @@ body {
 <div class="feature">
   <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
     <div class="feature-info">
+      <div class="feature-title">updateJsonc</div>
+      <div class="feature-path">src/core/jsonc-writer.test.ts</div>
+    </div>
+    <div class="feature-stats">
+      <span class="stat passed">✓ 4</span>
+      <span class="stat failed">✗ 0</span>
+      <span class="stat skipped">○ 0</span>
+      <span class="chevron">▼</span>
+    </div>
+  </div>
+  <div class="feature-content">
+    
+<div class="scenario" id="scenario-26253c7ba205">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">adds a new key while preserving comments</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a JSONC string with a comment header</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">a new key is added via updates</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the result contains the new key</span>
+  <span class="step-duration"></span>
+</div><div class="step continuation">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">And</span>
+  <span class="step-text">the comment is preserved in the output</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-d1a39b736099">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">updates an existing key value</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a JSONC string with an existing key</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">the key is updated</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the key is updated and others are preserved</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-6af441dc9709">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">adds nested objects for env sections</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a JSONC string with a top-level config</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">a nested env section is added</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the nested structure is present in the output</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-6bf0719bc4b4">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">handles trailing commas</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a JSONC string with trailing commas</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">parsed and updated</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">trailing commas are removed and extra key is added</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+  </div>
+</div>
+
+<div class="feature">
+  <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="feature-info">
+      <div class="feature-title">writeManagedBindings</div>
+      <div class="feature-path">src/core/managed.test.ts</div>
+    </div>
+    <div class="feature-stats">
+      <span class="stat passed">✓ 2</span>
+      <span class="stat failed">✗ 0</span>
+      <span class="stat skipped">○ 0</span>
+      <span class="chevron">▼</span>
+    </div>
+  </div>
+  <div class="feature-content">
+    
+<div class="scenario" id="scenario-fdc1b36c622b">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">generates KV and D1 bindings with correct IDs</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a config with KV, D1, hyperdrive, and queue bindings for apps/api</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">KV bindings include the correct ID</span>
+  <span class="step-duration"></span>
+</div><div class="step continuation">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">And</span>
+  <span class="step-text">D1 bindings include the database_id and database_name</span>
+  <span class="step-duration"></span>
+</div><div class="step continuation">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">And</span>
+  <span class="step-text">Hyperdrive bindings are included</span>
+  <span class="step-duration"></span>
+</div><div class="step continuation">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">And</span>
+  <span class="step-text">Queue producer bindings are included</span>
+  <span class="step-duration"></span>
+</div><div class="step continuation">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">And</span>
+  <span class="step-text">Service bindings map target worker to deployed name</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-718da93e63e6">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">skips resources without observed IDs</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a state where cache-kv has no observed ID (missing)</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">KV bindings are not generated for the missing resource</span>
+  <span class="step-duration"></span>
+</div><div class="step continuation">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">And</span>
+  <span class="step-text">D1 bindings are still generated (has an ID)</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+  </div>
+</div>
+
+<div class="feature">
+  <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="feature-info">
       <div class="feature-title">resourceName</div>
       <div class="feature-path">src/core/naming.test.ts</div>
     </div>
@@ -4214,6 +6048,113 @@ body {
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Then</span>
   <span class="step-text">returns true (protected by default)</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+  </div>
+</div>
+
+<div class="feature">
+  <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="feature-info">
+      <div class="feature-title">findAvailablePorts</div>
+      <div class="feature-path">src/core/port-finder.test.ts</div>
+    </div>
+    <div class="feature-stats">
+      <span class="stat passed">✓ 3</span>
+      <span class="stat failed">✗ 0</span>
+      <span class="stat skipped">○ 0</span>
+      <span class="chevron">▼</span>
+    </div>
+  </div>
+  <div class="feature-content">
+    
+<div class="scenario" id="scenario-579112167229">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">returns the requested number of unique ports</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a request for <span class="step-param">3</span> available ports starting at <span class="step-param">19200</span></span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text"><span class="step-param">3</span> unique ports are returned, all &gt;= <span class="step-param">19200</span></span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-f856d8823aa7">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">skips ports that are already in use</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">port <span class="step-param">19300</span> is occupied by another process</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the occupied port is skipped</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-379a7abed7fc">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">skips ports in the exclude set</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">ports <span class="step-param">19400</span> and <span class="step-param">19401</span> are in the exclude set</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">excluded ports are skipped even if they are free</span>
   <span class="step-duration"></span>
 </div></div>
     
@@ -4893,6 +6834,323 @@ body {
 <div class="feature">
   <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
     <div class="feature-info">
+      <div class="feature-title">diffStages</div>
+      <div class="feature-path">src/core/stage-diff.test.ts</div>
+    </div>
+    <div class="feature-stats">
+      <span class="stat passed">✓ 10</span>
+      <span class="stat failed">✗ 0</span>
+      <span class="stat skipped">○ 0</span>
+      <span class="chevron">▼</span>
+    </div>
+  </div>
+  <div class="feature-content">
+    
+<div class="scenario" id="scenario-4fba30d84090">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">sets stageA and stageB names on result</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">two stage states named staging and production</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">result.stageA is staging and result.stageB is production</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-a967ca093cc5">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">classifies shared resources with same type as same</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">payments-db exists in both stages with same type d1</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">payments-db has status same</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-bd59e674e4ac">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">classifies a resource only in A as only-in-a</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">staging-only-kv exists only in stageA</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">staging-only-kv has status only-in-a</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-c6bd52ec63c1">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">classifies a resource only in B as only-in-b</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a stageB with a resource not in stageA</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">prod-only-queue has status only-in-b</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-5db04ba17249">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">classifies a resource with different type as different</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">cache-kv has type kv in A but type d1 in B</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">cache-kv has status different</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-1f1e533d9715">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">classifies shared workers as same</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">apps/api exists in both stages</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">apps/api worker has status same</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-39a735009a60">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">classifies a worker only in A as only-in-a</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">apps/staging-only exists only in stageA</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">apps/staging-only has status only-in-a</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-62a0dd5be2a3">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">reports secret differences — set in A, missing in B</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">DB_PASSWORD is set in staging but missing in production</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">a SecretDiff exists for apps/api DB_PASSWORD with inA=set and inB=missing</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-43f1747291e0">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">does not report secrets that are identical in both stages</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">API_KEY is set in both staging and production</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">no SecretDiff for apps/api API_KEY</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-b5a42cd6092f">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">reports a secret absent in A but set in B</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">stageB has a secret not present in stageA&#039;s worker at all</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">NEW_SECRET for apps/api has inA=absent and inB=set</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+  </div>
+</div>
+
+<div class="feature">
+  <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="feature-info">
       <div class="feature-title">KvStateProvider</div>
       <div class="feature-path">src/core/state.test.ts</div>
     </div>
@@ -4932,6 +7190,203 @@ body {
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Then</span>
   <span class="step-text">it should parse the JSON text body into stage state</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+  </div>
+</div>
+
+<div class="feature">
+  <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="feature-info">
+      <div class="feature-title">validateConfig</div>
+      <div class="feature-path">src/core/validate-config.test.ts</div>
+    </div>
+    <div class="feature-stats">
+      <span class="stat passed">✓ 6</span>
+      <span class="stat failed">✗ 0</span>
+      <span class="stat skipped">○ 0</span>
+      <span class="chevron">▼</span>
+    </div>
+  </div>
+  <div class="feature-content">
+    
+<div class="scenario" id="scenario-efbcb7431663">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">passes for a valid config</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a config where all references are valid and there are no cycles</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">no errors are returned</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-38c2e5b2c95f">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">catches binding to a non-existent worker</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a resource that has a binding for a worker not in the workers list</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">an error is returned about the unknown worker</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-4c8cd2944e9f">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">catches circular service bindings</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">two workers that each bind to the other as a service</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">a circular binding error is detected</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-c11405a84390">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">catches DLQ referencing a non-existent resource</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a queue resource with a deadLetterFor pointing to a non-existent resource</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">an error about the unknown DLQ resource is returned</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-2686cd2f5f42">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">catches service binding to a non-existent worker</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a service binding that targets a worker not in the workers list</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">an error about the unknown target worker is returned</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-1bb85cd725df">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">catches DLQ referencing a resource that is not a queue</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a deadLetterFor reference that points at an existing KV resource instead of a queue</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">an error is returned because deadLetterFor must target another queue</span>
   <span class="step-duration"></span>
 </div></div>
     
@@ -5117,135 +7572,8 @@ body {
 <div class="feature">
   <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
     <div class="feature-info">
-      <div class="feature-title">cloudflare-api</div>
-      <div class="feature-path">src/providers/cloudflare-api.test.ts</div>
-    </div>
-    <div class="feature-stats">
-      <span class="stat passed">✓ 3</span>
-      <span class="stat failed">✗ 0</span>
-      <span class="stat skipped">○ 0</span>
-      <span class="chevron">▼</span>
-    </div>
-  </div>
-  <div class="feature-content">
-    
-<div class="scenario" id="scenario-e6225f0bd953">
-  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
-    <div class="scenario-info">
-      <div class="scenario-title">
-        <span class="status-icon status-passed">✓</span>
-        <span class="scenario-name">uses CLOUDFLARE_ACCOUNT_ID without fetching</span>
-      </div>
-      <div class="scenario-meta"></div>
-    </div>
-    <span class="scenario-duration"></span>
-  </div>
-  <div class="scenario-content">
-    
-    <div class="steps"><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">Given</span>
-  <span class="step-text">CLOUDFLARE_ACCOUNT_ID is set in the environment</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">When</span>
-  <span class="step-text">resolveAccountId is called</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">Then</span>
-  <span class="step-text">it returns the env var value without making any API calls</span>
-  <span class="step-duration"></span>
-</div></div>
-    
-    
-    
-  </div>
-</div>
-
-<div class="scenario" id="scenario-4e34fc65fccc">
-  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
-    <div class="scenario-info">
-      <div class="scenario-title">
-        <span class="status-icon status-passed">✓</span>
-        <span class="scenario-name">caches resolved account ids between calls</span>
-      </div>
-      <div class="scenario-meta"></div>
-    </div>
-    <span class="scenario-duration"></span>
-  </div>
-  <div class="scenario-content">
-    
-    <div class="steps"><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">Given</span>
-  <span class="step-text">no CLOUDFLARE_ACCOUNT_ID in the environment</span>
-  <span class="step-duration"></span>
-</div><div class="step continuation">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">And</span>
-  <span class="step-text">the API returns an account ID</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">When</span>
-  <span class="step-text">resolveAccountId is called twice</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">Then</span>
-  <span class="step-text">only one API call is made</span>
-  <span class="step-duration"></span>
-</div></div>
-    
-    
-    
-  </div>
-</div>
-
-<div class="scenario" id="scenario-d9b193f8f88a">
-  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
-    <div class="scenario-info">
-      <div class="scenario-title">
-        <span class="status-icon status-passed">✓</span>
-        <span class="scenario-name">formats API errors from cfApiResult</span>
-      </div>
-      <div class="scenario-meta"></div>
-    </div>
-    <span class="scenario-duration"></span>
-  </div>
-  <div class="scenario-content">
-    
-    <div class="steps"><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">Given</span>
-  <span class="step-text">an API response with multiple error codes</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">When</span>
-  <span class="step-text">cfApiResult parses the response</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">Then</span>
-  <span class="step-text">it throws with all error codes and messages formatted</span>
-  <span class="step-duration"></span>
-</div></div>
-    
-    
-    
-  </div>
-</div>
-  </div>
-</div>
-
-<div class="feature">
-  <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
-    <div class="feature-info">
-      <div class="feature-title">local CLI-backed providers</div>
-      <div class="feature-path">src/providers/local-cli.test.ts</div>
+      <div class="feature-title">postCheckRun</div>
+      <div class="feature-path">src/core/ci/check.test.ts</div>
     </div>
     <div class="feature-stats">
       <span class="stat passed">✓ 2</span>
@@ -5256,12 +7584,12 @@ body {
   </div>
   <div class="feature-content">
     
-<div class="scenario" id="scenario-228d55e9fd33">
+<div class="scenario" id="scenario-dbd62cd5ac98">
   <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
     <div class="scenario-info">
       <div class="scenario-title">
         <span class="status-icon status-passed">✓</span>
-        <span class="scenario-name">extracts the created D1 database id from wrangler output</span>
+        <span class="scenario-name">posts a success check run when state exists</span>
       </div>
       <div class="scenario-meta"></div>
     </div>
@@ -5272,17 +7600,12 @@ body {
     <div class="steps"><div class="step">
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Given</span>
-  <span class="step-text">wrangler output containing a D1 database UUID</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">When</span>
-  <span class="step-text">the UUID regex runs against the output</span>
+  <span class="step-text">a valid stage state and a GitHub provider</span>
   <span class="step-duration"></span>
 </div><div class="step">
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Then</span>
-  <span class="step-text">the database ID is extracted</span>
+  <span class="step-text">a success check run is created via the provider</span>
   <span class="step-duration"></span>
 </div></div>
     
@@ -5291,12 +7614,12 @@ body {
   </div>
 </div>
 
-<div class="scenario" id="scenario-8d52912889b3">
+<div class="scenario" id="scenario-06b59585d518">
   <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
     <div class="scenario-info">
       <div class="scenario-title">
         <span class="status-icon status-passed">✓</span>
-        <span class="scenario-name">treats existing R2 buckets as non-fatal based on error message matching</span>
+        <span class="scenario-name">posts a failure check run when state is null</span>
       </div>
       <div class="scenario-meta"></div>
     </div>
@@ -5307,17 +7630,12 @@ body {
     <div class="steps"><div class="step">
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Given</span>
-  <span class="step-text">an error message indicating a bucket already exists</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">When</span>
-  <span class="step-text">the error is checked for the &#039;already exists&#039; pattern</span>
+  <span class="step-text">a null state (stage has not been deployed)</span>
   <span class="step-duration"></span>
 </div><div class="step">
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Then</span>
-  <span class="step-text">the match succeeds, allowing the error to be treated as non-fatal</span>
+  <span class="step-text">a failure check run is created via the provider</span>
   <span class="step-duration"></span>
 </div></div>
     
@@ -5331,11 +7649,11 @@ body {
 <div class="feature">
   <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
     <div class="feature-info">
-      <div class="feature-title">providers</div>
-      <div class="feature-path">src/providers/resources.test.ts</div>
+      <div class="feature-title">renderAscii</div>
+      <div class="feature-path">src/core/renderers/ascii.test.ts</div>
     </div>
     <div class="feature-stats">
-      <span class="stat passed">✓ 4</span>
+      <span class="stat passed">✓ 6</span>
       <span class="stat failed">✗ 0</span>
       <span class="stat skipped">○ 0</span>
       <span class="chevron">▼</span>
@@ -5343,12 +7661,12 @@ body {
   </div>
   <div class="feature-content">
     
-<div class="scenario" id="scenario-56369a6775db">
+<div class="scenario" id="scenario-5c264d08a992">
   <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
     <div class="scenario-info">
       <div class="scenario-title">
         <span class="status-icon status-passed">✓</span>
-        <span class="scenario-name">adopts an existing KV namespace when create reports conflict</span>
+        <span class="scenario-name">includes worker names in the output</span>
       </div>
       <div class="scenario-meta"></div>
     </div>
@@ -5359,22 +7677,12 @@ body {
     <div class="steps"><div class="step">
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Given</span>
-  <span class="step-text">the Cloudflare API rejects KV creation with a conflict error</span>
-  <span class="step-duration"></span>
-</div><div class="step continuation">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">And</span>
-  <span class="step-text">a subsequent list call returns the existing namespace</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">When</span>
-  <span class="step-text">createKvNamespace is called</span>
+  <span class="step-text">a graph with two workers</span>
   <span class="step-duration"></span>
 </div><div class="step">
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Then</span>
-  <span class="step-text">the existing namespace is adopted</span>
+  <span class="step-text">output contains both worker labels</span>
   <span class="step-duration"></span>
 </div></div>
     
@@ -5383,12 +7691,12 @@ body {
   </div>
 </div>
 
-<div class="scenario" id="scenario-330018a4a97a">
+<div class="scenario" id="scenario-570ceeebb38b">
   <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
     <div class="scenario-info">
       <div class="scenario-title">
         <span class="status-icon status-passed">✓</span>
-        <span class="scenario-name">adopts an existing queue when create returns conflict</span>
+        <span class="scenario-name">includes resource names in the output</span>
       </div>
       <div class="scenario-meta"></div>
     </div>
@@ -5399,22 +7707,12 @@ body {
     <div class="steps"><div class="step">
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Given</span>
-  <span class="step-text">the Cloudflare API rejects queue creation with a <span class="step-param">409</span> conflict</span>
-  <span class="step-duration"></span>
-</div><div class="step continuation">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">And</span>
-  <span class="step-text">a subsequent list call returns the existing queue</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">When</span>
-  <span class="step-text">createQueue is called</span>
+  <span class="step-text">a graph with KV and D1 resources</span>
   <span class="step-duration"></span>
 </div><div class="step">
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Then</span>
-  <span class="step-text">the existing queue is adopted</span>
+  <span class="step-text">output contains resource names</span>
   <span class="step-duration"></span>
 </div></div>
     
@@ -5423,12 +7721,12 @@ body {
   </div>
 </div>
 
-<div class="scenario" id="scenario-4e8d2f9685bd">
+<div class="scenario" id="scenario-ff7281548a95">
   <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
     <div class="scenario-info">
       <div class="scenario-title">
         <span class="status-icon status-passed">✓</span>
-        <span class="scenario-name">adopts an existing Hyperdrive config when create returns conflict</span>
+        <span class="scenario-name">includes edge labels (binding names) in the output</span>
       </div>
       <div class="scenario-meta"></div>
     </div>
@@ -5439,22 +7737,12 @@ body {
     <div class="steps"><div class="step">
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Given</span>
-  <span class="step-text">the Cloudflare API rejects Hyperdrive creation with a <span class="step-param">409</span> conflict</span>
-  <span class="step-duration"></span>
-</div><div class="step continuation">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">And</span>
-  <span class="step-text">a subsequent list call returns the existing config</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">When</span>
-  <span class="step-text">createHyperdrive is called</span>
+  <span class="step-text">edges with binding name labels</span>
   <span class="step-duration"></span>
 </div><div class="step">
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Then</span>
-  <span class="step-text">the existing Hyperdrive config is adopted</span>
+  <span class="step-text">output contains the binding labels</span>
   <span class="step-duration"></span>
 </div></div>
     
@@ -5463,12 +7751,12 @@ body {
   </div>
 </div>
 
-<div class="scenario" id="scenario-a143242edc4a">
+<div class="scenario" id="scenario-43a65dadb1bf">
   <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
     <div class="scenario-info">
       <div class="scenario-title">
         <span class="status-icon status-passed">✓</span>
-        <span class="scenario-name">treats worker deletion as idempotent on 404</span>
+        <span class="scenario-name">uses tree structure prefixes</span>
       </div>
       <div class="scenario-meta"></div>
     </div>
@@ -5479,17 +7767,813 @@ body {
     <div class="steps"><div class="step">
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Given</span>
-  <span class="step-text">the Cloudflare API returns <span class="step-param">404</span> for a worker deletion</span>
-  <span class="step-duration"></span>
-</div><div class="step">
-  <span class="step-status status-passed">✓</span>
-  <span class="step-keyword">When</span>
-  <span class="step-text">deleteWorker is called</span>
+  <span class="step-text">a multi-node graph</span>
   <span class="step-duration"></span>
 </div><div class="step">
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Then</span>
-  <span class="step-text">it resolves without error</span>
+  <span class="step-text">output contains tree structure characters</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-914073b41805">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">includes resource type labels</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a graph with kv and d1 resources</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">output shows the resource type</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-bc496aeda447">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">shows deployedName and resourceId when present in state-enriched nodes</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a graph with state-enriched nodes</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">output shows deployed name and resource id</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+  </div>
+</div>
+
+<div class="feature">
+  <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="feature-info">
+      <div class="feature-title">renderDot</div>
+      <div class="feature-path">src/core/renderers/dot.test.ts</div>
+    </div>
+    <div class="feature-stats">
+      <span class="stat passed">✓ 8</span>
+      <span class="stat failed">✗ 0</span>
+      <span class="stat skipped">○ 0</span>
+      <span class="chevron">▼</span>
+    </div>
+  </div>
+  <div class="feature-content">
+    
+<div class="scenario" id="scenario-792d09968429">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">outputs a valid digraph block</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">any graph</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">output is a digraph block</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-472971b729cc">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">contains sanitized node IDs</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">nodes with slashes and hyphens</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">node IDs appear in the output sanitized</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-7b554f5f47ef">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">assigns box shape to worker nodes</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">worker nodes</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">worker nodes have shape=box</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-fbfa69259790">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">assigns cylinder shape to KV and D1 nodes</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">kv and d1 nodes</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">kv and d1 nodes have shape=cylinder</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-d858222458ed">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">assigns parallelogram shape to queue nodes</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a queue node</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">queue nodes have shape=parallelogram</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-20e54a9dea73">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">assigns hexagon shape to hyperdrive nodes</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a hyperdrive node</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">hyperdrive nodes have shape=hexagon</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-7f3a72e58284">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">includes edge labels</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">edges with labels</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">edge labels appear in the output</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-9549646fffcf">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">renders dead-letter edges with style=dashed</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a dead-letter edge</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">dead-letter edges have style=dashed</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+  </div>
+</div>
+
+<div class="feature">
+  <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="feature-info">
+      <div class="feature-title">renderJson</div>
+      <div class="feature-path">src/core/renderers/json.test.ts</div>
+    </div>
+    <div class="feature-stats">
+      <span class="stat passed">✓ 5</span>
+      <span class="stat failed">✗ 0</span>
+      <span class="stat skipped">○ 0</span>
+      <span class="chevron">▼</span>
+    </div>
+  </div>
+  <div class="feature-content">
+    
+<div class="scenario" id="scenario-a3990ddf3f20">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">returns a parseable JSON string</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a graph with nodes and edges</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the output is valid JSON</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-6913289125ea">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">parsed output contains nodes array</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a graph with two nodes</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">parsed JSON has a nodes array</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-41df121d0d9d">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">parsed output contains edges array</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a graph with one edge</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">parsed JSON has an edges array</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-682c43dc0906">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">preserves all node fields</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a node with id, type, and label</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the node fields are preserved</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-d43b6ba98411">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">is pretty-printed with 2-space indentation</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">any graph</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">output is formatted with 2-space indentation</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+  </div>
+</div>
+
+<div class="feature">
+  <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="feature-info">
+      <div class="feature-title">renderMermaid</div>
+      <div class="feature-path">src/core/renderers/mermaid.test.ts</div>
+    </div>
+    <div class="feature-stats">
+      <span class="stat passed">✓ 10</span>
+      <span class="stat failed">✗ 0</span>
+      <span class="stat skipped">○ 0</span>
+      <span class="chevron">▼</span>
+    </div>
+  </div>
+  <div class="feature-content">
+    
+<div class="scenario" id="scenario-392e64cfd37a">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">starts with &#039;graph TD&#039;</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">any graph</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">output starts with graph TD</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-991fcd90bf64">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">renders workers with rounded box shape</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">worker nodes</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">workers use ([label]) shape</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-b3b3147764b1">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">renders KV and D1 nodes with cylinder shape</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">kv and d1 nodes</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">KV and D1 use [(label)] shape</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-6c5012b9260d">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">renders queue nodes with parallelogram shape</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a queue node</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">queue uses [/label\] shape</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-e7d45b59ed66">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">renders hyperdrive nodes with hexagon shape</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a hyperdrive node</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">hyperdrive uses {{label}} shape</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-b222b00dc19d">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">uses --&gt; for service-binding and producer edges</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">service-binding and producer edges</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">those edges use --&gt; arrow with label</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-913d9e29a25d">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">uses -.-&gt; for binding edges</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">binding edges</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">binding edges use -.-&gt;</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-ab6b3126a223">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">uses -. DLQ .-&gt; for dead-letter edges</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a dead-letter edge</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">dead-letter edge uses -. DLQ .-&gt; syntax</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-5c4068fa6fd1">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">includes subgraphs grouping nodes by type</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">nodes of multiple types</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">output contains subgraph sections</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-dd89bce47564">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">sanitizes node IDs with non-alphanumeric characters</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">nodes with slashes and hyphens in IDs</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">node IDs have non-alphanumeric chars replaced with underscores</span>
   <span class="step-duration"></span>
 </div></div>
     

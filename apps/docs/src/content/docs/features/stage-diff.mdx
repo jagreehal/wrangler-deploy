@@ -1,0 +1,44 @@
+---
+title: Stage Diff
+description: Compare two stages side by side
+---
+
+## Usage
+
+```bash
+# Human-readable diff
+wd diff staging production
+
+# Machine-readable JSON
+wd diff staging production --format json
+```
+
+## What it compares
+
+The diff examines the state files of both stages and reports:
+
+| Category | Statuses |
+| -------- | -------- |
+| Resources | same, only-in-a, only-in-b, different |
+| Workers | same, only-in-a, only-in-b |
+| Secrets | present/missing per stage |
+
+## Example output
+
+```
+  Diff: staging vs production
+
+  Resources:
+    = payments-db (d1) — same
+    + cache-kv (kv) — only-in-a
+    ~ token-kv (kv) — different
+
+  Workers:
+    = workers/api — same
+    + workers/experiment — only-in-a
+
+  Secrets:
+    ~ workers/api/STRIPE_KEY: staging=set, production=set
+```
+
+Useful for checking staging against production before promoting, auditing what a PR preview added, or finding stale resources that only exist in one stage.

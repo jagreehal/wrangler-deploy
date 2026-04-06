@@ -1,0 +1,53 @@
+---
+title: Local Dev
+description: Start all workers locally with a single command
+---
+
+`wd dev` starts all your workers in one command.
+
+```bash
+wd dev                            # start all workers
+wd dev --filter workers/api       # start api + its deps
+wd dev --port 9000                # override base port
+```
+
+## Port resolution
+
+Before spawning anything, wrangler-deploy probes for free ports. If 8787 or 9229 is taken, it picks the next one. You never have to think about inspector port collisions when running multiple workers.
+
+```
+Starting dev servers:
+  workers/api    -> http://localhost:8787
+  workers/worker -> http://localhost:8788
+```
+
+## Filtering
+
+`--filter` starts only the target worker and any workers it depends on via service bindings. Dependencies are resolved transitively: if `api` calls `worker` which calls `auth`, filtering to `api` starts all three.
+
+```bash
+wd dev --filter workers/api
+```
+
+If the filter doesn't match any configured worker, the command fails immediately instead of sitting in an empty loop.
+
+## Hot reload
+
+Each `wrangler dev` process watches its own files. Save a change, the worker reloads.
+
+## Custom wrangler args
+
+Per-worker dev options can be set in the config:
+
+```ts
+export default defineConfig({
+  workers: ["workers/api", "workers/batch"],
+  workerOptions: {
+    "workers/api": {
+      devPort: 9000,
+      devArgs: ["--local", "--persist"],
+    },
+  },
+  resources: {},
+});
+```

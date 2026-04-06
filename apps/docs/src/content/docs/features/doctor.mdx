@@ -1,0 +1,36 @@
+---
+title: Doctor
+description: Diagnose common setup problems
+---
+
+## Usage
+
+```bash
+wd doctor
+```
+
+## What it checks
+
+Doctor runs a series of diagnostic checks and reports pass/warn/fail for each:
+
+```
+  wrangler-deploy doctor
+
+  ✓ wrangler installed: 4.80.0
+  ✓ wrangler authenticated
+  ✓ config valid: 0 errors
+  ✓ workers/api: wrangler.jsonc found
+  ✓ workers/batch: wrangler.jsonc found
+  ✗ workers/events: no wrangler.jsonc or wrangler.json
+```
+
+The checks include:
+
+| Check | What it verifies |
+| ----- | --------------- |
+| wrangler version | `wrangler` is installed and reachable |
+| wrangler auth | `wrangler whoami` succeeds |
+| config validation | `wrangler-deploy.config.ts` has no errors (dead-letter refs, unknown workers, etc.) |
+| worker configs | Each declared worker has a `wrangler.jsonc` or `wrangler.json` |
+
+Run it when setting up a new project, after upgrading wrangler, or when CI fails and you're not sure why.

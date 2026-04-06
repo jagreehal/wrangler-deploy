@@ -1,0 +1,46 @@
+---
+title: Topology Graph
+description: Visualise your worker and resource dependency graph
+---
+
+## Usage
+
+```bash
+# ASCII art (default)
+wd graph
+
+# Include live state overlay
+wd graph --stage staging
+
+# Mermaid diagram (paste into GitHub, Notion, etc.)
+wd graph --format mermaid
+
+# Graphviz DOT format
+wd graph --format dot
+
+# Machine-readable JSON
+wd graph --format json
+```
+
+## What it shows
+
+Workers, resources, service bindings, and queue relationships (producers, consumers, dead letter queues). The deploy order is visible from the graph structure.
+
+When `--stage` is provided, the graph overlays live state: resource IDs, worker URLs, sync status.
+
+## Formats
+
+| Format | Use case |
+| ------ | -------- |
+| `ascii` | Terminal output, quick overview |
+| `mermaid` | Embed in Markdown, GitHub PRs, docs |
+| `dot` | Render with Graphviz (`dot -Tpng`) |
+| `json` | Pipe into other tools, custom dashboards |
+
+## Example
+
+```bash
+wd graph --format mermaid
+```
+
+Output is valid Mermaid you can drop into a PR comment.

@@ -29,13 +29,11 @@ app.post("/dispatch", async (c) => {
   });
 
   // Call batch-workflow via service binding
-  const res = await c.env.WORKFLOWS.fetch(
-    new Request("https://internal/api/dispatch", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ batchId: body.batchId }),
-    }),
-  );
+  const res = await c.env.WORKFLOWS.fetch("https://internal/api/dispatch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ batchId: body.batchId }),
+  });
   const result = (await res.json()) as Record<string, unknown>;
   return c.json({ dispatched: true, ...result });
 });

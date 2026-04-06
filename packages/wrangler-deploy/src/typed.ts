@@ -105,23 +105,20 @@ export type ResourceMarker =
 // interfaces — the phantom type still works, it just can't resolve members.
 // ============================================================================
 
-// Fallback types — minimal compatible interfaces for wrangler-deploy's own build.
-// In consumer projects with @cloudflare/workers-types, the consumer's
-// wrangler-deploy.config.ts sees the REAL Cloudflare types via the Bound<T> mapping
-// because the consumer's tsconfig includes @cloudflare/workers-types globals.
-type CfKVNamespace = { get(key: string): Promise<string | null> };
-type CfQueue<Body = unknown> = { send(body: Body): Promise<void> };
-type CfHyperdrive = { connectionString: string };
-type CfD1Database = { prepare(query: string): unknown };
-type CfR2Bucket = { get(key: string): Promise<unknown> };
-type CfVectorizeIndex = {
-  query(vector: number[], options?: unknown): Promise<unknown>;
-  insert(vectors: unknown[]): Promise<unknown>;
-};
-type CfFetcher = { fetch(input: RequestInfo, init?: RequestInit): Promise<Response> };
-type CfWorkflow<Params = unknown> = {
-  create(options?: { id?: string; params?: Params }): Promise<{ id: string }>;
-};
+// Import the real Cloudflare binding types directly from @cloudflare/workers-types.
+// This avoids hand-rolled stubs that drift from the official types.
+// We use `import type` to pull specific types without loading the full ambient
+// globals (which conflict with Node's DOM types).
+import type {
+  KVNamespace as CfKVNamespace,
+  Queue as CfQueue,
+  Hyperdrive as CfHyperdrive,
+  D1Database as CfD1Database,
+  R2Bucket as CfR2Bucket,
+  VectorizeIndex as CfVectorizeIndex,
+  Workflow as CfWorkflow,
+} from "@cloudflare/workers-types";
+import type { Fetcher as CfFetcher } from "@cloudflare/workers-types";
 
 /**
  * Maps a wrangler-deploy resource marker to the corresponding Cloudflare Workers
