@@ -3,37 +3,60 @@ title: Local Dev
 description: Start all workers locally with a single command
 ---
 
-`wd dev` starts all your workers in one command.
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="tip">`wd dev` is built on top of your existing `wrangler.jsonc` files. It does not invent a separate dev config or ask you to change how local development works.</Aside>
+
+If you have more than one worker, you've probably dealt with opening three terminals, picking ports that don't collide, and then watching two `wrangler dev` processes fight over inspector port 9229. `wd dev` handles all of that.
+
+## Usage
 
 ```bash
-wd dev                            # start all workers
-wd dev --filter workers/api       # start api + its deps
-wd dev --port 9000                # override base port
+$ wd dev
+Starting dev servers:
+  workers/batch-workflow -> http://localhost:8787
+  workers/event-router   -> http://localhost:8788
+  workers/api            -> http://localhost:8789
 ```
+
+Workers start in dependency order and each one runs `wrangler dev` with its own port.
 
 ## Port resolution
 
-Before spawning anything, wrangler-deploy probes for free ports. If 8787 or 9229 is taken, it picks the next one. You never have to think about inspector port collisions when running multiple workers.
+Before spawning anything, wrangler-deploy probes for free ports. If 8787 or 9229 is already taken by another process, it picks the next one. You never have to think about inspector port collisions when running multiple workers.
 
-```
+```bash
+# Something else is on 8787? No problem.
+$ wd dev --port 9000
 Starting dev servers:
-  workers/api    -> http://localhost:8787
-  workers/worker -> http://localhost:8788
+  workers/batch-workflow -> http://localhost:9000
+  workers/event-router   -> http://localhost:9001
+  workers/api            -> http://localhost:9002
 ```
 
 ## Filtering
 
-`--filter` starts only the target worker and any workers it depends on via service bindings. Dependencies are resolved transitively: if `api` calls `worker` which calls `auth`, filtering to `api` starts all three.
+In a large monorepo you probably don't need every worker running. `--filter` starts only the target worker and its transitive service-binding dependencies.
 
 ```bash
-wd dev --filter workers/api
+$ wd dev --filter workers/api
+Starting dev servers:
+  workers/batch-workflow -> http://localhost:8787
+  workers/api            -> http://localhost:8788
 ```
 
-If the filter doesn't match any configured worker, the command fails immediately instead of sitting in an empty loop.
+batch-workflow is included because api has a `WORKFLOWS` service binding to it. event-router is skipped because api doesn't depend on it.
+
+If the filter doesn't match any configured worker, the command fails immediately with a list of valid worker paths.
 
 ## Hot reload
 
-Each `wrangler dev` process watches its own files. Save a change, the worker reloads.
+Each `wrangler dev` process watches its own files. Save a change, the worker reloads. This is the same wrangler hot reload you already use. wrangler-deploy just starts the processes for you.
+
+```
+[api                 ] ⎔ Reloading local server...
+[api                 ] ⎔ Local server updated and ready
+```
 
 ## Custom wrangler args
 

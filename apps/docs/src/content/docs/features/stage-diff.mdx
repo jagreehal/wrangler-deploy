@@ -3,29 +3,12 @@ title: Stage Diff
 description: Compare two stages side by side
 ---
 
+Typical situation: you're about to promote staging to production and want to check they actually match. Also good for auditing what a long-running PR preview has that production doesn't, or tracking down stale resources.
+
 ## Usage
 
 ```bash
-# Human-readable diff
-wd diff staging production
-
-# Machine-readable JSON
-wd diff staging production --format json
-```
-
-## What it compares
-
-The diff examines the state files of both stages and reports:
-
-| Category | Statuses |
-| -------- | -------- |
-| Resources | same, only-in-a, only-in-b, different |
-| Workers | same, only-in-a, only-in-b |
-| Secrets | present/missing per stage |
-
-## Example output
-
-```
+$ wd diff staging production
   Diff: staging vs production
 
   Resources:
@@ -41,4 +24,21 @@ The diff examines the state files of both stages and reports:
     ~ workers/api/STRIPE_KEY: staging=set, production=set
 ```
 
-Useful for checking staging against production before promoting, auditing what a PR preview added, or finding stale resources that only exist in one stage.
+The symbols: `=` same in both, `+` only in the first stage, `-` only in the second, `~` exists in both but different.
+
+## Machine-readable output
+
+```bash
+$ wd diff staging production --format json
+{
+  "resources": [
+    { "name": "payments-db", "type": "d1", "status": "same" },
+    { "name": "cache-kv", "type": "kv", "status": "only-in-a" },
+    ...
+  ],
+  "workers": [...],
+  "secrets": [...]
+}
+```
+
+Pipe this into `jq` or your own tooling for automated promotion checks.

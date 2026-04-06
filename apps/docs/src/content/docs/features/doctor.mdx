@@ -3,34 +3,42 @@ title: Doctor
 description: Diagnose common setup problems
 ---
 
+Run this when something isn't working and you're not sure where to start. Good first step after upgrading wrangler, onboarding a new team member, or seeing a CI failure you can't explain.
+
 ## Usage
 
 ```bash
-wd doctor
+$ wd doctor
+  wrangler-deploy doctor
+
+  ✓ wrangler installed: wrangler 4.80.0
+  ✓ wrangler auth: logged in as jag.reehal@gmail.com
+  ✓ worker path: workers/api exists
+  ✓ worker path: workers/batch-workflow exists
+  ✓ worker path: workers/event-router exists
+  ✓ config valid: No config errors
+```
+
+When something is wrong, you'll see it:
+
+```bash
+$ wd doctor
+  wrangler-deploy doctor
+
+  ✓ wrangler installed: wrangler 4.80.0
+  ✗ wrangler auth: not logged in
+  ✓ worker path: workers/api exists
+  ✗ worker path: workers/events: no wrangler.jsonc or wrangler.json
+  ✗ config valid: 2 errors
+    Resource "dlq" has deadLetterFor referencing "cache-kv" which is type "kv", not a queue
+    serviceBindings has unknown target worker "workers/missing"
 ```
 
 ## What it checks
 
-Doctor runs a series of diagnostic checks and reports pass/warn/fail for each:
-
-```
-  wrangler-deploy doctor
-
-  ✓ wrangler installed: 4.80.0
-  ✓ wrangler authenticated
-  ✓ config valid: 0 errors
-  ✓ workers/api: wrangler.jsonc found
-  ✓ workers/batch: wrangler.jsonc found
-  ✗ workers/events: no wrangler.jsonc or wrangler.json
-```
-
-The checks include:
-
 | Check | What it verifies |
 | ----- | --------------- |
 | wrangler version | `wrangler` is installed and reachable |
-| wrangler auth | `wrangler whoami` succeeds |
-| config validation | `wrangler-deploy.config.ts` has no errors (dead-letter refs, unknown workers, etc.) |
-| worker configs | Each declared worker has a `wrangler.jsonc` or `wrangler.json` |
-
-Run it when setting up a new project, after upgrading wrangler, or when CI fails and you're not sure why.
+| wrangler auth | `wrangler whoami` succeeds (catches expired tokens) |
+| worker paths | each declared worker has a `wrangler.jsonc` or `wrangler.json` on disk |
+| config validation | `wrangler-deploy.config.ts` has no errors — dead-letter refs, unknown workers, invalid bindings |

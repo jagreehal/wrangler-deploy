@@ -5,6 +5,15 @@ sidebar:
 description: Get wrangler-deploy running in 2 minutes
 ---
 
+If your project already has `wrangler.jsonc` files, this is the path. You do not rewrite them, migrate them, or stop using them. wrangler-deploy reads them, generates one project-level config, and uses rendered JSONC files only when it is time to deploy.
+
+At the end of this guide you will have:
+
+- Your existing `wrangler.jsonc` files untouched
+- A generated `wrangler-deploy.config.ts`
+- A stage you can plan, apply, deploy, and destroy
+- The option to run all workers locally with `wd dev`
+
 ## Install
 
 ```bash
@@ -15,58 +24,98 @@ pnpm add -D wrangler-deploy
 
 ## Initialize
 
-In any project with a `wrangler.jsonc`:
+Run this in any project that already has `wrangler.jsonc` or `wrangler.json` files:
 
 ```bash
-wd init
+$ wd init
+  ✓ Found workers/api/wrangler.jsonc
+  ✓ Found workers/batch-workflow/wrangler.jsonc
+  ✓ Found workers/event-router/wrangler.jsonc
+  ✓ Generated wrangler-deploy.config.ts
 ```
 
-This scans your wrangler configs and generates a `wrangler-deploy.config.ts` with your resources and bindings.
+`wd init` is built around existing Wrangler projects. It scans your `wrangler.jsonc` files and generates a matching `wrangler-deploy.config.ts`. Your Wrangler files stay untouched.
 
 ## Plan
 
-See what would be created:
+See what would be created before touching anything:
 
 ```bash
-wd plan --stage staging
-```
+$ wd plan --stage staging
+  + payments-db-staging (d1) create
+  + token-kv-staging (kv) create
+  + cache-kv-staging (kv) create
+  + payment-outbox-staging (queue) create
+  + payment-outbox-dlq-staging (queue) create
 
-```
-+ payments-db-staging (d1) create
-+ cache-kv-staging (kv) create
-+ outbox-staging (queue) create
-
-3 to create, 0 in sync
+  5 to create, 0 in sync, 0 drifted, 0 orphaned
 ```
 
 ## Apply
 
-Provision the resources:
+Provision the resources in Cloudflare and record their IDs in state:
 
 ```bash
-wd apply --stage staging
+$ wd apply --stage staging
+  + payments-db-staging (d1) created
+  + token-kv-staging (kv) created
+  + cache-kv-staging (kv) created
+  + payment-outbox-staging (queue) created
+  + payment-outbox-dlq-staging (queue) created
+
+  ✓ 5 resources applied
 ```
+
+This is the step where wrangler-deploy turns your stage name into real infrastructure. It also renders per-worker `wrangler.rendered.jsonc` files with the correct IDs and stage-specific names.
 
 ## Deploy
 
-Deploy workers with the provisioned IDs:
+Deploy workers using those rendered configs:
 
 ```bash
-wd deploy --stage staging
+$ wd deploy --stage staging
+  Deploying workers/batch-workflow...
+  ✓ payment-batch-workflow-staging deployed
+  Deploying workers/event-router...
+  ✓ payment-event-router-staging deployed
+  Deploying workers/api...
+  ✓ payment-api-staging deployed
 ```
+
+Workers deploy in dependency order, so service-binding targets go first. You still get Wrangler underneath. wrangler-deploy is deciding order and wiring, then calling `wrangler deploy` with the rendered JSONC for that stage.
 
 ## Destroy
 
-Tear everything down:
+Tear everything down when you're done:
 
 ```bash
-wd destroy --stage staging --force
+$ wd destroy --stage staging --force
+  Removing queue consumers...
+  Deleting workers...
+  Deleting resources...
+  ✓ Stage "staging" destroyed
 ```
 
 ## Local dev
 
-`wrangler dev` still works as before. No wrangler-deploy needed for local development:
+Local development is still a Wrangler workflow. Your checked-in `wrangler.jsonc` files have not changed, so `wrangler dev` still works exactly the way it did before:
 
 ```bash
-wrangler dev
+$ wrangler dev
 ```
+
+If you have multiple workers, `wd dev` starts them together and handles port assignment:
+
+```bash
+$ wd dev
+Starting dev servers:
+  workers/batch-workflow -> http://localhost:8787
+  workers/event-router   -> http://localhost:8788
+  workers/api            -> http://localhost:8789
+```
+
+That is the core model of the tool:
+
+- Keep `wrangler.jsonc` for development.
+- Generate stage-aware rendered JSONC for deploys.
+- Use one project-level config to connect the two.
