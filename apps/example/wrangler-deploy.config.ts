@@ -78,9 +78,187 @@ export default defineConfig({
     },
   },
 
+  fixtures: {
+    "api-health": {
+      type: "worker",
+      worker: "workers/api",
+      endpoint: "health",
+      description: "Shared health check for worker calls and local verification",
+    },
+    "echo-ping": {
+      type: "worker",
+      worker: "workers/api",
+      endpoint: "echo",
+      query: {
+        source: "fixture",
+      },
+      headers: {
+        "x-request-id": "fixture-echo",
+      },
+      body: JSON.stringify({ ping: true }),
+      description: "Exercise the local echo endpoint with a standard payload",
+    },
+    "payment-outbox-dispatch": {
+      type: "queue",
+      queue: "payment-outbox",
+      worker: "workers/api",
+      payload: JSON.stringify({ type: "batch.dispatched", data: { batchId: "fixture-test" } }),
+      description: "Send a representative payment outbox message",
+    },
+    "payments-batch-count": {
+      type: "d1",
+      database: "payments-db",
+      worker: "workers/api",
+      sql: "SELECT COUNT(*) AS batch_count FROM batches;",
+      description: "Assert that the seeded example contains one batch",
+    },
+  },
+
+  dev: {
+    endpoints: {
+      health: {
+        worker: "workers/api",
+        path: "/health",
+        method: "GET",
+        description: "API health endpoint",
+      },
+      echo: {
+        worker: "workers/api",
+        path: "/__wd/echo",
+        method: "POST",
+        description: "Local echo helper for worker call validation",
+      },
+    },
+    d1: {
+      "payments-db": {
+        worker: "workers/api",
+        seedFile: "sql/seed.sql",
+        resetFile: "sql/reset.sql",
+      },
+    },
+    queues: {
+      "payment-outbox": {
+        worker: "workers/api",
+        path: "/__wd/queues/payment-outbox",
+      },
+    },
+    session: {
+      entryWorker: "workers/api",
+      persistTo: ".wrangler/state",
+    },
+    snapshots: {
+      paths: [".wrangler/state"],
+    },
+    companions: [
+      {
+        name: "dev:cron",
+        command: "pnpm dev:cron",
+        cwd: ".",
+        workers: ["workers/api"],
+      },
+    ],
+  },
+
   stages: {
     production: { protected: true },
     staging: { protected: true },
     "pr-*": { protected: false, ttl: "7d" },
+  },
+
+  verifyLocal: {
+    checks: [
+      {
+        type: "worker",
+        name: "api health",
+        worker: "workers/api",
+        fixture: "api-health",
+        expectStatus: 200,
+        expectBodyIncludes: ['"ok":true'],
+      },
+      {
+        type: "d1Reset",
+        name: "reset payments db",
+        database: "payments-db",
+      },
+      {
+        type: "d1Seed",
+        name: "seed payments db",
+        database: "payments-db",
+      },
+      {
+        type: "d1",
+        name: "seeded batch count",
+        database: "payments-db",
+        fixture: "payments-batch-count",
+        expectTextIncludes: ['"batch_count": 1'],
+      },
+      {
+        type: "queue",
+        name: "payment outbox accepts payloads",
+        queue: "payment-outbox",
+        fixture: "payment-outbox-dispatch",
+        expectStatus: 200,
+        expectBodyIncludes: ['"queued":true'],
+      },
+      {
+        type: "cron",
+        name: "batch workflow cron route",
+        worker: "workers/batch-workflow",
+        expectStatus: 200,
+        expectBodyIncludes: ["ok"],
+      },
+    ],
+    packs: {
+      smoke: {
+        description: "Fast local smoke test for CI and dev sessions",
+        checks: [
+          {
+            type: "worker",
+            name: "api health json",
+            worker: "workers/api",
+            fixture: "api-health",
+            expectStatus: 200,
+            expectJsonIncludes: { ok: true },
+          },
+          {
+            type: "queue",
+            name: "queue fixture accepted",
+            queue: "payment-outbox",
+            fixture: "payment-outbox-dispatch",
+            expectStatus: 200,
+            expectJsonIncludes: { queued: true },
+          },
+        ],
+      },
+      regression: {
+        description: "Reset, seed, verify D1, queue, and cron in one local run",
+        checks: [
+          {
+            type: "d1Reset",
+            name: "reset payments db",
+            database: "payments-db",
+          },
+          {
+            type: "d1Seed",
+            name: "seed payments db",
+            database: "payments-db",
+          },
+          {
+            type: "d1",
+            name: "seeded batch count json",
+            database: "payments-db",
+            fixture: "payments-batch-count",
+            expectJsonIncludes: [{ results: [{ batch_count: 1 }] }],
+          },
+          {
+            type: "cron",
+            name: "batch workflow cron route",
+            worker: "workers/batch-workflow",
+            expectStatus: 200,
+            expectBodyIncludes: ["ok"],
+          },
+        ],
+      },
+    },
   },
 });

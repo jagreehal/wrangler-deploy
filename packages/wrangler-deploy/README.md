@@ -1,8 +1,10 @@
 # wrangler-deploy
 
-Cloudflare Workers projects that use D1, KV, Queues, Hyperdrive, or R2 have no built-in way to spin up a complete environment. You create each resource by hand, copy IDs into config files, deploy workers one at a time, and reverse the whole process to tear down. For every stage. Every PR.
+Cloudflare Workers projects that use D1, KV, Queues, Hyperdrive, or R2 still leave a lot of repo-level wiring to the user. Wrangler and `wrangler.jsonc` are still the right foundation. The gap is that raw Wrangler does not give you a good way to treat a multi-worker app as one stageable system or one local runtime workflow.
 
-wrangler-deploy does this in one command. It reads your existing `wrangler.jsonc` files, provisions the resources for a named stage, wires up the IDs, deploys workers in dependency order, and tears everything down when you're done. It shells out to wrangler for every Cloudflare operation, so if `wrangler deploy` works on your machine, so does this.
+wrangler-deploy sits on top of Wrangler. It reads your existing `wrangler.jsonc` files, provisions the resources for a named stage, wires up the IDs, deploys workers in dependency order, and tears everything down when you're done. It also gives you repo-aware local workflows so developers can say "send to `payment-outbox`" or "trigger `workers/batch-workflow`" instead of remembering which worker, which port, and which local route to hit.
+
+It does not ask you to migrate away from `wrangler.jsonc`. It exists because teams like `wrangler.jsonc` and want to keep it.
 
 ```bash
 wd apply   --stage pr-42          # creates D1, KV, Queues, etc.
@@ -10,7 +12,7 @@ wd deploy  --stage pr-42 --verify # deploys workers with real IDs
 wd destroy --stage pr-42          # tears down everything
 ```
 
-Spin up a full environment per PR, per branch, or per developer. Tear it down when you're done. Wire it into GitHub Actions and every pull request gets its own isolated Cloudflare stack.
+Spin up a full environment per PR, per branch, or per developer. Tear it down when you're done. Keep `wrangler dev` if you want, or use `wd dev`, `wd dev doctor`, `wd cron trigger`, and `wd queue send` when the repo is large enough that local conventions start drifting.
 
 ## Install
 
@@ -27,7 +29,28 @@ wd apply --stage staging  # creates the resources
 wd deploy --stage staging # deploys workers
 ```
 
-Your `wrangler.jsonc` files stay untouched. `wrangler dev` still works.
+Your `wrangler.jsonc` files stay untouched. `wrangler dev` still works. `wd dev` can either start one process per worker or a single shared Queue-oriented Wrangler session with `--persist-to`, while `wd` runtime commands resolve workers, ports, queue producers, and helper routes from one repo config.
+
+If you already like `wrangler.jsonc`, that is the point. Keep it. wrangler-deploy is additive.
+
+## Why use it if Wrangler already exists?
+
+Because the gap is usually not "can Wrangler do this primitive action?" The gap is "does every developer on this repo know which worker, which port, which route, and which dependency order applies right now?"
+
+Wrangler gives you:
+- per-worker deploy and local dev commands
+- local Queue and cron primitives
+- the underlying Cloudflare auth and API surface
+
+wrangler-deploy adds:
+- stage-aware provisioning and teardown for the whole app
+- deploy ordering derived from service bindings
+- one config that maps logical names to workers, ports, queue producers, and local helper routes
+- repo-aware local workflows like `wd dev doctor`, `wd dev ui`, `wd logs`, `wd worker routes`, `wd worker call`, `wd d1 exec`, `wd cron trigger`, `wd queue send`, `wd queue replay`, and `wd queue tail`
+
+The product boundary is simple: Wrangler remains the engine. wrangler-deploy turns that engine into repeatable workflows for a multi-worker repo.
+
+Another way to say it: if you love `wrangler.jsonc`, you should not have to give it up just to get staged resources, ordered deploys, and saner local workflows.
 
 ## What it manages
 
@@ -71,8 +94,33 @@ wd deploy   --stage <name> [--verify]      # deploy workers
 wd destroy  --stage <name> [--force]       # tear down
 wd status   [--stage <name>]               # list stages or inspect one
 wd verify   --stage <name>                 # post-deploy coherence check
+wd verify   local                          # config-driven local smoke test
+wd dev      [--session] [--persist-to ...] # local multi-worker dev
 wd secrets  --stage <name>                 # check/set/sync secrets
 wd gc                                      # destroy expired stages
+```
+
+Local runtime workflows are first-class too:
+
+```bash
+wd dev --session --persist-to .wrangler/state
+wd dev doctor
+wd dev ui --port 8899
+wd fixture list
+wd snapshot save local-baseline
+wd snapshot load local-baseline
+wd logs workers/api --once
+wd worker routes workers/api
+wd worker call workers/api --path /health
+wd worker call --fixture echo-ping
+wd d1 exec payments-db --sql 'SELECT COUNT(*) FROM batches;'
+wd d1 exec --fixture payments-batch-count
+wd cron trigger workers/batch-workflow
+wd queue send payment-outbox --json '{"type":"batch.dispatched"}'
+wd queue send --fixture payment-outbox-dispatch
+wd queue replay payment-outbox --file fixtures/payment-outbox.json
+wd queue tail payment-outbox
+wd verify local --pack smoke
 ```
 
 ## Monorepos and single workers

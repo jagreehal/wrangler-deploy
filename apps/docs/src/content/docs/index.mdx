@@ -1,9 +1,9 @@
 ---
 title: wrangler-deploy
-description: One command to spin up a full Cloudflare Workers environment per branch. Tear it down when you're done.
+description: Keep your wrangler.jsonc, add staged resources and repo-aware workflows, and tear environments down when you're done.
 template: splash
 hero:
-  tagline: "Keep your wrangler.jsonc. Use Wrangler for local dev. Use wrangler-deploy to create resources, render stage-aware JSONC, deploy your workers in order, and clean everything up when the branch is done."
+  tagline: "Keep your wrangler.jsonc. Keep using Wrangler. Add wrangler-deploy for staged resources, ordered deploys, and repo-aware local workflows."
   actions:
     - text: Get started
       link: /wrangler-deploy/getting-started/quick-start/
@@ -163,7 +163,7 @@ hero:
   </div>
   <div class="feature-cell">
     <h3>One tool for dev and deploy</h3>
-    <p>Keep using Wrangler locally, or run <code>wd dev</code> to start every worker together with sane ports and dependency order. Then use the same project definition to apply, deploy, verify, and destroy full stages.</p>
+    <p>Keep using Wrangler locally, or run <code>wd dev</code> to start every worker together with sane ports and dependency order. When you need Queue local-dev parity, switch to <code>wd dev --session --persist-to .wrangler/state</code>. Add <code>wd dev doctor</code>, <code>wd cron trigger</code>, and <code>wd queue list</code> when you need runtime visibility on top. The benefit is not replacing Wrangler's primitives. The benefit is turning them into repo-aware workflows so developers stop guessing which worker, which port, and which local route they need.</p>
   </div>
   <div class="feature-cell">
     <h3>Types without codegen</h3>

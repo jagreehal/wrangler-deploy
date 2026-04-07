@@ -142,6 +142,48 @@ $ wd verify --stage staging
   Verification: 5 passed, 0 failed
 ```
 
+## `wd verify local`
+
+Run a config-driven local smoke test against the active development runtime.
+
+```bash
+$ wd verify local
+
+  wrangler-deploy verify local
+
+  + api health — 200 http://127.0.0.1:8791/health
+  + reset payments db — workers/api
+  + seed payments db — workers/api
+  + seeded batch count — workers/api
+  + payment outbox accepts payloads — 200 http://127.0.0.1:8791/__wd/queues/payment-outbox
+  + batch workflow cron route — 200 http://127.0.0.1:8787/cdn-cgi/handler/scheduled
+
+  6 passed, 0 failed
+```
+
+This is the repo-aware local harness. It can combine:
+
+- worker endpoint checks
+- cron triggers
+- queue sends
+- local D1 reset, seed, and SQL assertions
+- named verify packs for CI-style smoke and regression runs
+- machine-readable JSON output with `--json-report`
+
+Configure it with `verifyLocal.checks` in `wrangler-deploy.config.ts`, then run it after `wd dev`.
+
+Use `--pack <name>` when you want a named subset or stricter regression pack:
+
+```bash
+$ wd verify local --pack smoke
+```
+
+Use `--json-report` in CI when you want structured output:
+
+```bash
+$ wd verify local --pack regression --json-report
+```
+
 ## `wd secrets --stage <name>`
 
 Check which declared secrets are set or missing. Use before deploy to see what's needed.
@@ -265,9 +307,11 @@ $ wd diff staging production
 
 `--format json` for machine-readable output you can pipe into other tools.
 
-## `wd dev [--filter <worker>] [--port <base>]`
+## `wd dev [--filter <worker>] [--port <base>] [--session] [--persist-to <path>]`
 
 Start all workers in local dev mode. Reads your existing `wrangler.jsonc` files as-is. Automatically resolves available dev and inspector ports so multi-worker setups work without conflicts.
+
+Wrangler can start these workers too. The benefit of `wd dev` is that it derives the worker set, dependency order, port map, companion processes, and session settings from one project config instead of leaving that orchestration to shell scripts or tribal knowledge.
 
 ```bash
 $ wd dev
@@ -287,6 +331,375 @@ Starting dev servers:
 ```
 
 (batch-workflow is included because api has a service binding to it.)
+
+Use `--session` for Cloudflare Queue local development sessions where producer and consumer workers need to share one Miniflare environment:
+
+```bash
+$ wd dev --session --persist-to .wrangler/state
+Starting local dev session:
+  workers/api -> http://localhost:8787
+  includes: workers/batch-workflow, workers/event-router
+```
+
+`--persist-to` also enables session mode even if `--session` is omitted.
+
+## `wd dev doctor`
+
+Run local preflight checks before starting a dev stack. This validates worker config files, session entry worker references, companion working directories, cron-enabled workers, and queue topology wiring.
+
+```bash
+$ wd dev doctor
+  wrangler-deploy dev doctor
+
+  ✓ dev worker config: workers/api: wrangler config found
+  ✓ dev worker config: workers/batch-workflow: wrangler config found
+  ✓ cron route: workers/batch-workflow: 1 cron trigger(s) configured
+  ✓ dev session entry worker: workers/api is declared
+```
+
+Use this when `wd dev` behaves strangely or when you want to catch local-only config problems before you start anything.
+
+## `wd dev ui`
+
+Start a small local control plane for the active runtime.
+
+```bash
+$ wd dev ui --port 8899
+
+  dev ui -> http://127.0.0.1:8899
+```
+
+The UI shows worker URLs, named endpoints, queue topology, D1 databases, verify packs, snapshots, recent history, and logs. It also lets you:
+
+- call named local endpoints
+- run fixture-backed worker, queue, and D1 actions
+- trigger cron workers
+- run local verify packs with pass/fail summaries
+- save and load local snapshots
+- replay recent local actions from the UI history
+
+Use this when you want the repo-aware runtime workflow without memorizing commands during local debugging.
+
+## `wd cron trigger <worker>`
+
+Trigger a local scheduled event against a running `wrangler dev` server. This calls Cloudflare's documented local scheduled route: `/cdn-cgi/handler/scheduled`.
+
+```bash
+$ wd cron trigger workers/batch-workflow --port 8787
+  200 http://127.0.0.1:8787/cdn-cgi/handler/scheduled
+  ok
+```
+
+Optional flags:
+
+- `--cron "<expr>"` to override `controller.cron`
+- `--time <epoch>` to override `controller.scheduledTime`
+- `--path <route>` to override the default scheduled route
+- `--port <number>` to target an explicit local dev port
+
+## `wd cron loop <worker>`
+
+Repeat local scheduled events on an interval. Useful for replaying cron-driven workflows or local recovery loops.
+
+```bash
+$ wd cron loop workers/batch-workflow --port 8787 --every 5s --cron "*/5 * * * *"
+```
+
+Intervals accept `ms`, `s`, or `m` suffixes.
+
+## `wd snapshot list`
+
+List saved local runtime snapshots.
+
+```bash
+$ wd snapshot list
+
+  Snapshots
+
+  local-baseline
+    created: 2026-04-07T19:02:26.117Z
+    sources: .wrangler/state, .wrangler/state/v3, .wrangler-deploy/dev-runtime.json, .wrangler-deploy/dev-logs
+```
+
+## `wd snapshot save <name>`
+
+Save the current local state so it can be restored later.
+
+```bash
+$ wd snapshot save local-baseline
+```
+
+This snapshots the configured local Miniflare state plus runtime metadata and logs. It is meant for reproducible local environments, not as a replacement for `wrangler.jsonc`.
+
+## `wd snapshot load <name>`
+
+Restore a previously saved local runtime snapshot.
+
+```bash
+$ wd snapshot load local-baseline
+```
+
+Use this when you want to jump back to a known-good D1 and local resource state before rerunning `wd verify local` or replaying queue traffic.
+
+## `wd worker call <worker>`
+
+Call a running local worker by worker path instead of remembering the current port yourself.
+
+This is the HTTP equivalent of `wd queue send`: Wrangler can expose the worker, but `wd worker call` resolves the current local port from the repo's active dev runtime or planned dev config first.
+
+```bash
+$ wd worker call workers/api --method POST --path /__wd/echo --query source=docs --header x-request-id=local-test --json '{"ping":true}'
+
+  worker workers/api
+  POST http://127.0.0.1:8788/__wd/echo?source=docs
+  200
+  {"ok":true,"worker":"api","method":"POST","path":"/__wd/echo","query":{"source":"docs"},"requestId":"local-test","body":"{\"ping\":true}"}
+```
+
+Or call a shared fixture:
+
+```bash
+$ wd worker call --fixture echo-ping
+```
+
+Optional flags:
+
+- `--method <verb>` to override the default `GET`
+- `--path <route>` to call a non-root route
+- `--query key=value` to append query-string pairs, repeatable
+- `--header key=value` to send request headers, repeatable
+- `--json '<payload>'` to send a JSON body and default `content-type: application/json`
+- `--body '<text>'` to send a raw body
+- `--body-file request.txt` to read the request body from disk
+- `--watch` to repeat the call on an interval
+- `--every 5s` to control the watch interval
+- `--count 10` to stop after a fixed number of calls
+- `--port <number>` to force a specific local dev port
+- `--fixture <name>` to load a shared worker fixture from config
+- `--json`, `--body`, and `--body-file` are mutually exclusive
+
+Start `wd dev` first if you want the command to use the active runtime's current ports automatically.
+
+## `wd worker routes [worker]`
+
+Show the current local URL for each worker plus any named endpoints declared in `dev.endpoints`.
+
+```bash
+$ wd worker routes workers/api
+
+  Worker routes
+
+  workers/api
+    url: http://127.0.0.1:8788
+    endpoint health: GET /health
+    endpoint echo: POST /__wd/echo
+```
+
+This is the discovery command for `wd worker call`. Use it when you want to see the repo's local HTTP surface without opening multiple `wrangler.jsonc` files.
+
+## `wd logs [worker]`
+
+Tail persisted logs from the active `wd dev` runtime.
+
+```bash
+$ wd logs workers/api --once
+
+  Tailing dev logs
+
+  [workers/api]
+  [wrangler:info] GET /health 200 OK (5ms)
+```
+
+Optional flags:
+
+- `--once` to print the current snapshot and exit
+- `--every 1s` to change the polling interval
+- `--grep <pattern>` to filter by regex
+
+This is broader than `wd queue tail`: it tails a worker's full persisted runtime log instead of only queue-related lines.
+
+## `wd d1 list`
+
+Show D1 database topology from `wrangler-deploy.config.ts`.
+
+```bash
+$ wd d1 list
+
+  D1 databases
+
+  payments-db
+    bindings: workers/api:DB, workers/batch-workflow:DB, workers/event-router:DB
+```
+
+## `wd d1 inspect <database>`
+
+Inspect one logical D1 database in detail, including any configured seed or reset files.
+
+```bash
+$ wd d1 inspect payments-db
+
+  D1: payments-db
+
+  bindings: workers/api:DB, workers/batch-workflow:DB, workers/event-router:DB
+  seed file: sql/seed.sql
+  reset file: sql/reset.sql
+  default worker: workers/api
+```
+
+## `wd d1 exec <database>`
+
+Run `wrangler d1 execute --local` by logical database name instead of by manually choosing a worker directory first.
+
+```bash
+$ wd d1 exec payments-db --sql 'SELECT COUNT(*) AS batch_count FROM batches;'
+$ wd d1 exec --fixture payments-batch-count
+```
+
+Use one of:
+
+- `--sql 'SELECT ...'`
+- `--file sql/query.sql`
+- `--fixture <name>`
+
+If the database is bound in multiple workers, configure `dev.d1["<database>"].worker` or pass `--worker`.
+
+## `wd d1 seed <database>`
+
+Run a local seed SQL file for a logical D1 database.
+
+```bash
+$ wd d1 seed payments-db
+```
+
+This uses `dev.d1["payments-db"].seedFile` by default, or `--file` when you want to override it for one run.
+
+## `wd d1 reset <database>`
+
+Run a local reset SQL file for a logical D1 database.
+
+```bash
+$ wd d1 reset payments-db
+```
+
+This is intentionally explicit. `wrangler-deploy` does not guess how to reset your schema. It runs the SQL file you configure in `dev.d1["payments-db"].resetFile` or pass with `--file`.
+
+## `wd queue list`
+
+Show queue topology from `wrangler-deploy.config.ts`, including producers, consumers, and dead-letter relationships.
+
+```bash
+$ wd queue list
+  Queue topology
+
+  payment-outbox
+    producers: workers/api:OUTBOX_QUEUE, workers/batch-workflow:OUTBOX_QUEUE
+    consumers: workers/event-router
+  payment-outbox-dlq → dead-letter for payment-outbox
+    producers: none
+    consumers: none
+```
+
+## `wd queue inspect <queue>`
+
+Inspect one queue in detail.
+
+```bash
+$ wd queue inspect payment-outbox
+
+  Queue: payment-outbox
+
+  producers: workers/api:OUTBOX_QUEUE, workers/batch-workflow:OUTBOX_QUEUE
+  consumers: workers/event-router
+  dead-letter-for: none
+```
+
+## `wd queue send <queue>`
+
+Send a local queue payload through a producer worker's debug route. This avoids undocumented Miniflare internals and uses the worker's real Queue binding.
+
+Raw Wrangler does not give you a repo-level "send to this logical queue" workflow. `wd queue send` resolves the correct producer worker, current local port, and configured route from your project config first.
+
+```bash
+$ wd queue send payment-outbox --json '{"type":"batch.dispatched","data":{"batchId":"local-test"}}'
+$ wd queue send --fixture payment-outbox-dispatch
+
+  queue payment-outbox -> workers/api
+  200 http://127.0.0.1:8788/__wd/queues/payment-outbox
+  {"queued":true}
+```
+
+Use one of:
+
+- `--json '<payload>'`
+- `--file payload.json`
+- `--fixture <name>`
+
+Optional flags:
+
+- `--watch` to repeat the same payload on an interval
+- `--every 5s` to control the watch interval
+- `--count 10` to stop after a fixed number of sends
+- `--worker <worker>` when a queue has multiple producers and you want a specific one
+- `--port <number>` to target a specific local dev port
+- `--path <route>` to override the configured local injection route
+
+If a queue has multiple producers, configure `dev.queues` in `wrangler-deploy.config.ts` or pass `--worker`.
+
+## `wd fixture list`
+
+Show the shared local fixtures declared in `wrangler-deploy.config.ts`.
+
+```bash
+$ wd fixture list
+
+  Fixtures
+
+  api-health [worker]
+    workers/api endpoint=health
+  payment-outbox-dispatch [queue]
+    payment-outbox via workers/api
+  payments-batch-count [d1]
+    payments-db via workers/api sql
+```
+
+This is the discovery command for fixture-backed local workflows. Use it when you want reusable worker calls, queue sends, D1 queries, and local verification steps to all share the same inputs.
+
+## `wd queue replay <queue>`
+
+Replay a fixture file containing a JSON array of queue payloads.
+
+```bash
+$ wd queue replay payment-outbox --file fixtures/payment-outbox.json
+
+  replay payment-outbox -> workers/api
+  sent 2 message(s) to http://127.0.0.1:8788/__wd/queues/payment-outbox
+  all messages accepted
+```
+
+The file must contain a top-level JSON array. Each array element is POSTed as one queue payload through the same local producer route used by `wd queue send`.
+
+## `wd queue tail <queue>`
+
+Tail queue-related logs from the active `wd dev` runtime. This reads persisted per-worker dev logs written by `wd dev` and shows queue markers or local injection route activity.
+
+This is another app-level workflow wrapper. Wrangler gives you process logs, but not a logical "tail queue activity for this app" command.
+
+```bash
+$ wd queue tail payment-outbox --once
+
+  Tailing queue payment-outbox
+
+  [workers/api]
+  [wrangler:info] POST /__wd/queues/payment-outbox 200 OK (9ms)
+```
+
+Use:
+
+- `--once` to print the current snapshot and exit
+- `--every 1s` to change the polling interval
+- `--worker <worker>` to restrict tailing to one related worker
+
+Start `wd dev` first so runtime state and log files exist.
 
 ## `wd ci init [--provider github] [--branch main]`
 

@@ -1,3 +1,6 @@
+import { appendFileSync, mkdirSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+
 const LABEL_WIDTH = 20;
 
 // ANSI 256-color palette for worker labels
@@ -20,11 +23,23 @@ export interface LogMultiplexer {
   createWriter(workerPath: string): (data: string) => void;
 }
 
+export interface LogMultiplexerOptions {
+  logDir?: string;
+}
+
+export function logFilePathForTarget(logDir: string, target: string): string {
+  const safeName = target.replaceAll("/", "__").replaceAll(":", "--");
+  return resolve(logDir, `${safeName}.log`);
+}
+
 /**
  * Creates a log multiplexer that prefixes each line of output with a
  * color-coded label derived from the worker path's last segment.
  */
-export function createLogMultiplexer(output: (line: string) => void): LogMultiplexer {
+export function createLogMultiplexer(
+  output: (line: string) => void,
+  options?: LogMultiplexerOptions,
+): LogMultiplexer {
   let colorIndex = 0;
 
   return {
@@ -36,11 +51,18 @@ export function createLogMultiplexer(output: (line: string) => void): LogMultipl
       colorIndex++;
 
       const prefix = `${color}[${label}]${RESET} `;
+      const logFile = options?.logDir ? logFilePathForTarget(options.logDir, workerPath) : undefined;
+      if (logFile) {
+        mkdirSync(dirname(logFile), { recursive: true });
+      }
 
       return (data: string) => {
         const lines = data.split("\n");
         for (const line of lines) {
           output(`${prefix}${line}`);
+          if (logFile) {
+            appendFileSync(logFile, `${line}\n`);
+          }
         }
       };
     },

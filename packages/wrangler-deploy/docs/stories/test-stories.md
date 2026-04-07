@@ -2,9 +2,9 @@
 
 | Key | Value |
 | --- | --- |
-| Date | 2026-04-06T08:41:42.851Z |
+| Date | 2026-04-07T19:41:07.415Z |
 | Version | 1.1.0 |
-| Git SHA | 22be659 |
+| Git SHA | 6710ca8 |
 
 ## src/github.test.ts
 
@@ -261,6 +261,12 @@
 - **When** multi-line data is written at once
 - **Then** each line is emitted separately with the prefix
 
+### ✅ optionally persists plain logs to files
+
+- **Given** a writer for workers/event-router with log persistence enabled
+- **When** a line is written
+- **Then** the line is also written to the target log file without ansi prefixes
+
 ## src/core/dev-ports.test.ts
 
 ### assignPorts
@@ -286,23 +292,38 @@
 
 ### ✅ creates plan for all workers in dependency order
 
-- **Given** a config with api depending on worker
-- **Then** plan contains both workers in dependency order (worker before api)
+- **Given** a config with api depending on batch-workflow
+- **Then** plan contains both workers in dependency order (batch-workflow before api)
 
 ### ✅ each worker has a unique port assigned
 
-- **Given** a config with two workers
+- **Given** a config with three workers
 - **Then** each worker has a port >= basePort and all ports are unique
 
 ### ✅ filter includes only target and transitive deps
 
-- **Given** api -> worker -> auth, plus an unrelated worker
-- **Then** plan only contains apps/api, apps/worker, apps/auth
+- **Given** api -> batch-workflow -> event-router, plus an unrelated worker
+- **Then** plan only contains workers/api, workers/batch-workflow, workers/event-router
 
 ### ✅ custom devArgs are included in worker args
 
-- **Given** workerOptions with custom devArgs for apps/api
+- **Given** workerOptions with custom devArgs for workers/api
 - **Then** the worker args include the custom devArgs
+
+### ✅ uses config.dev port overrides before probing
+
+- **Given** a config with a persisted dev port override
+- **Then** the planned worker port uses the configured override
+
+### ✅ builds a shared Wrangler session when configured
+
+- **Given** a config opting into Wrangler's multi-config local session
+- **Then** the plan uses a single session with all worker configs and shared state
+
+### ✅ includes matching companion commands in the plan
+
+- **Given** a worker-scoped companion command for batch-workflow
+- **Then** only companions matching the filtered workers are included
 
 ### ✅ throws when filter references an unknown worker
 
@@ -313,6 +334,11 @@
 
 - **Given** a plan with non-consecutive explicit worker ports
 - **Then** the resolved dev ports still match the per-worker planned ports
+
+### ✅ startDev launches a single Wrangler session and companion processes
+
+- **Given** a session-mode plan with one companion command
+- **Then** wrangler is spawned once for the shared session and once for the companion
 
 ## src/core/doctor.test.ts
 
@@ -879,6 +905,82 @@
 - **Then** it does not throw
 - **And** main is resolved to an absolute path from the repo root
 
+## src/core/runtime.test.ts
+
+### runtime helpers
+
+### ✅ lists queue topology from config bindings
+
+- **Given** a queue with two producers, one consumer, and a dead-letter queue
+- **Then** the main queue exposes its producers and consumers
+- **And** the dlq relationship can be inspected independently
+
+### ✅ lists worker routes and named endpoints
+
+- **Given** a named local endpoint configured for workers/api
+- **Then** the worker route summary includes the resolved local URL and endpoint
+
+### ✅ lists D1 databases and resolves a repo-aware command target
+
+- **Given** a D1 database bound in multiple workers with a configured default worker
+- **Then** the configured worker is used for local D1 commands
+
+### ✅ parses simple duration strings for cron loop intervals
+
+- **Given** interval strings expressed in ms, seconds, and minutes
+- **Then** invalid values are rejected
+
+### ✅ triggers the local scheduled route with cron and time query params
+
+- **Given** a running local dev server
+- **Then** the documented scheduled handler route is called
+
+### ✅ resolves queue send targets from dev queue config and posts payloads
+
+- **Given** a configured local queue injection route for payment-outbox
+- **Then** the target points at the configured producer worker route
+- **And** the payload is posted to the local debug route
+
+### ✅ resolves worker calls from worker path, port, path, and query string
+
+- **Given** a local worker path with explicit query parameters
+- **Then** the local worker URL is built from the active worker path
+
+### ✅ calls a local worker with headers and body
+
+- **Given** a running local worker endpoint
+- **Then** the request is sent to the resolved local worker URL
+
+### ✅ calls a named worker endpoint with its configured path and method
+
+- **Given** a named endpoint in dev.endpoints
+- **Then** the endpoint path and configured method are used
+
+### ✅ executes local D1 commands via the wrangler runner
+
+- **Given** a local SQL statement against payments-db
+- **Then** the repo-aware target is converted to wrangler d1 execute --local
+
+### ✅ replays multiple queue payloads through the same target
+
+- **Given** a payload fixture with two queue messages
+- **Then** both payloads are POSTed to the same injection route
+
+### ✅ runs dev doctor checks for entry workers, companions, and queues
+
+- **Given** a valid local runtime configuration
+- **Then** entry worker, companion cwd, cron, and queue checks all pass
+
+### ✅ reads queue tail snapshots from the active dev runtime log files
+
+- **Given** an active dev runtime state with a consumer log file
+- **Then** the consumer log content is returned for queue tailing
+
+### ✅ reads filtered worker log snapshots from the active dev runtime
+
+- **Given** an active runtime log with multiple lines
+- **Then** only matching lines are returned
+
 ## src/core/secrets.test.ts
 
 ### secrets
@@ -1045,6 +1147,28 @@
 - **Given** state containing an extra worker not declared in config.workers
 - **When** verification runs
 - **Then** verification should fail because state contains undeclared workers
+
+### verifyLocal
+
+### ✅ passes when all local runtime checks succeed
+
+- **Given** a local verification config with worker, queue, cron, and d1 checks
+- **Then** all local checks pass
+
+### ✅ passes when local verification checks use shared fixtures
+
+- **Given** a local verification config that references worker, queue, and d1 fixtures
+- **Then** the fixtures are resolved into concrete local runtime calls
+
+### ✅ runs a named verify pack with json assertions
+
+- **Given** a verify-local pack that asserts json response bodies
+- **Then** the named pack passes and is reported in the result
+
+### ✅ fails when no local verification config exists
+
+- **Given** a config without verifyLocal
+- **Then** the command fails fast with a configuration check
 
 ## src/core/ci/check.test.ts
 

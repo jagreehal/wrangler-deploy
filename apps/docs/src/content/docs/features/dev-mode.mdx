@@ -9,6 +9,8 @@ import { Aside } from '@astrojs/starlight/components';
 
 If you have more than one worker, you've probably dealt with opening three terminals, picking ports that don't collide, and then watching two `wrangler dev` processes fight over inspector port 9229. `wd dev` handles all of that.
 
+Wrangler already gives you the local runtime primitives. `wrangler.jsonc` is still the right local-dev file. The benefit here is that wrangler-deploy makes those primitives repo-aware. You ask for `payment-outbox` or `workers/batch-workflow`, not "the worker on port 8788 with the queue debug route we added last month".
+
 ## Usage
 
 ```bash
@@ -20,6 +22,19 @@ Starting dev servers:
 ```
 
 Workers start in dependency order and each one runs `wrangler dev` with its own port.
+
+## Queue session mode
+
+For Queue-heavy local development, `wd dev` can also run a single Wrangler local session with repeated `-c` configs and shared Miniflare state. This mirrors Cloudflare's documented `wrangler dev -c ... -c ... --persist-to ...` flow while still deriving the worker list from your `wrangler-deploy.config.ts`.
+
+```bash
+$ wd dev --session --persist-to .wrangler/state
+Starting local dev session:
+  workers/api -> http://localhost:8787
+  includes: workers/batch-workflow, workers/event-router
+```
+
+Set `dev.session.entryWorker` when the worker you want exposed on localhost is not the last worker in dependency order.
 
 ## Port resolution
 
@@ -60,17 +75,80 @@ Each `wrangler dev` process watches its own files. Save a change, the worker rel
 
 ## Custom wrangler args
 
-Per-worker dev options can be set in the config:
+Dev options can be set in the config:
 
 ```ts
 export default defineConfig({
   workers: ["workers/api", "workers/batch"],
-  workerOptions: {
-    "workers/api": {
-      devPort: 9000,
-      devArgs: ["--local", "--persist"],
+  dev: {
+    ports: {
+      "workers/api": 9000,
     },
+    args: ["--log-level", "debug"],
+    session: {
+      enabled: true,
+      entryWorker: "workers/api",
+      persistTo: ".wrangler/state",
+    },
+    companions: [
+      {
+        name: "dev:cron",
+        command: "pnpm dev:cron",
+        cwd: ".",
+        workers: ["workers/api"],
+      },
+    ],
   },
   resources: {},
 });
 ```
+
+`companions` are for local-only helpers like recovery loops, seeders, or queue replay scripts. `wd dev` starts them after Wrangler boots and stops them on shutdown.
+
+## Runtime helpers
+
+`wd dev` now has a few companion commands for local runtime workflows:
+
+```bash
+$ wd dev doctor
+$ wd dev ui --port 8899
+$ wd snapshot save local-baseline
+$ wd snapshot load local-baseline
+$ wd logs workers/api --once
+$ wd worker routes workers/api
+$ wd worker call workers/api --path /health
+$ wd worker call --fixture echo-ping
+$ wd fixture list
+$ wd d1 list
+$ wd d1 exec payments-db --sql 'SELECT COUNT(*) FROM batches;'
+$ wd d1 exec --fixture payments-batch-count
+$ wd cron trigger workers/batch-workflow --port 8787
+$ wd cron loop workers/batch-workflow --port 8787 --every 5s
+$ wd queue list
+$ wd queue send payment-outbox --json '{"type":"batch.dispatched"}'
+$ wd queue send --fixture payment-outbox-dispatch
+$ wd queue send payment-outbox --json '{"type":"batch.dispatched"}' --watch --every 5s
+$ wd queue replay payment-outbox --file fixtures/payment-outbox.json
+$ wd queue tail payment-outbox --once
+$ wd verify local --pack smoke
+```
+
+You could build many of these flows manually with raw Wrangler plus custom scripts. The DX gain from wrangler-deploy is that the commands resolve workers, ports, queue producers, and local routes from `wrangler-deploy.config.ts` instead of making every developer rediscover that wiring.
+
+- `wd dev doctor` catches local-only setup issues before startup
+- `wd dev ui` gives you a small live control plane for workers, queues, D1, verify packs, snapshots, and logs
+- `wd fixture list` shows the shared local payloads and SQL used by the repo
+- `wd snapshot save` and `wd snapshot load` make local state reproducible instead of disposable
+- `wd logs` tails persisted worker logs from the active dev runtime
+- `wd worker routes` shows current local URLs and named endpoints
+- `wd worker call` resolves the current local port for a worker before making an HTTP request, and can reuse shared fixtures
+- `wd d1 list`, `wd d1 exec`, `wd d1 seed`, and `wd d1 reset` make local D1 workflows logical-name driven
+- `wd cron trigger` and `wd cron loop` hit Cloudflare's documented local scheduled route
+- `wd queue list` and `wd queue inspect` show queue producer/consumer topology from config
+- `wd queue send` posts payloads through a configured producer worker route and can reuse shared fixtures
+- `wd queue send --watch` repeats the same local injection on an interval
+- `wd queue replay` replays JSON-array fixtures through the same route
+- `wd queue tail` reads queue-related lines from persisted dev logs
+- `wd verify local --pack` lets teams split quick CI smoke runs from deeper regression packs
+
+The practical win is consistency. The same fixture can drive `wd worker call`, `wd queue send`, `wd d1 exec`, `wd verify local`, and buttons inside `wd dev ui`. Snapshot save/load adds reproducible state on top of that, and the UI now keeps replayable local actions so you can rerun a known-good workflow without rebuilding the command by hand. None of that replaces `wrangler.jsonc`; it removes the repo-memory tax around it.

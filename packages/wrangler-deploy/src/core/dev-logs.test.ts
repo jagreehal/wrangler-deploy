@@ -1,3 +1,6 @@
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { story } from "executable-stories-vitest";
 import { createLogMultiplexer } from "./dev-logs.js";
@@ -64,5 +67,25 @@ describe("createLogMultiplexer", () => {
     expect(lines[0]).toContain("line one");
     expect(lines[1]).toContain("line two");
     expect(lines[2]).toContain("line three");
+  });
+
+  it("optionally persists plain logs to files", ({ task }) => {
+    story.init(task);
+
+    const lines: string[] = [];
+    const logDir = mkdtempSync(join(tmpdir(), "wd-logs-"));
+    const mux = createLogMultiplexer((line) => lines.push(line), { logDir });
+
+    story.given("a writer for workers/event-router with log persistence enabled");
+    const write = mux.createWriter("workers/event-router");
+
+    story.when("a line is written");
+    write("tail me");
+
+    story.then("the line is also written to the target log file without ansi prefixes");
+    const content = readFileSync(join(logDir, "workers__event-router.log"), "utf-8");
+    expect(content).toContain("tail me");
+    expect(content).not.toContain("[event-router");
+    expect(lines[0]).toContain("tail me");
   });
 });

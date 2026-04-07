@@ -1,7 +1,10 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import type { CfStageConfig } from "../types.js";
+import type { CfStageConfig, LocalVerifyCheckConfig } from "../types.js";
 import type { StateProvider } from "./state.js";
+import { getD1Fixture, getQueueFixture, getWorkerFixture } from "./fixtures.js";
+import { callWorker, executeLocalD1, resolvePlannedWorkerPort, sendQueueMessage, triggerCron } from "./runtime.js";
+import { createWranglerRunner, type WranglerRunner } from "./wrangler-runner.js";
 
 export interface VerifyResult {
   passed: boolean;
@@ -24,6 +27,24 @@ export type VerifyDeps = {
   state: StateProvider;
   existsFn?: typeof existsSync;
 };
+
+export interface LocalVerifyResult {
+  passed: boolean;
+  checks: VerifyCheck[];
+  pack?: string;
+}
+
+export interface LocalVerifyDeps {
+  rootDir: string;
+  config: CfStageConfig;
+  pack?: string;
+  wrangler?: WranglerRunner;
+  callWorkerFn?: typeof callWorker;
+  sendQueueMessageFn?: typeof sendQueueMessage;
+  triggerCronFn?: typeof triggerCron;
+  resolvePlannedWorkerPortFn?: typeof resolvePlannedWorkerPort;
+  executeLocalD1Fn?: typeof executeLocalD1;
+}
 
 export async function verify(args: VerifyArgs, deps: VerifyDeps): Promise<VerifyResult> {
   const { stage } = args;
@@ -140,4 +161,233 @@ export async function verify(args: VerifyArgs, deps: VerifyDeps): Promise<Verify
 
   const passed = checks.every((c) => c.passed);
   return { passed, checks };
+}
+
+function includesAll(haystack: string, needles: string[] | undefined): boolean {
+  return (needles ?? []).every((needle) => haystack.includes(needle));
+}
+
+function matchesHeaders(
+  actual: Record<string, string>,
+  expected: Record<string, string> | undefined,
+): boolean {
+  return Object.entries(expected ?? {}).every(([key, value]) => actual[key.toLowerCase()] === value);
+}
+
+function deepIncludes(actual: unknown, expected: unknown): boolean {
+  if (expected === undefined) return true;
+  if (actual === expected) return true;
+  if (Array.isArray(expected)) {
+    if (!Array.isArray(actual)) return false;
+    return expected.every((expectedValue, index) => deepIncludes(actual[index], expectedValue));
+  }
+  if (expected && typeof expected === "object") {
+    if (!actual || typeof actual !== "object") return false;
+    return Object.entries(expected).every(([key, value]) =>
+      deepIncludes((actual as Record<string, unknown>)[key], value));
+  }
+  return false;
+}
+
+function parseEmbeddedJson(body: string): unknown {
+  try {
+    return JSON.parse(body) as unknown;
+  } catch {
+    const candidates = [body.indexOf("\n["), body.indexOf("\n{"), body.indexOf("["), body.indexOf("{")]
+      .filter((index) => index >= 0)
+      .map((index) => body.slice(index).trimStart());
+    for (const candidate of candidates) {
+      try {
+        return JSON.parse(candidate) as unknown;
+      } catch {
+        continue;
+      }
+    }
+    throw new Error("Unable to parse embedded JSON");
+  }
+}
+
+function matchesJson(body: string, expected: unknown): boolean {
+  if (expected === undefined) return true;
+  try {
+    return deepIncludes(parseEmbeddedJson(body), expected);
+  } catch {
+    return false;
+  }
+}
+
+function describeLocalCheck(check: LocalVerifyCheckConfig): string {
+  return check.name
+    ?? (check.type === "worker"
+      ? `worker: ${check.worker}${check.endpoint ? `#${check.endpoint}` : ` ${check.path ?? "/"}`}`
+      : check.type === "cron"
+        ? `cron: ${check.worker}`
+        : check.type === "queue"
+          ? `queue: ${check.queue}`
+          : `${check.type}: ${check.database}`);
+}
+
+export async function verifyLocal(deps: LocalVerifyDeps): Promise<LocalVerifyResult> {
+  const { rootDir, config } = deps;
+  const wrangler = deps.wrangler ?? createWranglerRunner();
+  const callWorkerFn = deps.callWorkerFn ?? callWorker;
+  const sendQueueMessageFn = deps.sendQueueMessageFn ?? sendQueueMessage;
+  const triggerCronFn = deps.triggerCronFn ?? triggerCron;
+  const resolvePlannedWorkerPortFn = deps.resolvePlannedWorkerPortFn ?? resolvePlannedWorkerPort;
+  const executeLocalD1Fn = deps.executeLocalD1Fn ?? executeLocalD1;
+  const checks: VerifyCheck[] = [];
+  const configuredPack = deps.pack ? config.verifyLocal?.packs?.[deps.pack] : undefined;
+  if (deps.pack && !configuredPack) {
+    return {
+      passed: false,
+      pack: deps.pack,
+      checks: [{
+        name: "Local verify pack",
+        passed: false,
+        details: `Unknown verifyLocal pack "${deps.pack}"`,
+      }],
+    };
+  }
+  const localChecks = configuredPack?.checks ?? config.verifyLocal?.checks ?? [];
+
+  if (localChecks.length === 0) {
+    return {
+      passed: false,
+      checks: [{
+        name: "Local verify config",
+        passed: false,
+        details: "No verifyLocal.checks configured.",
+      }],
+    };
+  }
+
+  for (const check of localChecks) {
+    const name = describeLocalCheck(check);
+    try {
+      if (check.type === "worker") {
+        const fixture = check.fixture ? getWorkerFixture(config, check.fixture) : undefined;
+        if (check.fixture && !fixture) {
+          throw new Error(`Unknown worker fixture "${check.fixture}"`);
+        }
+        const result = await callWorkerFn(config, rootDir, {
+          worker: fixture?.worker ?? check.worker,
+          endpoint: check.endpoint ?? fixture?.endpoint,
+          path: check.path ?? fixture?.path,
+          method: check.method ?? fixture?.method,
+          query: { ...(fixture?.query ?? {}), ...(check.query ?? {}) },
+          headers: { ...(fixture?.headers ?? {}), ...(check.headers ?? {}) },
+          body: check.body ?? fixture?.body,
+        });
+        const expectedStatus = check.expectStatus ?? 200;
+        checks.push({
+          name,
+          passed:
+            result.status === expectedStatus
+            && includesAll(result.body, check.expectBodyIncludes)
+            && matchesHeaders(result.headers, check.expectHeaders)
+            && matchesJson(result.body, check.expectJsonIncludes),
+          details: `${result.status} ${result.target.url}`,
+        });
+        continue;
+      }
+
+      if (check.type === "cron") {
+        const port = resolvePlannedWorkerPortFn(config, rootDir, check.worker);
+        const result = await triggerCronFn({ port, cron: check.cron, time: check.time });
+        const expectedStatus = check.expectStatus ?? 200;
+        checks.push({
+          name,
+          passed:
+            result.status === expectedStatus
+            && includesAll(result.body, check.expectBodyIncludes)
+            && matchesJson(result.body, check.expectJsonIncludes),
+          details: `${result.status} ${result.url}`,
+        });
+        continue;
+      }
+
+      if (check.type === "queue") {
+        const fixture = check.fixture ? getQueueFixture(config, check.fixture) : undefined;
+        if (check.fixture && !fixture) {
+          throw new Error(`Unknown queue fixture "${check.fixture}"`);
+        }
+        const payload = check.payload ?? fixture?.payload;
+        if (!payload) {
+          throw new Error(`Queue check "${name}" requires payload or fixture.`);
+        }
+        const result = await sendQueueMessageFn(config, rootDir, {
+          queue: fixture?.queue ?? check.queue,
+          payload,
+          worker: check.worker ?? fixture?.worker,
+        });
+        const expectedStatus = check.expectStatus ?? 200;
+        checks.push({
+          name,
+          passed:
+            result.status === expectedStatus
+            && includesAll(result.body, check.expectBodyIncludes)
+            && matchesJson(result.body, check.expectJsonIncludes),
+          details: `${result.status} ${result.target.url}`,
+        });
+        continue;
+      }
+
+      if (check.type === "d1") {
+        const fixture = check.fixture ? getD1Fixture(config, check.fixture) : undefined;
+        if (check.fixture && !fixture) {
+          throw new Error(`Unknown D1 fixture "${check.fixture}"`);
+        }
+        const result = executeLocalD1Fn(config, rootDir, wrangler, {
+          database: fixture?.database ?? check.database,
+          worker: check.worker ?? fixture?.worker,
+          sql: check.sql ?? fixture?.sql,
+          file: check.file ?? fixture?.file,
+        });
+        checks.push({
+          name,
+          passed:
+            includesAll(result.output, check.expectTextIncludes)
+            && matchesJson(result.output, check.expectJsonIncludes),
+          details: result.target.workerPath,
+        });
+        continue;
+      }
+
+      if (check.type === "d1Seed" || check.type === "d1Reset") {
+        const fixture = check.fixture ? getD1Fixture(config, check.fixture) : undefined;
+        if (check.fixture && !fixture) {
+          throw new Error(`Unknown D1 fixture "${check.fixture}"`);
+        }
+        const configuredFile = check.type === "d1Seed"
+          ? config.dev?.d1?.[check.database]?.seedFile
+          : config.dev?.d1?.[check.database]?.resetFile;
+        const file = check.file ?? fixture?.file ?? configuredFile;
+        if (!file) {
+          throw new Error(`No file configured for ${check.type}.`);
+        }
+        const result = executeLocalD1Fn(config, rootDir, wrangler, {
+          database: fixture?.database ?? check.database,
+          worker: check.worker ?? fixture?.worker,
+          file,
+        });
+        checks.push({
+          name,
+          passed: includesAll(result.output, check.expectTextIncludes),
+          details: result.target.workerPath,
+        });
+      }
+    } catch (error) {
+      checks.push({
+        name,
+        passed: false,
+        details: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return {
+    passed: checks.every((check) => check.passed),
+    checks,
+    pack: deps.pack,
+  };
 }

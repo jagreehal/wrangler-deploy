@@ -13,6 +13,7 @@ At the end of this guide you will have:
 - A generated `wrangler-deploy.config.ts`
 - A stage you can plan, apply, deploy, and destroy
 - The option to run all workers locally with `wd dev`
+- The option to switch Queue-heavy local development into a shared Wrangler session
 
 ## Install
 
@@ -114,8 +115,44 @@ Starting dev servers:
   workers/api            -> http://localhost:8789
 ```
 
+If you want Wrangler's shared local Queue session, switch it on explicitly:
+
+```bash
+$ wd dev --session --persist-to .wrangler/state
+Starting local dev session:
+  workers/api -> http://localhost:8787
+  includes: workers/batch-workflow, workers/event-router
+```
+
+For local runtime workflows on top of that:
+
+```bash
+$ wd dev doctor
+$ wd dev ui --port 8899
+$ wd fixture list
+$ wd snapshot save local-baseline
+$ wd snapshot load local-baseline
+$ wd logs workers/api --once
+$ wd worker routes workers/api
+$ wd worker call workers/api --path /health
+$ wd worker call --fixture echo-ping
+$ wd d1 list
+$ wd d1 exec payments-db --sql 'SELECT COUNT(*) FROM batches;'
+$ wd d1 exec --fixture payments-batch-count
+$ wd queue list
+$ wd queue send payment-outbox --json '{"type":"batch.dispatched"}'
+$ wd queue send --fixture payment-outbox-dispatch
+$ wd queue send payment-outbox --json '{"type":"batch.dispatched"}' --watch --count 10 --every 5s
+$ wd queue replay payment-outbox --file fixtures/payment-outbox.json
+$ wd queue tail payment-outbox --once
+$ wd cron trigger workers/batch-workflow --port 8787
+$ wd verify local
+$ wd verify local --pack smoke
+```
+
 That is the core model of the tool:
 
 - Keep `wrangler.jsonc` for development.
+- Add `wd dev --session` when you need one shared Miniflare environment for Queues.
 - Generate stage-aware rendered JSONC for deploys.
 - Use one project-level config to connect the two.
