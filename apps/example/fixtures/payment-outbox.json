@@ -1,0 +1,14 @@
+[
+  {
+    "type": "batch.dispatched",
+    "data": {
+      "batchId": "local-replay-1"
+    }
+  },
+  {
+    "type": "batch.dispatched",
+    "data": {
+      "batchId": "local-replay-2"
+    }
+  }
+]

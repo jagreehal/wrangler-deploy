@@ -1712,16 +1712,16 @@ body {
         <button type="button" class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme"></button>
       </div>
     </header>
-    <dl class="meta-info"><dt>Started:</dt><dd>2026-04-06T08:41:42.851Z</dd><dt>Duration:</dt><dd>1.27s</dd><dt>Version:</dt><dd>1.1.0</dd><dt>Git:</dt><dd>22be659</dd></dl>
+    <dl class="meta-info"><dt>Started:</dt><dd>2026-04-07T19:41:07.415Z</dd><dt>Duration:</dt><dd>1.17s</dd><dt>Version:</dt><dd>1.1.0</dd><dt>Git:</dt><dd>6710ca8</dd></dl>
 
 <div class="summary">
   <div class="summary-card">
     <div class="label">Total</div>
-    <div class="value">190</div>
+    <div class="value">213</div>
   </div>
   <div class="summary-card passed">
     <div class="label">Passed</div>
-    <div class="value">190</div>
+    <div class="value">213</div>
   </div>
   <div class="summary-card failed">
     <div class="label">Failed</div>
@@ -3032,7 +3032,7 @@ body {
       <div class="feature-path">src/core/dev-logs.test.ts</div>
     </div>
     <div class="feature-stats">
-      <span class="stat passed">✓ 3</span>
+      <span class="stat passed">✓ 4</span>
       <span class="stat failed">✗ 0</span>
       <span class="stat skipped">○ 0</span>
       <span class="chevron">▼</span>
@@ -3137,6 +3137,41 @@ body {
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Then</span>
   <span class="step-text">each line is emitted separately with the prefix</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-4c42de239e93">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">optionally persists plain logs to files</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a writer for workers/event-router with log persistence enabled</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">a line is written</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the line is also written to the target log file without ansi prefixes</span>
   <span class="step-duration"></span>
 </div></div>
     
@@ -3261,7 +3296,7 @@ body {
       <div class="feature-path">src/core/dev.test.ts</div>
     </div>
     <div class="feature-stats">
-      <span class="stat passed">✓ 6</span>
+      <span class="stat passed">✓ 10</span>
       <span class="stat failed">✗ 0</span>
       <span class="stat skipped">○ 0</span>
       <span class="chevron">▼</span>
@@ -3285,12 +3320,12 @@ body {
     <div class="steps"><div class="step">
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Given</span>
-  <span class="step-text">a config with api depending on worker</span>
+  <span class="step-text">a config with api depending on batch-workflow</span>
   <span class="step-duration"></span>
 </div><div class="step">
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Then</span>
-  <span class="step-text">plan contains both workers in dependency order (worker before api)</span>
+  <span class="step-text">plan contains both workers in dependency order (batch-workflow before api)</span>
   <span class="step-duration"></span>
 </div></div>
     
@@ -3315,7 +3350,7 @@ body {
     <div class="steps"><div class="step">
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Given</span>
-  <span class="step-text">a config with two workers</span>
+  <span class="step-text">a config with three workers</span>
   <span class="step-duration"></span>
 </div><div class="step">
   <span class="step-status status-passed">✓</span>
@@ -3345,12 +3380,12 @@ body {
     <div class="steps"><div class="step">
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Given</span>
-  <span class="step-text">api -&gt; worker -&gt; auth, plus an unrelated worker</span>
+  <span class="step-text">api -&gt; batch-workflow -&gt; event-router, plus an unrelated worker</span>
   <span class="step-duration"></span>
 </div><div class="step">
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Then</span>
-  <span class="step-text">plan only contains apps/api, apps/worker, apps/auth</span>
+  <span class="step-text">plan only contains workers/api, workers/batch-workflow, workers/event-router</span>
   <span class="step-duration"></span>
 </div></div>
     
@@ -3375,12 +3410,102 @@ body {
     <div class="steps"><div class="step">
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Given</span>
-  <span class="step-text">workerOptions with custom devArgs for apps/api</span>
+  <span class="step-text">workerOptions with custom devArgs for workers/api</span>
   <span class="step-duration"></span>
 </div><div class="step">
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Then</span>
   <span class="step-text">the worker args include the custom devArgs</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-bd046cbfc90f">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">uses config.dev port overrides before probing</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a config with a persisted dev port override</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the planned worker port uses the configured override</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-5db4c60c747d">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">builds a shared Wrangler session when configured</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a config opting into Wrangler&#039;s multi-config local session</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the plan uses a single session with all worker configs and shared state</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-c681b4471922">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">includes matching companion commands in the plan</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a worker-scoped companion command for batch-workflow</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">only companions matching the filtered workers are included</span>
   <span class="step-duration"></span>
 </div></div>
     
@@ -3441,6 +3566,36 @@ body {
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Then</span>
   <span class="step-text">the resolved dev ports still match the per-worker planned ports</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-4b4a36b29439">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">startDev launches a single Wrangler session and companion processes</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a session-mode plan with one companion command</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">wrangler is spawned once for the shared session and once for the companion</span>
   <span class="step-duration"></span>
 </div></div>
     
@@ -6612,6 +6767,453 @@ body {
 <div class="feature">
   <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
     <div class="feature-info">
+      <div class="feature-title">runtime helpers</div>
+      <div class="feature-path">src/core/runtime.test.ts</div>
+    </div>
+    <div class="feature-stats">
+      <span class="stat passed">✓ 14</span>
+      <span class="stat failed">✗ 0</span>
+      <span class="stat skipped">○ 0</span>
+      <span class="chevron">▼</span>
+    </div>
+  </div>
+  <div class="feature-content">
+    
+<div class="scenario" id="scenario-75d2558b6be4">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">lists queue topology from config bindings</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a queue with two producers, one consumer, and a dead-letter queue</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the main queue exposes its producers and consumers</span>
+  <span class="step-duration"></span>
+</div><div class="step continuation">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">And</span>
+  <span class="step-text">the dlq relationship can be inspected independently</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-011c19cf85c8">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">lists worker routes and named endpoints</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a named local endpoint configured for workers/api</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the worker route summary includes the resolved local URL and endpoint</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-aec0618c5703">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">lists D1 databases and resolves a repo-aware command target</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a D1 database bound in multiple workers with a configured default worker</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the configured worker is used for local D1 commands</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-7c3d547faf25">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">parses simple duration strings for cron loop intervals</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">interval strings expressed in ms, seconds, and minutes</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">invalid values are rejected</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-51eb16fc6ccd">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">triggers the local scheduled route with cron and time query params</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a running local dev server</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the documented scheduled handler route is called</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-eca7be17b1d7">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">resolves queue send targets from dev queue config and posts payloads</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a configured local queue injection route for payment-outbox</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the target points at the configured producer worker route</span>
+  <span class="step-duration"></span>
+</div><div class="step continuation">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">And</span>
+  <span class="step-text">the payload is posted to the local debug route</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-cc6374c4e6a8">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">resolves worker calls from worker path, port, path, and query string</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a local worker path with explicit query parameters</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the local worker URL is built from the active worker path</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-2a16473388c6">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">calls a local worker with headers and body</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a running local worker endpoint</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the request is sent to the resolved local worker URL</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-c4f53bc4fa2b">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">calls a named worker endpoint with its configured path and method</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a named endpoint in dev.endpoints</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the endpoint path and configured method are used</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-75a654b79e48">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">executes local D1 commands via the wrangler runner</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a local SQL statement against payments-db</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the repo-aware target is converted to wrangler d1 execute --local</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-df148b35c287">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">replays multiple queue payloads through the same target</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a payload fixture with two queue messages</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">both payloads are POSTed to the same injection route</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-c4cd3c1d48af">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">runs dev doctor checks for entry workers, companions, and queues</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a valid local runtime configuration</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">entry worker, companion cwd, cron, and queue checks all pass</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-01d5717799a5">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">reads queue tail snapshots from the active dev runtime log files</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">an active dev runtime state with a consumer log file</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the consumer log content is returned for queue tailing</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-75a8c624b2ef">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">reads filtered worker log snapshots from the active dev runtime</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">an active runtime log with multiple lines</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">only matching lines are returned</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+  </div>
+</div>
+
+<div class="feature">
+  <div class="feature-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="feature-info">
       <div class="feature-title">secrets</div>
       <div class="feature-path">src/core/secrets.test.ts</div>
     </div>
@@ -7404,7 +8006,7 @@ body {
       <div class="feature-path">src/core/verify.test.ts</div>
     </div>
     <div class="feature-stats">
-      <span class="stat passed">✓ 5</span>
+      <span class="stat passed">✓ 9</span>
       <span class="stat failed">✗ 0</span>
       <span class="stat skipped">○ 0</span>
       <span class="chevron">▼</span>
@@ -7559,6 +8161,126 @@ body {
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Then</span>
   <span class="step-text">verification should fail because state contains undeclared workers</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-f200ba54130f">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">passes when all local runtime checks succeed</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a local verification config with worker, queue, cron, and d1 checks</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">all local checks pass</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-8e9061c53805">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">passes when local verification checks use shared fixtures</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a local verification config that references worker, queue, and d1 fixtures</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the fixtures are resolved into concrete local runtime calls</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-de182bc98046">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">runs a named verify pack with json assertions</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a verify-local pack that asserts json response bodies</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the named pack passes and is reported in the result</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-c79156ef4606">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">fails when no local verification config exists</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <span class="scenario-duration"></span>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a config without verifyLocal</span>
+  <span class="step-duration"></span>
+</div><div class="step">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">the command fails fast with a configuration check</span>
   <span class="step-duration"></span>
 </div></div>
     

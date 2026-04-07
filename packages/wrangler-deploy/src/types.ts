@@ -76,6 +76,116 @@ export interface VerifyConfig {
   skipHttp?: boolean;
 }
 
+export interface LocalVerifyWorkerCheck {
+  type: "worker";
+  name?: string;
+  worker: string;
+  fixture?: string;
+  endpoint?: string;
+  path?: string;
+  method?: string;
+  query?: Record<string, string>;
+  headers?: Record<string, string>;
+  body?: string;
+  expectStatus?: number;
+  expectBodyIncludes?: string[];
+  expectHeaders?: Record<string, string>;
+  expectJsonIncludes?: unknown;
+}
+
+export interface LocalVerifyCronCheck {
+  type: "cron";
+  name?: string;
+  worker: string;
+  cron?: string;
+  time?: string;
+  expectStatus?: number;
+  expectBodyIncludes?: string[];
+  expectJsonIncludes?: unknown;
+}
+
+export interface LocalVerifyQueueCheck {
+  type: "queue";
+  name?: string;
+  queue: string;
+  payload?: string;
+  fixture?: string;
+  worker?: string;
+  expectStatus?: number;
+  expectBodyIncludes?: string[];
+  expectJsonIncludes?: unknown;
+}
+
+export interface LocalVerifyD1Check {
+  type: "d1";
+  name?: string;
+  database: string;
+  sql?: string;
+  file?: string;
+  fixture?: string;
+  worker?: string;
+  expectTextIncludes?: string[];
+  expectJsonIncludes?: unknown;
+}
+
+export interface LocalVerifyD1FileCheck {
+  type: "d1Seed" | "d1Reset";
+  name?: string;
+  database: string;
+  fixture?: string;
+  worker?: string;
+  file?: string;
+  expectTextIncludes?: string[];
+}
+
+export type LocalVerifyCheckConfig =
+  | LocalVerifyWorkerCheck
+  | LocalVerifyCronCheck
+  | LocalVerifyQueueCheck
+  | LocalVerifyD1Check
+  | LocalVerifyD1FileCheck;
+
+export interface LocalVerifyConfig {
+  checks: LocalVerifyCheckConfig[];
+  packs?: Record<string, LocalVerifyPackConfig>;
+}
+
+export interface LocalVerifyPackConfig {
+  description?: string;
+  checks: LocalVerifyCheckConfig[];
+}
+
+export interface WorkerFixtureConfig {
+  type: "worker";
+  worker: string;
+  endpoint?: string;
+  path?: string;
+  method?: string;
+  query?: Record<string, string>;
+  headers?: Record<string, string>;
+  body?: string;
+  description?: string;
+}
+
+export interface QueueFixtureConfig {
+  type: "queue";
+  queue: string;
+  payload: string;
+  worker?: string;
+  description?: string;
+}
+
+export interface D1FixtureConfig {
+  type: "d1";
+  database: string;
+  sql?: string;
+  file?: string;
+  worker?: string;
+  description?: string;
+}
+
+export type FixtureConfig = WorkerFixtureConfig | QueueFixtureConfig | D1FixtureConfig;
+
 export interface RouteConfig {
   pattern: string; // e.g. "api-{stage}.example.com/*"
   zone?: string; // e.g. "example.com"
@@ -86,6 +196,81 @@ export interface StateConfig {
   backend: "local" | "kv";
   namespaceId?: string; // KV namespace ID for remote state
   keyPrefix?: string; // prefix for keys in KV (default: "wrangler-deploy/")
+}
+
+export interface DevCompanionConfig {
+  /** Label shown in dev logs. */
+  name: string;
+  /** Shell command to run for this local-only companion process. */
+  command: string;
+  /** Optional working directory, relative to the repo root unless absolute. */
+  cwd?: string;
+  /** Extra env vars for the companion process. */
+  env?: Record<string, string>;
+  /** Only run this companion when one of these workers is included in the dev plan. */
+  workers?: string[];
+}
+
+export interface DevSessionConfig {
+  /** Use a single `wrangler dev` process with repeated `-c` configs. */
+  enabled?: boolean;
+  /** Worker to expose as the primary local HTTP entrypoint for the session. */
+  entryWorker?: string;
+  /** Shared Miniflare state directory, equivalent to Wrangler's `--persist-to`. */
+  persistTo?: string;
+  /** Extra args appended only in session mode. */
+  args?: string[];
+}
+
+export interface DevQueueRouteConfig {
+  /** Worker that exposes the local debug route and owns the queue binding. */
+  worker: string;
+  /** Local path to POST queue payloads to. Defaults to `/__wd/queues/<logical-name>`. */
+  path?: string;
+}
+
+export interface DevEndpointConfig {
+  /** Worker that exposes this local endpoint. */
+  worker: string;
+  /** Local path to call, for example `/health` or `/__wd/echo`. */
+  path: string;
+  /** Optional default method when calling by endpoint name. */
+  method?: string;
+  /** Optional description shown in route listings and the dev UI. */
+  description?: string;
+}
+
+export interface DevD1Config {
+  /** Worker to run local wrangler d1 commands from when multiple workers bind the same DB. */
+  worker?: string;
+  /** Optional SQL file used by `wd d1 seed <db>` when --file is omitted. */
+  seedFile?: string;
+  /** Optional SQL file used by `wd d1 reset <db>` when --file is omitted. */
+  resetFile?: string;
+}
+
+export interface DevConfig {
+  /** Per-worker port overrides for `wd dev`. */
+  ports?: Record<string, number>;
+  /** Extra args appended to each spawned `wrangler dev` process. */
+  args?: string[];
+  /** Local-only helper commands to run alongside `wd dev`. */
+  companions?: DevCompanionConfig[];
+  /** Local queue injection routes keyed by logical queue name. */
+  queues?: Record<string, DevQueueRouteConfig>;
+  /** Named local HTTP endpoints keyed by logical endpoint name. */
+  endpoints?: Record<string, DevEndpointConfig>;
+  /** Local D1 workflow hints keyed by logical database name. */
+  d1?: Record<string, DevD1Config>;
+  /** Wrangler local development session options. */
+  session?: DevSessionConfig;
+  /** Snapshot defaults for local reproducible environments. */
+  snapshots?: DevSnapshotConfig;
+}
+
+export interface DevSnapshotConfig {
+  /** Local state directories to snapshot, relative to repo root unless absolute. */
+  paths?: string[];
 }
 
 export interface CfStageConfig {
@@ -99,8 +284,14 @@ export interface CfStageConfig {
   secrets?: Record<string, string[]>;
   verify?: Record<string, VerifyConfig>;
   routes?: Record<string, RouteConfig>;
+  /** Shared local fixtures for worker calls, queue sends, and D1 commands. */
+  fixtures?: Record<string, FixtureConfig>;
   /** Remote state configuration */
   state?: StateConfig;
+  /** Config-driven local integration checks for `wd verify local`. */
+  verifyLocal?: LocalVerifyConfig;
+  /** Local dev configuration */
+  dev?: DevConfig;
 }
 
 // ============================================================================

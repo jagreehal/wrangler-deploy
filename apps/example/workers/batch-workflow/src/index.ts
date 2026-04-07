@@ -16,4 +16,13 @@ app.post("/api/dispatch", async (c) => {
   return c.json({ dispatched: true, batchId: body.batchId });
 });
 
-export default app;
+async function scheduled(
+  controller: ScheduledController,
+): Promise<void> {
+  console.log(`[batch-workflow] cron processed ${controller.cron}`);
+}
+
+export default {
+  fetch: app.fetch,
+  scheduled,
+};

@@ -16,14 +16,24 @@ This file sits alongside your existing Wrangler config. It does not replace `wra
 ## Minimal example
 
 ```ts
-import { defineConfig, d1, kv } from "wrangler-deploy";
+import { defineConfig } from "wrangler-deploy";
 
 export default defineConfig({
   version: 1,
   workers: ["workers/api"],
   resources: {
-    DB: d1({ name: "payments-db" }),
-    CACHE: kv({ title: "cache-kv" }),
+    "payments-db": {
+      type: "d1",
+      bindings: {
+        "workers/api": "DB",
+      },
+    },
+    "cache-kv": {
+      type: "kv",
+      bindings: {
+        "workers/api": "CACHE",
+      },
+    },
   },
 });
 ```
@@ -73,13 +83,133 @@ export default defineConfig({
   verify: {
     /* ... */
   }, // post-deploy health checks
+  verifyLocal: {
+    /* ... */
+  }, // config-driven local runtime checks
   state: {
     /* ... */
   }, // remote state backend (KV)
+  dev: {
+    /* ... */
+  }, // local multi-worker dev config
 });
 ```
 
 Every worker listed in `workers` should point at a directory that already contains `wrangler.jsonc` or `wrangler.json`.
+
+## Local Verify
+
+`verifyLocal` powers `wd verify local`. It is intentionally separate from deploy-time `verify`: this block is for local runtime workflows against `wd dev`.
+
+```ts
+verifyLocal: {
+  checks: [
+    {
+      type: "worker",
+      name: "api health",
+      worker: "workers/api",
+      endpoint: "health",
+      expectStatus: 200,
+      expectBodyIncludes: ['"ok":true'],
+    },
+    {
+      type: "d1Reset",
+      database: "payments-db",
+    },
+    {
+      type: "d1Seed",
+      database: "payments-db",
+    },
+    {
+      type: "d1",
+      database: "payments-db",
+      sql: "SELECT COUNT(*) AS batch_count FROM batches;",
+      expectTextIncludes: ['"batch_count": 1'],
+    },
+    {
+      type: "queue",
+      queue: "payment-outbox",
+      payload: JSON.stringify({ type: "batch.dispatched" }),
+      expectStatus: 200,
+      expectBodyIncludes: ['"queued":true'],
+    },
+    {
+      type: "cron",
+      worker: "workers/batch-workflow",
+      expectStatus: 200,
+      expectBodyIncludes: ["ok"],
+    },
+  ],
+}
+```
+
+Supported check types:
+
+- `worker`
+- `cron`
+- `queue`
+- `d1`
+- `d1Seed`
+- `d1Reset`
+
+`worker`, `queue`, and `d1` checks can reference shared fixtures with `fixture: "<name>"`. That lets `wd verify local`, `wd dev ui`, and the CLI reuse the same local payloads and SQL instead of duplicating them in multiple places.
+
+`verifyLocal` also supports named packs:
+
+```ts
+verifyLocal: {
+  checks: [...],
+  packs: {
+    smoke: {
+      description: "Fast local smoke test for CI",
+      checks: [
+        {
+          type: "worker",
+          worker: "workers/api",
+          fixture: "api-health",
+          expectStatus: 200,
+          expectJsonIncludes: { ok: true },
+        },
+      ],
+    },
+  },
+}
+```
+
+Use packs when the repo needs a fast smoke run and a stricter regression run without copying the same fixtures into multiple scripts.
+
+## Shared fixtures
+
+```ts
+fixtures: {
+  "api-health": {
+    type: "worker",
+    worker: "workers/api",
+    endpoint: "health",
+    description: "Shared health check used by verify and dev ui",
+  },
+  "payment-outbox-dispatch": {
+    type: "queue",
+    queue: "payment-outbox",
+    worker: "workers/api",
+    payload: JSON.stringify({ type: "batch.dispatched", data: { batchId: "fixture-test" } }),
+  },
+  "payments-batch-count": {
+    type: "d1",
+    database: "payments-db",
+    worker: "workers/api",
+    sql: "SELECT COUNT(*) AS batch_count FROM batches;",
+  },
+}
+```
+
+Fixture types:
+
+- `worker` for reusable `wd worker call` inputs
+- `queue` for reusable `wd queue send` payloads
+- `d1` for reusable `wd d1 exec` SQL or file-based commands
+
+Fixtures are optional. Keep using raw `wrangler.jsonc` and direct Wrangler commands if that is enough for your repo. Add fixtures when repeated local workflows start drifting across scripts, docs, and tests.
 
 ## Resource types
 
@@ -90,6 +220,7 @@ Every worker listed in `workers` should point at a directory that already contai
 | Queue        | `queue`      | `wrangler queues create`       |
 | Hyperdrive   | `hyperdrive` | `wrangler hyperdrive create`   |
 | R2 Bucket    | `r2`         | `wrangler r2 bucket create`    |
+| Vectorize    | `vectorize`  | Cloudflare Vectorize API       |
 
 ## State backend
 
@@ -139,3 +270,69 @@ secrets: {
 ```
 
 Declared by name only. Values never stored. Deploy blocks if any are missing.
+
+## Local dev
+
+```ts
+dev: {
+  ports: {
+    "workers/api": 9000,
+  },
+  args: ["--log-level", "debug"],
+  queues: {
+    "payment-outbox": {
+      worker: "workers/api",
+      path: "/__wd/queues/payment-outbox",
+    },
+  },
+  companions: [
+    {
+      name: "dev:cron",
+      command: "pnpm dev:cron",
+      cwd: ".",
+      workers: ["workers/api"],
+    },
+  ],
+  endpoints: {
+    health: {
+      worker: "workers/api",
+      path: "/health",
+      method: "GET",
+      description: "API health endpoint",
+    },
+  },
+  d1: {
+    "payments-db": {
+      worker: "workers/api",
+      seedFile: "sql/seed.sql",
+      resetFile: "sql/reset.sql",
+    },
+  },
+  session: {
+    enabled: false,
+    entryWorker: "workers/api",
+    persistTo: ".wrangler/state",
+    args: ["--local"],
+  },
+  snapshots: {
+    paths: [".wrangler/state"],
+  },
+}
+```
+
+- `ports` sets per-worker `wd dev` port preferences
+- `args` appends args to every spawned `wrangler dev` process
+- `queues` declares local queue injection routes used by `wd queue send`
+- `companions` starts local-only helper processes alongside `wd dev`
+- `endpoints` names local HTTP routes so `wd worker call --endpoint` and `wd worker routes` can resolve them
+- `d1` adds local workflow hints for `wd d1 exec`, `wd d1 seed`, and `wd d1 reset`
+- `session.enabled` switches `wd dev` to one shared Wrangler session with repeated `-c` configs
+- `session.entryWorker` picks which worker owns the primary localhost URL in session mode
+- `session.persistTo` sets the default Miniflare state path for explicit session runs
+- `snapshots.paths` adds extra local paths to include in `wd snapshot save`
+
+Use CLI flags when you want session mode only for a particular run:
+
+```bash
+$ wd dev --session --persist-to .wrangler/state
+```

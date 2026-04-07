@@ -1,17 +1,21 @@
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { story } from "executable-stories-vitest";
 import { buildDevPlan } from "./dev.js";
 import type { CfStageConfig } from "../types.js";
 
-function makeConfig(
-  workers: string[],
-  serviceBindings?: Record<string, Record<string, string>>,
-): CfStageConfig {
+const exampleRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../apps/example");
+
+function makeConfig(overrides?: Partial<CfStageConfig>): CfStageConfig {
   return {
     version: 1,
-    workers,
+    workers: ["workers/api", "workers/batch-workflow", "workers/event-router"],
     resources: {},
-    serviceBindings,
+    serviceBindings: {
+      "workers/api": { WORKFLOWS: "workers/batch-workflow" },
+    },
+    ...overrides,
   };
 }
 
@@ -19,30 +23,28 @@ describe("buildDevPlan", () => {
   it("creates plan for all workers in dependency order", ({ task }) => {
     story.init(task);
 
-    const config = makeConfig(["apps/api", "apps/worker"], {
-      "apps/api": { BACKEND: "apps/worker" },
-    });
+    const config = makeConfig();
 
-    story.given("a config with api depending on worker");
-    const plan = buildDevPlan(config, "/repo", { basePort: 8787 });
+    story.given("a config with api depending on batch-workflow");
+    const plan = buildDevPlan(config, exampleRoot, { basePort: 8787 });
 
-    story.then("plan contains both workers in dependency order (worker before api)");
-    expect(plan.workers).toHaveLength(2);
+    story.then("plan contains both workers in dependency order (batch-workflow before api)");
+    expect(plan.workers).toHaveLength(3);
     const paths = plan.workers.map((w) => w.workerPath);
-    expect(paths.indexOf("apps/worker")).toBeLessThan(paths.indexOf("apps/api"));
+    expect(paths.indexOf("workers/batch-workflow")).toBeLessThan(paths.indexOf("workers/api"));
   });
 
   it("each worker has a unique port assigned", ({ task }) => {
     story.init(task);
 
-    const config = makeConfig(["apps/api", "apps/worker"]);
+    const config = makeConfig();
 
-    story.given("a config with two workers");
-    const plan = buildDevPlan(config, "/repo", { basePort: 8787 });
+    story.given("a config with three workers");
+    const plan = buildDevPlan(config, exampleRoot, { basePort: 8787 });
 
     story.then("each worker has a port >= basePort and all ports are unique");
     const ports = plan.workers.map((w) => w.port);
-    expect(new Set(ports).size).toBe(2);
+    expect(new Set(ports).size).toBe(3);
     for (const port of ports) {
       expect(port).toBeGreaterThanOrEqual(8787);
     }
@@ -51,58 +53,138 @@ describe("buildDevPlan", () => {
   it("filter includes only target and transitive deps", ({ task }) => {
     story.init(task);
 
-    const config = makeConfig(
-      ["apps/api", "apps/worker", "apps/auth", "apps/unrelated"],
-      {
-        "apps/api": { BACKEND: "apps/worker" },
-        "apps/worker": { AUTH: "apps/auth" },
+    const config = makeConfig({
+      workers: ["workers/api", "workers/batch-workflow", "workers/event-router", "workers/extra"],
+      serviceBindings: {
+        "workers/api": { WORKFLOWS: "workers/batch-workflow" },
+        "workers/batch-workflow": { EVENTS: "workers/event-router" },
       },
-    );
+    });
 
-    story.given("api -> worker -> auth, plus an unrelated worker");
-    const plan = buildDevPlan(config, "/repo", { basePort: 8787, filter: "apps/api" });
+    story.given("api -> batch-workflow -> event-router, plus an unrelated worker");
+    const plan = buildDevPlan(config, exampleRoot, { basePort: 8787, filter: "workers/api" });
 
-    story.then("plan only contains apps/api, apps/worker, apps/auth");
+    story.then("plan only contains workers/api, workers/batch-workflow, workers/event-router");
     const paths = plan.workers.map((w) => w.workerPath);
-    expect(paths).toContain("apps/api");
-    expect(paths).toContain("apps/worker");
-    expect(paths).toContain("apps/auth");
-    expect(paths).not.toContain("apps/unrelated");
+    expect(paths).toContain("workers/api");
+    expect(paths).toContain("workers/batch-workflow");
+    expect(paths).toContain("workers/event-router");
+    expect(paths).not.toContain("workers/extra");
   });
 
   it("custom devArgs are included in worker args", ({ task }) => {
     story.init(task);
 
-    const config = makeConfig(["apps/api"]);
+    const config = makeConfig();
 
-    story.given("workerOptions with custom devArgs for apps/api");
-    const plan = buildDevPlan(config, "/repo", {
+    story.given("workerOptions with custom devArgs for workers/api");
+    const plan = buildDevPlan(config, exampleRoot, {
       basePort: 8787,
       workerOptions: {
-        "apps/api": { devArgs: ["--local", "--persist"] },
+        "workers/api": { devArgs: ["--local", "--test-scheduled"] },
       },
     });
 
     story.then("the worker args include the custom devArgs");
-    const apiWorker = plan.workers.find((w) => w.workerPath === "apps/api");
+    const apiWorker = plan.workers.find((w) => w.workerPath === "workers/api");
     expect(apiWorker?.args).toContain("--local");
-    expect(apiWorker?.args).toContain("--persist");
+    expect(apiWorker?.args).toContain("--test-scheduled");
+  });
+
+  it("uses config.dev port overrides before probing", ({ task }) => {
+    story.init(task);
+
+    const config = makeConfig({
+      dev: {
+        ports: {
+          "workers/api": 9000,
+        },
+      },
+    });
+
+    story.given("a config with a persisted dev port override");
+    const plan = buildDevPlan(config, exampleRoot, { basePort: 8787 });
+
+    story.then("the planned worker port uses the configured override");
+    const apiWorker = plan.workers.find((w) => w.workerPath === "workers/api");
+    expect(apiWorker?.port).toBe(9000);
+  });
+
+  it("builds a shared Wrangler session when configured", ({ task }) => {
+    story.init(task);
+
+    const config = makeConfig({
+      dev: {
+        args: ["--log-level", "debug"],
+        session: {
+          enabled: true,
+          entryWorker: "workers/api",
+          persistTo: ".wrangler/state",
+          args: ["--local"],
+        },
+      },
+    });
+
+    story.given("a config opting into Wrangler's multi-config local session");
+    const plan = buildDevPlan(config, exampleRoot, { basePort: 8787 });
+
+    story.then("the plan uses a single session with all worker configs and shared state");
+    expect(plan.mode).toBe("session");
+    expect(plan.session?.entryWorkerPath).toBe("workers/api");
+    expect(plan.session?.args).toContain("--persist-to");
+    expect(plan.session?.args).toContain(resolve(exampleRoot, ".wrangler/state"));
+    expect(plan.session?.args).toContain("--log-level");
+    expect(plan.session?.args).toContain("--local");
+    expect(plan.session?.configPaths).toHaveLength(3);
+  });
+
+  it("includes matching companion commands in the plan", ({ task }) => {
+    story.init(task);
+
+    const config = makeConfig({
+      dev: {
+        companions: [
+          {
+            name: "dev:cron",
+            command: "pnpm dev:cron",
+            cwd: "workers/batch-workflow",
+            workers: ["workers/batch-workflow"],
+          },
+          {
+            name: "other",
+            command: "echo other",
+            workers: ["workers/unknown"],
+          },
+        ],
+      },
+    });
+
+    story.given("a worker-scoped companion command for batch-workflow");
+    const plan = buildDevPlan(config, exampleRoot, { basePort: 8787, filter: "workers/api" });
+
+    story.then("only companions matching the filtered workers are included");
+    expect(plan.companions).toEqual([
+      {
+        name: "dev:cron",
+        command: "pnpm dev:cron",
+        cwd: resolve(exampleRoot, "workers/batch-workflow"),
+        env: undefined,
+      },
+    ]);
   });
 
   it("throws when filter references an unknown worker", ({ task }) => {
     story.init(task);
 
-    const config = makeConfig(["apps/api", "apps/worker"], {
-      "apps/api": { BACKEND: "apps/worker" },
-    });
+    const config = makeConfig();
 
     story.given("a filter for a worker path that is not declared in the config");
 
     story.then("building the plan fails fast instead of producing an empty dev session");
     expect(() =>
-      buildDevPlan(config, "/repo", {
+      buildDevPlan(config, exampleRoot, {
         basePort: 8787,
-        filter: "apps/missing-worker",
+        filter: "workers/missing-worker",
       }),
     ).toThrow(/unknown worker/i);
   });
@@ -123,7 +205,8 @@ describe("buildDevPlan", () => {
       .fn()
       .mockResolvedValueOnce([9000])
       .mockResolvedValueOnce([9100])
-      .mockResolvedValueOnce([9229, 9230]);
+      .mockResolvedValueOnce([9200])
+      .mockResolvedValueOnce([9229, 9230, 9231]);
 
     vi.doMock("node:child_process", () => ({ spawn: spawnMock }));
     vi.doMock("./port-finder.js", () => ({ findAvailablePorts: findAvailablePortsMock }));
@@ -132,19 +215,145 @@ describe("buildDevPlan", () => {
 
     const handle = await startDev(
       {
+        mode: "workers",
         workers: [
-          { workerPath: "apps/api", cwd: "/repo/apps/api", port: 9000, args: [] },
-          { workerPath: "apps/worker", cwd: "/repo/apps/worker", port: 9100, args: [] },
+          {
+            workerPath: "workers/api",
+            cwd: "/repo/workers/api",
+            configPath: "/repo/workers/api/wrangler.jsonc",
+            port: 9000,
+            args: [],
+          },
+          {
+            workerPath: "workers/batch-workflow",
+            cwd: "/repo/workers/batch-workflow",
+            configPath: "/repo/workers/batch-workflow/wrangler.jsonc",
+            port: 9100,
+            args: [],
+          },
+          {
+            workerPath: "workers/event-router",
+            cwd: "/repo/workers/event-router",
+            configPath: "/repo/workers/event-router/wrangler.jsonc",
+            port: 9200,
+            args: [],
+          },
         ],
-        ports: { "apps/api": 9000, "apps/worker": 9100 },
+        companions: [],
+        ports: {
+          "workers/api": 9000,
+          "workers/batch-workflow": 9100,
+          "workers/event-router": 9200,
+        },
       },
       { output: () => {} },
     );
 
     story.then("the resolved dev ports still match the per-worker planned ports");
     expect(handle.ports).toEqual({
-      "apps/api": 9000,
-      "apps/worker": 9100,
+      "workers/api": 9000,
+      "workers/batch-workflow": 9100,
+      "workers/event-router": 9200,
+    });
+  });
+
+  it("startDev launches a single Wrangler session and companion processes", async ({ task }) => {
+    story.init(task);
+    story.given("a session-mode plan with one companion command");
+
+    vi.resetModules();
+
+    const spawnMock = vi.fn(() => ({
+      stdout: { on: vi.fn() },
+      stderr: { on: vi.fn() },
+      kill: vi.fn(),
+    }));
+
+    const findAvailablePortsMock = vi
+      .fn()
+      .mockResolvedValueOnce([8787])
+      .mockResolvedValueOnce([9229]);
+
+    vi.doMock("node:child_process", () => ({ spawn: spawnMock }));
+    vi.doMock("./port-finder.js", () => ({ findAvailablePorts: findAvailablePortsMock }));
+
+    const { startDev } = await import("./dev.js");
+
+    const handle = await startDev(
+      {
+        mode: "session",
+        workers: [],
+        companions: [
+          {
+            name: "dev:cron",
+            cwd: "/repo/workers/batch-workflow",
+            command: "pnpm dev:cron",
+          },
+        ],
+        ports: {
+          "workers/api": 8787,
+        },
+        session: {
+          cwd: "/repo",
+          entryWorkerPath: "workers/api",
+          workerPaths: ["workers/api", "workers/event-router"],
+          configPaths: [
+            "/repo/workers/api/wrangler.jsonc",
+            "/repo/workers/event-router/wrangler.jsonc",
+          ],
+          port: 8787,
+          args: [
+            "-c",
+            "/repo/workers/api/wrangler.jsonc",
+            "-c",
+            "/repo/workers/event-router/wrangler.jsonc",
+            "--persist-to",
+            "/repo/.wrangler/state",
+          ],
+        },
+      },
+      { output: () => {} },
+    );
+
+    story.then("wrangler is spawned once for the shared session and once for the companion");
+    expect(spawnMock).toHaveBeenCalledTimes(2);
+    expect(spawnMock).toHaveBeenNthCalledWith(
+      1,
+      "npx",
+      [
+        "wrangler",
+        "dev",
+        "--port",
+        "8787",
+        "--inspector-port",
+        "9229",
+        "-c",
+        "/repo/workers/api/wrangler.jsonc",
+        "-c",
+        "/repo/workers/event-router/wrangler.jsonc",
+        "--persist-to",
+        "/repo/.wrangler/state",
+      ],
+      {
+        cwd: "/repo",
+        shell: false,
+      },
+    );
+    expect(spawnMock).toHaveBeenNthCalledWith(
+      2,
+      "pnpm dev:cron",
+      expect.objectContaining({
+        cwd: "/repo/workers/batch-workflow",
+        env: expect.objectContaining({
+          WD_DEV_ENTRY_WORKER: "workers/api",
+          WD_DEV_ENTRY_URL: "http://127.0.0.1:8787",
+          WD_DEV_PORTS: JSON.stringify({ "workers/api": 8787 }),
+        }),
+        shell: true,
+      }),
+    );
+    expect(handle.ports).toEqual({
+      "workers/api": 8787,
     });
   });
 });

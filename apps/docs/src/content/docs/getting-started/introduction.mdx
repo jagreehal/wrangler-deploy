@@ -7,13 +7,17 @@ sidebar:
 
 wrangler-deploy sits on top of wrangler. It is a deploy tool, but it is also a development tool for projects that already live in `wrangler.jsonc`. You keep your existing config files, keep using `wrangler dev`, and add one file at the repo root: `wrangler-deploy.config.ts`.
 
+This is intentionally not a pitch to move away from `wrangler.jsonc`. `wrangler.jsonc` works fine. The goal is to keep it and add the missing repo-level workflows around it.
+
 That extra file tells wrangler-deploy what resources exist, which workers use them, and how stages should behave. From there it can create stage-specific resources, render stage-specific `wrangler.jsonc` files with the right IDs, deploy in the right order, and tear everything down when the stage is done.
+
+Wrangler still provides the underlying primitives. The value here is that wrangler-deploy turns those primitives into repo-aware workflows. Instead of remembering which worker owns a Queue binding, which local port it landed on, or which ad hoc route to hit in development, you use logical names from one project config and let the tool resolve the rest.
 
 ## The problem
 
 Cloudflare Workers projects usually start with `wrangler.jsonc`, then grow into something messier. A second worker gets added. Then a queue. Then D1. Then a preview environment. At that point the hard part is not writing the worker code. It is keeping IDs, bindings, deploy order, and cleanup steps straight across environments.
 
-`wrangler.jsonc` is still the right source for local development. The problem is that raw Wrangler does not give you a good way to treat a whole multi-worker app as one stageable system.
+`wrangler.jsonc` is still the right source for local development. The problem is not that `wrangler.jsonc` is wrong. The problem is that raw Wrangler does not give you a good way to treat a whole multi-worker app as one stageable system.
 
 ```mermaid
 flowchart LR
@@ -35,6 +39,13 @@ There is no standard way to:
 - Tear down a stage cleanly
 - Get typed Worker `Env` from a single config
 
+There is also no good repo-level answer to local runtime workflows once the app gets bigger. Raw Wrangler can start processes and expose local routes, but it still leaves the user to figure out:
+
+- which worker to call
+- which port it is on right now
+- which worker produces to a queue and which one consumes it
+- how to replay a cron or queue flow without hand-written shell scripts
+
 ## The solution
 
 You add `wrangler-deploy.config.ts` next to your existing `wrangler.jsonc` files. That file does not replace Wrangler config. It complements it.
@@ -42,7 +53,10 @@ You add `wrangler-deploy.config.ts` next to your existing `wrangler.jsonc` files
 - Your checked-in `wrangler.jsonc` stays readable and dev-friendly.
 - wrangler-deploy renders stage-specific `wrangler.rendered.jsonc` files when it needs real IDs and stage-suffixed names.
 - `wrangler dev` still uses the files you already have.
+- `wd dev` can either spawn one Wrangler process per worker or one shared Queue-oriented local session.
 - `wd deploy` uses the rendered files built for that stage.
+
+If you are happy with `wrangler.jsonc` today, the intended outcome is that you still are.
 
 ```mermaid
 flowchart LR
@@ -71,6 +85,13 @@ The important split is simple:
 
 - Dev keeps using your existing `wrangler.jsonc`.
 - Deploy uses rendered `wrangler.rendered.jsonc` with real IDs for that stage.
+
+The other important split is:
+
+- Wrangler gives you low-level commands per worker.
+- wrangler-deploy gives you app-level commands across the whole repo.
+
+That is why commands like `wd dev doctor`, `wd cron trigger`, and `wd queue send` matter. They are not replacing Wrangler's runtime. They are removing the need to remember which worker, which port, and which local convention applies in a given repo.
 
 That is why JSONC stays first-class instead of turning into something you have to work around.
 
@@ -105,7 +126,7 @@ That gives you something Wrangler alone does not really give you out of the box:
 
 - **Additive**: Wrangler still handles auth, deploy, and local dev. wrangler-deploy sits on top.
 - **JSONC-first**: Your existing `wrangler.jsonc` files stay in place. No rewrite step. No migration away from Wrangler.
-- **Built for both dev and deploy**: Keep using `wrangler dev` or `wd dev` locally, then use the same project definition for staged deploys.
+- **Built for both dev and deploy**: Keep using `wrangler dev`, use `wd dev` for multi-worker local startup, or use `wd dev --session` when you want a shared Queue local-dev session.
 - **Type-safe**: Worker `Env` types come from config. No generated files to commit.
 - **Safe by default**: Protected stages, resumable apply, dependency-aware deploy and destroy order.
 - **Usable in teams**: Put state in KV and let local dev, CI, and teammates operate on the same stage without guessing.

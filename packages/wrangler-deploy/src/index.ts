@@ -1,5 +1,24 @@
 export { defineConfig } from "./config.js";
-export type { CfStageConfig, ResourceConfig, WorkerRef, StageRule, StateConfig } from "./types.js";
+export type {
+  CfStageConfig,
+  DevCompanionConfig,
+  DevConfig,
+  DevD1Config,
+  DevEndpointConfig,
+  DevSnapshotConfig,
+  D1FixtureConfig,
+  DevSessionConfig,
+  FixtureConfig,
+  LocalVerifyPackConfig,
+  LocalVerifyCheckConfig,
+  LocalVerifyConfig,
+  QueueFixtureConfig,
+  ResourceConfig,
+  WorkerRef,
+  WorkerFixtureConfig,
+  StageRule,
+  StateConfig,
+} from "./types.js";
 
 // State providers
 export { resolveStateProvider, LocalStateProvider, KvStateProvider } from "./core/state.js";
@@ -32,10 +51,65 @@ export { renderDot } from "./core/renderers/dot.js";
 export { renderJson } from "./core/renderers/json.js";
 
 // Dev
-export { buildDevPlan, startDev, type DevPlan, type DevOptions, type WorkerDevPlan, type DevHandle } from "./core/dev.js";
+export {
+  buildDevPlan,
+  startDev,
+  type DevCompanionPlan,
+  type DevHandle,
+  type DevOptions,
+  type DevPlan,
+  type WorkerDevPlan,
+  type WranglerSessionPlan,
+} from "./core/dev.js";
 export { assignPorts } from "./core/dev-ports.js";
-export { createLogMultiplexer, type LogMultiplexer } from "./core/dev-logs.js";
+export { createLogMultiplexer, logFilePathForTarget, type LogMultiplexer, type LogMultiplexerOptions } from "./core/dev-logs.js";
 export { findAvailablePorts } from "./core/port-finder.js";
+export {
+  getQueueRoute,
+  getD1Database,
+  listD1Databases,
+  listQueueRoutes,
+  listWorkerRoutes,
+  parseInterval,
+  readDevLogSnapshot,
+  readQueueTailSnapshot,
+  resolveD1CommandTarget,
+  replayQueueMessages,
+  resolveWorkerCallTarget,
+  resolveQueueSendTarget,
+  resolvePlannedWorkerPort,
+  runDevDoctor,
+  executeLocalD1,
+  callWorker,
+  sendQueueMessage,
+  triggerCron,
+  type CronTriggerOptions,
+  type CronTriggerResult,
+  type D1CommandTarget,
+  type D1DatabaseRoute,
+  type D1ExecOptions,
+  type D1ExecResult,
+  type DevLogSnapshotOptions,
+  type QueueReplayResult,
+  type QueueSendOptions,
+  type QueueSendResult,
+  type QueueSendTarget,
+  type QueueTailOptions,
+  type QueueRoute,
+  type WorkerCallOptions,
+  type WorkerCallResult,
+  type WorkerCallTarget,
+  type WorkerRouteSummary,
+} from "./core/runtime.js";
+export { startDevUi, type DevUiHandle } from "./core/dev-ui.js";
+export {
+  clearActiveDevState,
+  readActiveDevState,
+  resolveDevLogDir,
+  resolveDevStatePath,
+  writeActiveDevState,
+  type ActiveDevState,
+} from "./core/dev-runtime-state.js";
 
 // CI
 export { detectCiEnvironment } from "./core/ci/detect.js";
@@ -53,6 +127,27 @@ export { updateJsonc } from "./core/jsonc-writer.js";
 export { runDoctor, type DoctorCheck, type DoctorDeps } from "./core/doctor.js";
 export { validateConfig } from "./core/validate-config.js";
 export { generateCompletions } from "./core/completions.js";
+export { verify, verifyLocal, type VerifyArgs, type VerifyCheck, type VerifyDeps, type VerifyResult, type LocalVerifyDeps, type LocalVerifyResult } from "./core/verify.js";
+export {
+  getD1Fixture,
+  getFixture,
+  getQueueFixture,
+  getWorkerFixture,
+  listD1Fixtures,
+  listFixtures,
+  listQueueFixtures,
+  listWorkerFixtures,
+} from "./core/fixtures.js";
+export {
+  listSnapshots,
+  loadSnapshot,
+  resolveSnapshotPath,
+  resolveSnapshotRoot,
+  resolveSnapshotSources,
+  saveSnapshot,
+  type SnapshotSource,
+  type SnapshotSummary,
+} from "./core/snapshots.js";
 
 // Timer
 export { createTimer } from "./core/timer.js";
