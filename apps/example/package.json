@@ -51,7 +51,7 @@
     "wrangler-deploy": "workspace:*",
     "concurrently": "^9.2.1",
     "tsx": "^4.21.0",
-    "wrangler": "^4.80.0"
+    "wrangler": "^4.81.1"
   },
   "dependencies": {
     "hono": "^4.12.10"
