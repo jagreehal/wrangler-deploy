@@ -1,9 +1,9 @@
 ---
 title: wrangler-deploy
-description: Keep your wrangler.jsonc, add staged resources and repo-aware workflows, and tear environments down when you're done.
+description: Keep using wrangler.jsonc, add staged resources and repo-aware workflows, and tear environments down when you're done.
 template: splash
 hero:
-  tagline: "Keep your wrangler.jsonc. Keep using Wrangler. Add wrangler-deploy for staged resources, ordered deploys, and repo-aware local workflows."
+  tagline: "Keep using wrangler.jsonc. Keep using Wrangler. Add wrangler-deploy for staged resources, ordered deploys, and repo-aware local workflows that cover dev, deploy, and inspection."
   actions:
     - text: Get started
       link: /wrangler-deploy/getting-started/quick-start/
@@ -86,7 +86,38 @@ hero:
   </a>
 </div>
 
----
+<span class="section-label">Local control plane</span>
+<h2 class="section-title">Not just deploys. A live dashboard for the whole runtime.</h2>
+<p class="section-desc">
+  `wd dev ui` puts project defaults, agent metadata, workers, queues, D1, verify packs, snapshots, and logs into one repo-aware control plane. It is the fastest way to see what the CLI knows before you run the next command.
+</p>
+
+<div class="dashboard-showcase">
+  <div class="dashboard-copy">
+    <div class="feature-rows">
+      <div class="feature-cell">
+        <h3>Project defaults at a glance</h3>
+        <p>The dashboard surfaces the resolved `.wdrc` / `.wdrc.json` values so agents and humans can see the active stage, ports, and auth-related defaults before they change anything.</p>
+      </div>
+      <div class="feature-cell">
+        <h3>Command metadata built in</h3>
+        <p>It reuses the same CLI manifest that powers `wd schema` and `wd tools`, so the UI can reflect the real command surface instead of a hand-written summary.</p>
+      </div>
+      <div class="feature-cell">
+        <h3>Dev workflows, not just deploys</h3>
+        <p>From endpoint calls and queue sends to D1 seed/reset flows and verify packs, `wd dev ui` keeps the runtime loop visible in one place.</p>
+      </div>
+    </div>
+  </div>
+  <figure class="dashboard-figure">
+    <img
+      src="/wrangler-deploy/images/dev-ui-dashboard.png"
+      alt="wrangler-deploy dev ui showing project defaults, agent metadata, workers, queues, D1 databases, and local routes"
+    />
+    <figcaption>Live `wd dev ui` dashboard from the example app.</figcaption>
+  </figure>
+</div>
+
 
 <span class="section-label">The problem</span>
 <h2 class="section-title">Setting up a staging environment today</h2>
@@ -151,23 +182,21 @@ hero:
   </div>
 </div>
 
----
-
 <span class="section-label">What you get</span>
 <h2 class="section-title">A better deploy workflow without throwing away your Wrangler workflow.</h2>
 
 <div class="feature-rows">
   <div class="feature-cell">
     <h3>JSONC stays first-class</h3>
-    <p>Your existing <code>wrangler.jsonc</code> files stay in the repo and stay readable. No rewrite step, no migration away from Wrangler. <code>wd init</code> reads them, <code>wrangler dev</code> still uses them, and <code>wd deploy</code> uses rendered JSONC built for the target stage.</p>
+    <p>Your existing <code>wrangler.jsonc</code> files stay in the repo and stay readable. No rewrite step, no migration away from Wrangler. <code>wd init</code> reads them, <code>wrangler dev</code> still uses them, and <code>wd deploy</code> uses rendered JSONC built for the target stage. The checked-in JSONC remains the thing you author; wrangler-deploy adds orchestration around it.</p>
   </div>
   <div class="feature-cell">
     <h3>One tool for dev and deploy</h3>
-    <p>Keep using Wrangler locally, or run <code>wd dev</code> to start every worker together with sane ports and dependency order. When you need Queue local-dev parity, switch to <code>wd dev --session --persist-to .wrangler/state</code>. Add <code>wd dev doctor</code>, <code>wd cron trigger</code>, and <code>wd queue list</code> when you need runtime visibility on top. The benefit is not replacing Wrangler's primitives. The benefit is turning them into repo-aware workflows so developers stop guessing which worker, which port, and which local route they need.</p>
+    <p>Keep using Wrangler locally, or run <code>wd dev</code> to start every worker together with sane ports and dependency order. When you already applied a stage, <code>wd dev --stage staging</code> can reuse rendered bindings so local runtime matches deploy-time state. When you need Queue local-dev parity, switch to <code>wd dev --session --persist-to .wrangler/state</code>. Add <code>wd dev doctor</code>, <code>wd cron trigger</code>, and <code>wd queue list</code> when you need runtime visibility on top. The benefit is not replacing Wrangler's primitives. The benefit is turning them into repo-aware workflows so developers stop guessing which worker, which port, and which local route they need.</p>
   </div>
   <div class="feature-cell">
-    <h3>Types without codegen</h3>
-    <p>Import your Env type directly from the config file. <code>D1Database</code>, <code>KVNamespace</code>, <code>Queue</code>, and service binding types resolve at compile time. No generated files to commit.</p>
+    <h3>Typed <code>Env</code> from config</h3>
+    <p>One line — <code>type Env = typeof api.Env</code> — gives you <code>D1Database</code>, <code>KVNamespace</code>, <code>Queue&lt;T&gt;</code>, and <code>Fetcher</code> at compile time. No generated files, no sync step. Rename a binding in config and TypeScript finds every mismatch across every worker.</p>
   </div>
   <div class="feature-cell">
     <h3>Shared state across the team</h3>
@@ -183,17 +212,95 @@ hero:
   </div>
 </div>
 
----
+<span class="section-label">Zero-codegen types</span>
+<h2 class="section-title">Declare resources once. Types flow everywhere.</h2>
+<p class="section-desc">
+  wrangler-deploy infers your Worker <code>Env</code> type directly from the resources you declare in config. No build step, no generated files, no type-sync commands. Rename a binding and TypeScript catches every mismatch across every worker.
+</p>
 
-<div class="cta-section">
+<div class="before-after-labels">
+  <span class="before-after-label" style="color: var(--ws-blue);">wrangler-deploy.config.ts</span>
+  <span class="before-after-label after-label">workers/api/src/index.ts</span>
+</div>
+<div class="before-after">
+  <div class="terminal-demo terminal-sm">
+    <div class="terminal-bar">
+      <span class="terminal-dot"></span>
+      <span class="terminal-dot"></span>
+      <span class="terminal-dot"></span>
+    </div>
+    <div class="terminal-body">
+      <div><span class="flag">import</span> &#123; d1, kv, queue, workerEnv &#125; <span class="flag">from</span> <span class="success">"wrangler-deploy"</span></div>
+      <div style="margin-top: 0.75rem"><span class="flag">export const</span> api = <span class="cmd">workerEnv</span>(&#123;</div>
+      <div style="padding-left: 1.5rem"><span class="resource">DB</span>:     <span class="cmd">d1</span>(<span class="success">"payments-db"</span>),</div>
+      <div style="padding-left: 1.5rem"><span class="resource">CACHE</span>:  <span class="cmd">kv</span>(<span class="success">"token-kv"</span>),</div>
+      <div style="padding-left: 1.5rem"><span class="resource">OUTBOX</span>: <span class="cmd">queue</span>&lt;PaymentEvent&gt;(<span class="success">"events"</span>),</div>
+      <div>&#125;)</div>
+    </div>
+  </div>
+  <div class="terminal-demo terminal-sm">
+    <div class="terminal-bar">
+      <span class="terminal-dot"></span>
+      <span class="terminal-dot"></span>
+      <span class="terminal-dot"></span>
+    </div>
+    <div class="terminal-body">
+      <div><span class="flag">import type</span> &#123; api &#125; <span class="flag">from</span> <span class="success">"../wrangler-deploy.config.ts"</span></div>
+      <div><span class="flag">type</span> <span class="resource">Env</span> = <span class="flag">typeof</span> api.<span class="resource">Env</span></div>
+      <div style="margin-top: 0.5rem"><span class="comment">// resolves to:</span></div>
+      <div><span class="comment">// &#123; DB: D1Database,</span></div>
+      <div><span class="comment">//   CACHE: KVNamespace,</span></div>
+      <div><span class="comment">//   OUTBOX: Queue&lt;PaymentEvent&gt; &#125;</span></div>
+      <div style="margin-top: 0.75rem"><span class="flag">const</span> app = <span class="flag">new</span> <span class="cmd">Hono</span>&lt;&#123; Bindings: <span class="resource">Env</span> &#125;&gt;()</div>
+      <div style="margin-top: 0.5rem"><span class="comment">// env.DB.prepare(...)        ✓  typed</span></div>
+      <div><span class="comment">// env.OUTBOX.send(&#123;...&#125;)   ✓  typed</span></div>
+    </div>
+  </div>
+</div>
+
+<span class="section-label">Vite starter</span>
+<h2 class="section-title">Full-stack Cloudflare Workers app in one command.</h2>
+<p class="section-desc">
+  <code>wd create vite my-app</code> scaffolds a working Hono API + Vite frontend with typed bindings, stage config, and a Vite proxy already wired. <code>pnpm dev</code> starts both servers side by side.
+</p>
+
+<div class="terminal-demo">
+  <div class="terminal-bar">
+    <span class="terminal-dot"></span>
+    <span class="terminal-dot"></span>
+    <span class="terminal-dot"></span>
+    <span class="terminal-title">~/projects</span>
+  </div>
+  <div class="terminal-body">
+    <div>
+      <span class="prompt">$</span> <span class="cmd">wd create vite</span> <span class="flag">my-app</span>
+    </div>
+    <div class="output">
+      <span class="success">+</span> <span class="resource">wrangler-deploy.config.ts</span>  typed KV binding, stages pre-configured<br />
+      <span class="success">+</span> <span class="resource">workers/api/src/index.ts</span>    Hono API, Env fully typed<br />
+      <span class="success">+</span> <span class="resource">workers/api/wrangler.jsonc</span>  worker config with KV namespace<br />
+      <span class="success">+</span> <span class="resource">src/main.ts</span>                 Vite frontend<br />
+      <span class="success">+</span> <span class="resource">vite.config.ts</span>              /api proxy → worker
+    </div>
+    <div style="margin-top: 0.75rem">
+      <span class="prompt">$</span> <span class="cmd">cd</span> <span class="flag">my-app</span> <span class="cmd">&amp;&amp; pnpm install &amp;&amp; pnpm dev</span>
+    </div>
+    <div class="output">
+      <span class="success">➜</span>  vite      <span class="resource">http://localhost:5173</span><br />
+      <span class="success">➜</span>  wrangler  <span class="resource">http://localhost:8787</span>
+    </div>
+  </div>
+</div>
+
+<div>
   <span class="section-label">Get started</span>
-  <h2 class="section-title">Start from the Wrangler project you already have.</h2>
+  <h2 class="section-title">Start a new app or adopt the Wrangler project you already have.</h2>
   <div class="install-cmd">
     <span class="dollar">$</span> npm install -D wrangler-deploy
   </div>
-  <p class="section-desc" style="margin-inline: auto; text-align: center;">
-    <strong>Repo already has <code>wrangler.jsonc</code>?</strong> Run <code>wd init</code> to generate project config from local files.<br/>
-    <strong>Already deployed in Cloudflare?</strong> Run <code>wd introspect</code> to generate config from the live account.<br/>
-    Then run <code>wd apply --stage staging</code> and <code>wd deploy --stage staging</code>. Local dev stays on Wrangler. Stage deploys get rendered JSONC with the right IDs.
-  </p>
+  <div class="gap-4">
+    <p><strong>Repo already has <code>wrangler.jsonc</code>?</strong> Run <code>wd init</code> to generate project config from local files without changing your JSONC.</p>
+    <p><strong>Already deployed in Cloudflare?</strong> Run <code>wd introspect</code> to generate config from the live account.<br/></p>
+    <p>Then run <code>wd apply --stage staging</code> and <code>wd deploy --stage staging</code>. Local dev stays on Wrangler and your checked-in JSONC stays the authoring source. Stage deploys get rendered JSONC with the right IDs.</p>
+  </div>
 </div>

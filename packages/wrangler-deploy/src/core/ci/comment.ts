@@ -1,4 +1,5 @@
 import type { CfStageConfig, StageState } from "../../types.js";
+import { resourceId } from "../../types.js";
 import { buildRichGraph } from "../graph-model.js";
 import { renderMermaid } from "../renderers/mermaid.js";
 
@@ -42,8 +43,8 @@ export function buildPrComment(
     lines.push("| Name | Type | ID | Status |");
     lines.push("| ---- | ---- | -- | ------ |");
     for (const [name, resource] of resourceEntries) {
-      const id = resource.observed.id ?? "—";
-      const status = resource.observed.status;
+      const id = resourceId(resource) ?? "—";
+      const status = resource.lifecycleStatus;
       lines.push(`| ${name} | ${resource.type} | ${id} | ${status} |`);
     }
     lines.push("");

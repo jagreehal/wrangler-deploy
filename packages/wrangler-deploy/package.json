@@ -19,6 +19,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "generate:agent-context": "node scripts/generate-agent-context.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "dev": "tsc -p tsconfig.build.json --watch",
@@ -39,7 +40,8 @@
   "files": [
     "dist",
     "README.md",
-    "github"
+    "github",
+    "agent-context.json"
   ],
   "keywords": [
     "cloudflare",

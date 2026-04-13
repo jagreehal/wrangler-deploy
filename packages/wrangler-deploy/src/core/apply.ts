@@ -1,5 +1,16 @@
 import { resolve } from "node:path";
-import type { CfStageConfig, StageState, WranglerConfig, PlanItem, Plan, VectorizeResourceConfig } from "../types.js";
+import type {
+  CfStageConfig,
+  StageState,
+  WranglerConfig,
+  PlanItem,
+  Plan,
+  VectorizeResourceConfig,
+  HyperdriveResourceConfig,
+  ResourceOutput,
+  ResourceProps,
+} from "../types.js";
+import { isActive, resourceId, resourceStagedName } from "../types.js";
 import { resourceName, workerName } from "./naming.js";
 import type { StateProvider } from "./state.js";
 import { readWranglerConfig as defaultReadWranglerConfig } from "./wrangler.js";
@@ -46,23 +57,21 @@ export async function plan(args: PlanArgs, deps: PlanDeps): Promise<Plan> {
         action: "create",
         name: stagedName,
       });
-    } else if (stateResource.observed.status === "active") {
+    } else if (isActive(stateResource)) {
       items.push({
         resource: logicalName,
         type: resource.type,
         action: "in-sync",
-        name: stateResource.desired.name,
+        name: resourceStagedName(stateResource),
       });
     } else {
-      // Map state status to a valid PlanAction.
-      // "missing" means the resource was tracked but no longer exists live — treat as orphaned.
-      const status = stateResource.observed.status;
-      const action = status === "missing" ? "orphaned" : status as "drifted" | "orphaned";
+      const ls = stateResource.lifecycleStatus;
+      const action = ls === "missing" ? "orphaned" : ls as "drifted" | "orphaned";
       items.push({
         resource: logicalName,
         type: resource.type,
         action,
-        name: stateResource.desired.name,
+        name: resourceStagedName(stateResource),
       });
     }
   }
@@ -75,7 +84,7 @@ export async function plan(args: PlanArgs, deps: PlanDeps): Promise<Plan> {
           resource: logicalName,
           type: stateResource.type,
           action: "orphaned",
-          name: stateResource.desired.name,
+          name: resourceStagedName(stateResource),
           details: "In state but removed from manifest",
         });
       }
@@ -99,6 +108,7 @@ export type ApplyDeps = {
   config: CfStageConfig;
   state: StateProvider;
   wrangler: WranglerRunner;
+  logger?: Pick<Console, "log" | "warn" | "error">;
   createD1?: typeof defaultCreateD1;
   createR2?: typeof defaultCreateR2;
   createVectorize?: typeof defaultCreateVectorize;
@@ -106,6 +116,24 @@ export type ApplyDeps = {
   renderConfig?: typeof defaultRenderWranglerConfig;
   writeConfigs?: typeof defaultWriteRenderedConfigs;
 };
+
+export interface ApplyResourceSummary {
+  logicalName: string;
+  type: string;
+  stagedName: string;
+  lifecycleStatus: "creating" | "updating" | "created" | "updated" | "in-sync";
+  id?: string;
+}
+
+export interface ApplyResult extends StageState {
+  summary: {
+    stage: string;
+    resources: ApplyResourceSummary[];
+    workers: string[];
+    renderedConfigs: string[];
+    storedSecrets: string[];
+  };
+}
 
 function extractId(output: string): string | undefined {
   // Try various patterns wrangler outputs IDs in
@@ -143,15 +171,17 @@ function wranglerWithIdempotency(runner: WranglerRunner, args: string[], cwd: st
 
 /**
  * Apply the manifest — provision resources via wrangler CLI, write state, generate configs.
- * Uses wrangler for auth (supports OAuth login, no API token needed).
+ * Uses write-before-act pattern for crash recovery: writes "creating" before each provider
+ * call and "created" after, so a resume after crash retries incomplete resources.
  */
-export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<StageState> {
+export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<ApplyResult> {
   const { stage, databaseUrl } = args;
   const {
     rootDir,
     config,
     state: provider,
     wrangler,
+    logger = console,
     createD1 = defaultCreateD1,
     createR2 = defaultCreateR2,
     createVectorize = defaultCreateVectorize,
@@ -171,22 +201,57 @@ export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<StageStat
     secrets: {},
   };
 
-  console.log(`\n  wrangler-deploy apply --stage ${stage}\n`);
+  const resourceSummaries: ApplyResourceSummary[] = [];
 
   // Provision resources
   for (const [logicalName, resource] of Object.entries(config.resources)) {
     const stagedName = resourceName(logicalName, stage);
     const existing = state.resources[logicalName];
 
-    if (existing?.observed.status === "active") {
-      console.log(`  = ${stagedName} (${resource.type}) in sync`);
+    if (existing && isActive(existing)) {
+      logger.log(`  = ${stagedName} (${resource.type}) in sync`);
+      resourceSummaries.push({
+        logicalName,
+        type: resource.type,
+        stagedName,
+        lifecycleStatus: "in-sync",
+        id: resourceId(existing),
+      });
       continue;
     }
 
-    console.log(`  + creating ${stagedName} (${resource.type})...`);
+    logger.log(`  + creating ${stagedName} (${resource.type})...`);
 
     try {
-      let id: string | undefined;
+      // Build props snapshot — common fields plus type-specific extras
+      const props: ResourceProps = {
+        type: resource.type,
+        name: stagedName,
+        bindings: resource.bindings as Record<string, unknown>,
+      };
+      if (resource.type === "vectorize") {
+        const vr = resource as VectorizeResourceConfig;
+        if (vr.dimensions !== undefined) props["dimensions"] = vr.dimensions;
+        if (vr.metric !== undefined) props["metric"] = vr.metric;
+        if (vr.preset !== undefined) props["preset"] = vr.preset;
+        if (vr.description !== undefined) props["description"] = vr.description;
+      }
+      if (resource.type === "hyperdrive") {
+        const hr = resource as HyperdriveResourceConfig;
+        if (hr.database) props["database"] = hr.database;
+      }
+
+      // Write-before-act: persist "creating" status before calling provider (crash recovery anchor)
+      state.resources[logicalName] = {
+        type: resource.type,
+        lifecycleStatus: existing ? "updating" : "creating",
+        props,
+        ...(existing ? { oldProps: existing.props } : {}),
+        source: "managed",
+      };
+      await provider.write(stage, state);
+
+      let resourceOutput: ResourceOutput | undefined;
 
       switch (resource.type) {
         case "kv": {
@@ -195,7 +260,7 @@ export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<StageStat
             ["kv", "namespace", "create", stagedName],
             rootDir,
           );
-          id = extractId(output);
+          let id = extractId(output);
           // If "already exists" didn't give us an ID, look it up
           if (!id) {
             const listOutput = wrangler.run(["kv", "namespace", "list"], rootDir);
@@ -206,6 +271,7 @@ export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<StageStat
             );
             id = match?.[1] ?? match?.[2];
           }
+          resourceOutput = { id: id!, title: stagedName };
           break;
         }
         case "queue": {
@@ -214,7 +280,7 @@ export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<StageStat
             ["queues", "create", stagedName],
             rootDir,
           );
-          id = extractId(output);
+          let id = extractId(output);
           // If "already exists" didn't give us an ID, look it up
           if (!id) {
             const listOutput = wrangler.run(["queues", "list"], rootDir);
@@ -225,6 +291,7 @@ export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<StageStat
             );
             id = match?.[1] ?? match?.[2];
           }
+          resourceOutput = { id: id ?? undefined, name: stagedName };
           break;
         }
         case "hyperdrive": {
@@ -238,20 +305,21 @@ export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<StageStat
             ["hyperdrive", "create", stagedName, "--database-url", databaseUrl],
             rootDir,
           );
-          id = extractId(output);
+          const id = extractId(output);
+          resourceOutput = { id: id!, name: stagedName, origin: databaseUrl };
           break;
         }
         case "d1": {
-          id = createD1(stagedName, rootDir);
+          resourceOutput = createD1(stagedName, rootDir);
           break;
         }
         case "r2": {
-          createR2(stagedName, rootDir);
+          resourceOutput = createR2(stagedName, rootDir);
           break;
         }
         case "vectorize": {
           const vectorizeConfig = resource as VectorizeResourceConfig;
-          id = createVectorize(
+          resourceOutput = createVectorize(
             stagedName,
             {
               dimensions: vectorizeConfig.dimensions,
@@ -265,26 +333,33 @@ export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<StageStat
         }
       }
 
-      // Update state immediately after each resource
+      // Write "created" status after provider succeeds (clears oldProps)
       state.resources[logicalName] = {
         type: resource.type,
-        desired: { name: stagedName },
-        observed: {
-          id,
-          status: "active",
-          lastSeenAt: new Date().toISOString(),
-        },
+        lifecycleStatus: existing ? "updated" : "created",
+        props: state.resources[logicalName]!.props,
+        output: resourceOutput,
         source: "managed",
       };
       state.updatedAt = new Date().toISOString();
       await provider.write(stage, state);
 
-      console.log(`    created${id ? ` (id: ${id})` : ""}`);
+      const id = resourceOutput ? resourceId(state.resources[logicalName]!) : undefined;
+      logger.log(`    created${id ? ` (id: ${id})` : ""}`);
+      resourceSummaries.push({
+        logicalName,
+        type: resource.type,
+        stagedName,
+        lifecycleStatus: existing ? "updated" : "created",
+        id,
+      });
     } catch (err) {
-      console.error(`    FAILED: ${(err as Error).message}`);
+      logger.error(`    FAILED: ${(err as Error).message}`);
       throw err;
     }
   }
+
+  const renderedWorkers = config.workers.slice();
 
   // Record worker names in state and remove stale workers no longer in config
   const declaredWorkers = new Set(config.workers);
@@ -300,6 +375,15 @@ export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<StageStat
     }
   }
   state.updatedAt = new Date().toISOString();
+
+  // Store encrypted secrets from config (encryption handled by state provider on write)
+  if (config.storedSecrets && Object.keys(config.storedSecrets).length > 0) {
+    state.storedSecrets = { ...config.storedSecrets };
+    if (!config.statePassword && !process.env.WD_STATE_PASSWORD) {
+      logger.warn("  Warning: storedSecrets are present but no statePassword is set — storing as plaintext");
+    }
+  }
+
   await provider.write(stage, state);
 
   // Generate rendered wrangler configs
@@ -311,10 +395,20 @@ export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<StageStat
   }
   writeConfigs(rootDir, stage, renderedConfigs);
 
-  console.log(
+  logger.log(
     `\n  State written to ${config.state?.backend === "kv" ? "KV" : ".wrangler-deploy"}/${stage}/state.json`,
   );
-  console.log(`  Rendered configs written for ${config.workers.length} workers\n`);
+  logger.log(`  Rendered configs written for ${config.workers.length} workers\n`);
 
-  return state;
+  // Callers may call enrichMarkers(markers, state) to attach output to typed markers.
+  // See src/core/enrich.ts.
+  return Object.assign(state, {
+    summary: {
+      stage,
+      resources: resourceSummaries,
+      workers: renderedWorkers,
+      renderedConfigs: renderedWorkers.map((workerPath) => resolve(rootDir, ".wrangler-deploy", stage, workerPath, "wrangler.rendered.jsonc")),
+      storedSecrets: config.storedSecrets ? Object.keys(config.storedSecrets).flatMap((workerPath) => Object.keys(config.storedSecrets?.[workerPath] ?? {}).map((secret) => `${workerPath}/${secret}`)) : [],
+    },
+  }) as ApplyResult;
 }

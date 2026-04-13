@@ -1,6 +1,7 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import type { CfStageConfig, StageState, WranglerConfig, QueueBinding } from "../types.js";
+import { resourceId, resourceStagedName } from "../types.js";
 import { resourceName, workerName } from "./naming.js";
 
 /**
@@ -43,37 +44,56 @@ export function renderWranglerConfig(
   for (const [logicalName, resource] of Object.entries(config.resources)) {
     const stateResource = state.resources[logicalName];
     if (!stateResource) continue;
-    if (!stateResource.observed.id && resource.type !== "queue") continue;
+
+    const rid = resourceId(stateResource);
+    if (!rid && resource.type !== "queue" && resource.type !== "r2") continue;
 
     const bindings = resource.bindings;
     const binding = bindings[workerPath];
     if (!binding) continue;
 
     switch (resource.type) {
+      case "d1": {
+        if (!rid) break;
+        const bindingName = binding as string;
+        const databaseName = resourceStagedName(stateResource);
+        rendered.d1_databases = rendered.d1_databases?.map((db) =>
+          db.binding === bindingName ? { ...db, database_id: rid, database_name: databaseName } : db,
+        ) ?? [{ binding: bindingName, database_id: rid, database_name: databaseName }];
+        break;
+      }
+
       case "kv": {
-        const resourceId = stateResource.observed.id;
-        if (!resourceId) break;
+        if (!rid) break;
         const bindingName = binding as string;
         rendered.kv_namespaces = rendered.kv_namespaces?.map((kv) =>
-          kv.binding === bindingName ? { ...kv, id: resourceId } : kv,
-        ) ?? [{ binding: bindingName, id: resourceId }];
+          kv.binding === bindingName ? { ...kv, id: rid } : kv,
+        ) ?? [{ binding: bindingName, id: rid }];
         break;
       }
 
       case "hyperdrive": {
-        const resourceId = stateResource.observed.id;
-        if (!resourceId) break;
+        if (!rid) break;
         const bindingName = binding as string;
         rendered.hyperdrive = rendered.hyperdrive?.map((h) =>
-          h.binding === bindingName ? { ...h, id: resourceId } : h,
-        ) ?? [{ binding: bindingName, id: resourceId }];
+          h.binding === bindingName ? { ...h, id: rid } : h,
+        ) ?? [{ binding: bindingName, id: rid }];
+        break;
+      }
+
+      case "r2": {
+        const bindingName = binding as string;
+        const bucketName = resourceStagedName(stateResource);
+        rendered.r2_buckets = rendered.r2_buckets?.map((bucket) =>
+          bucket.binding === bindingName ? { ...bucket, bucket_name: bucketName } : bucket,
+        ) ?? [{ binding: bindingName, bucket_name: bucketName }];
         break;
       }
 
       case "queue": {
         const queueBinding = binding as QueueBinding;
         // Use the authoritative name from state, not a computed name
-        const stagedName = stateResource.desired.name;
+        const stagedName = resourceStagedName(stateResource);
 
         if (typeof queueBinding === "string" || "producer" in (queueBinding as object)) {
           const producerBinding =
@@ -99,10 +119,12 @@ export function renderWranglerConfig(
           const dlqName = stagedName;
           rendered.queues = rendered.queues ?? {};
           // Only set DLQ on the consumer entry for the source queue.
-          // Use state's desired.name for the source queue too.
+          // Use state's staged name for the source queue too.
           const sourceQueueLogical = (queueBinding as { deadLetterFor: string }).deadLetterFor;
           const sourceState = state.resources[sourceQueueLogical];
-          const sourceQueueLive = sourceState?.desired.name ?? resourceName(sourceQueueLogical, stage);
+          const sourceQueueLive = sourceState
+            ? resourceStagedName(sourceState)
+            : resourceName(sourceQueueLogical, stage);
           rendered.queues.consumers = rendered.queues.consumers?.map((c) =>
             c.queue === sourceQueueLogical || c.queue === sourceQueueLive
               ? { ...c, dead_letter_queue: dlqName }
@@ -144,12 +166,28 @@ export function renderWranglerConfig(
   }
 
   // Final cleanup: remove any KV namespaces with placeholder IDs
+  if (rendered.d1_databases) {
+    rendered.d1_databases = rendered.d1_databases.filter(
+      (db) => db.database_id && !db.database_id.includes("placeholder"),
+    );
+    if (rendered.d1_databases.length === 0) {
+      delete rendered.d1_databases;
+    }
+  }
+
   if (rendered.kv_namespaces) {
     rendered.kv_namespaces = rendered.kv_namespaces.filter(
       (kv) => kv.id && !kv.id.includes("placeholder"),
     );
     if (rendered.kv_namespaces.length === 0) {
       delete rendered.kv_namespaces;
+    }
+  }
+
+  if (rendered.r2_buckets) {
+    rendered.r2_buckets = rendered.r2_buckets.filter((bucket) => bucket.bucket_name && !bucket.bucket_name.includes("placeholder"));
+    if (rendered.r2_buckets.length === 0) {
+      delete rendered.r2_buckets;
     }
   }
 

@@ -1,10 +1,13 @@
 import { execFileSync } from "node:child_process";
+import { getWranglerEnv } from "../core/auth.js";
+import type { R2Output } from "../types.js";
 
 function wrangler(args: string[], cwd: string): string {
   try {
     return execFileSync("npx", ["wrangler", ...args], {
       encoding: "utf-8",
       cwd,
+      env: getWranglerEnv(cwd),
       stdio: ["pipe", "pipe", "pipe"],
     }).trim();
   } catch (err: unknown) {
@@ -17,8 +20,9 @@ function wrangler(args: string[], cwd: string): string {
   }
 }
 
-export function createR2Bucket(name: string, cwd: string): void {
+export function createR2Bucket(name: string, cwd: string): R2Output {
   wrangler(["r2", "bucket", "create", name], cwd);
+  return { name };
 }
 
 export function deleteR2Bucket(name: string, cwd: string): void {

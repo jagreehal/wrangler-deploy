@@ -1,9 +1,12 @@
+import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import { story } from "executable-stories-vitest";
 import { buildDevPlan } from "./dev.js";
 import type { CfStageConfig } from "../types.js";
+import type { StateProvider } from "./state.js";
+import type { StageState } from "../types.js";
 
 const exampleRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../apps/example");
 
@@ -20,13 +23,13 @@ function makeConfig(overrides?: Partial<CfStageConfig>): CfStageConfig {
 }
 
 describe("buildDevPlan", () => {
-  it("creates plan for all workers in dependency order", ({ task }) => {
+  it("creates plan for all workers in dependency order", async ({ task }) => {
     story.init(task);
 
     const config = makeConfig();
 
     story.given("a config with api depending on batch-workflow");
-    const plan = buildDevPlan(config, exampleRoot, { basePort: 8787 });
+    const plan = await buildDevPlan(config, exampleRoot, { basePort: 8787 });
 
     story.then("plan contains both workers in dependency order (batch-workflow before api)");
     expect(plan.workers).toHaveLength(3);
@@ -34,13 +37,13 @@ describe("buildDevPlan", () => {
     expect(paths.indexOf("workers/batch-workflow")).toBeLessThan(paths.indexOf("workers/api"));
   });
 
-  it("each worker has a unique port assigned", ({ task }) => {
+  it("each worker has a unique port assigned", async ({ task }) => {
     story.init(task);
 
     const config = makeConfig();
 
     story.given("a config with three workers");
-    const plan = buildDevPlan(config, exampleRoot, { basePort: 8787 });
+    const plan = await buildDevPlan(config, exampleRoot, { basePort: 8787 });
 
     story.then("each worker has a port >= basePort and all ports are unique");
     const ports = plan.workers.map((w) => w.port);
@@ -50,7 +53,7 @@ describe("buildDevPlan", () => {
     }
   });
 
-  it("filter includes only target and transitive deps", ({ task }) => {
+  it("filter includes only target and transitive deps", async ({ task }) => {
     story.init(task);
 
     const config = makeConfig({
@@ -62,7 +65,7 @@ describe("buildDevPlan", () => {
     });
 
     story.given("api -> batch-workflow -> event-router, plus an unrelated worker");
-    const plan = buildDevPlan(config, exampleRoot, { basePort: 8787, filter: "workers/api" });
+    const plan = await buildDevPlan(config, exampleRoot, { basePort: 8787, filter: "workers/api" });
 
     story.then("plan only contains workers/api, workers/batch-workflow, workers/event-router");
     const paths = plan.workers.map((w) => w.workerPath);
@@ -72,13 +75,13 @@ describe("buildDevPlan", () => {
     expect(paths).not.toContain("workers/extra");
   });
 
-  it("custom devArgs are included in worker args", ({ task }) => {
+  it("custom devArgs are included in worker args", async ({ task }) => {
     story.init(task);
 
     const config = makeConfig();
 
     story.given("workerOptions with custom devArgs for workers/api");
-    const plan = buildDevPlan(config, exampleRoot, {
+    const plan = await buildDevPlan(config, exampleRoot, {
       basePort: 8787,
       workerOptions: {
         "workers/api": { devArgs: ["--local", "--test-scheduled"] },
@@ -91,7 +94,7 @@ describe("buildDevPlan", () => {
     expect(apiWorker?.args).toContain("--test-scheduled");
   });
 
-  it("uses config.dev port overrides before probing", ({ task }) => {
+  it("uses config.dev port overrides before probing", async ({ task }) => {
     story.init(task);
 
     const config = makeConfig({
@@ -103,14 +106,14 @@ describe("buildDevPlan", () => {
     });
 
     story.given("a config with a persisted dev port override");
-    const plan = buildDevPlan(config, exampleRoot, { basePort: 8787 });
+    const plan = await buildDevPlan(config, exampleRoot, { basePort: 8787 });
 
     story.then("the planned worker port uses the configured override");
     const apiWorker = plan.workers.find((w) => w.workerPath === "workers/api");
     expect(apiWorker?.port).toBe(9000);
   });
 
-  it("builds a shared Wrangler session when configured", ({ task }) => {
+  it("builds a shared Wrangler session when configured", async ({ task }) => {
     story.init(task);
 
     const config = makeConfig({
@@ -126,7 +129,7 @@ describe("buildDevPlan", () => {
     });
 
     story.given("a config opting into Wrangler's multi-config local session");
-    const plan = buildDevPlan(config, exampleRoot, { basePort: 8787 });
+    const plan = await buildDevPlan(config, exampleRoot, { basePort: 8787 });
 
     story.then("the plan uses a single session with all worker configs and shared state");
     expect(plan.mode).toBe("session");
@@ -138,7 +141,143 @@ describe("buildDevPlan", () => {
     expect(plan.session?.configPaths).toHaveLength(3);
   });
 
-  it("includes matching companion commands in the plan", ({ task }) => {
+  it("renders stage bindings directly when stage is provided", async ({ task }) => {
+    story.init(task);
+
+    const mockState: StageState = {
+      stage: "staging",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+      resources: {
+        "payments-db": {
+          type: "d1",
+          lifecycleStatus: "created",
+          props: { type: "d1", name: "payments-db-staging", bindings: {} },
+          output: { id: "d1-stage-id", name: "payments-db-staging" },
+          source: "managed",
+        },
+        "token-kv": {
+          type: "kv",
+          lifecycleStatus: "created",
+          props: { type: "kv", name: "token-kv-staging", bindings: {} },
+          output: { id: "kv-token-id", title: "token-kv-staging" },
+          source: "managed",
+        },
+        "cache-kv": {
+          type: "kv",
+          lifecycleStatus: "created",
+          props: { type: "kv", name: "cache-kv-staging", bindings: {} },
+          output: { id: "kv-cache-id", title: "cache-kv-staging" },
+          source: "managed",
+        },
+        "payment-outbox": {
+          type: "queue",
+          lifecycleStatus: "created",
+          props: { type: "queue", name: "payment-outbox-staging", bindings: {} },
+          output: { name: "payment-outbox-staging" },
+          source: "managed",
+        },
+        "payment-outbox-dlq": {
+          type: "queue",
+          lifecycleStatus: "created",
+          props: { type: "queue", name: "payment-outbox-dlq-staging", bindings: {} },
+          output: { name: "payment-outbox-dlq-staging" },
+          source: "managed",
+        },
+      },
+      workers: {
+        "workers/api": { name: "payment-api-staging" },
+        "workers/batch-workflow": { name: "payment-batch-workflow-staging" },
+        "workers/event-router": { name: "payment-event-router-staging" },
+      },
+      secrets: {},
+    };
+
+    const mockProvider: StateProvider = {
+      read: vi.fn().mockResolvedValue(mockState),
+      write: vi.fn(),
+      delete: vi.fn(),
+      list: vi.fn(),
+    };
+
+    const stageConfig: CfStageConfig = {
+      version: 1,
+      workers: ["workers/api", "workers/batch-workflow", "workers/event-router"],
+      resources: {
+        "payments-db": {
+          type: "d1",
+          bindings: {
+            "workers/api": "DB",
+            "workers/batch-workflow": "DB",
+            "workers/event-router": "DB",
+          },
+        },
+        "token-kv": {
+          type: "kv",
+          bindings: {
+            "workers/api": "TOKEN_KV",
+          },
+        },
+        "cache-kv": {
+          type: "kv",
+          bindings: {
+            "workers/batch-workflow": "CACHE_KV",
+          },
+        },
+        "payment-outbox": {
+          type: "queue",
+          bindings: {
+            "workers/api": { producer: "OUTBOX_QUEUE" },
+            "workers/batch-workflow": { producer: "OUTBOX_QUEUE" },
+            "workers/event-router": { producer: "OUTBOX_QUEUE", consumer: true },
+          },
+        },
+        "payment-outbox-dlq": {
+          type: "queue",
+          bindings: {
+            "workers/event-router": { deadLetterFor: "payment-outbox" },
+          },
+        },
+      },
+      serviceBindings: {
+        "workers/api": {
+          WORKFLOWS: "workers/batch-workflow",
+        },
+      },
+      dev: {
+        session: {
+          entryWorker: "workers/api",
+          persistTo: ".wrangler/state",
+        },
+      },
+    };
+
+    story.given("an example config and a rendered staging state");
+    const plan = await buildDevPlan(stageConfig, exampleRoot, {
+      basePort: 8787,
+      stage: "staging",
+      stateProvider: mockProvider,
+      session: true,
+    });
+
+    story.then("dev config paths point at rendered stage configs");
+    expect(plan.workers.every((worker) => worker.configPath.includes(".wrangler-deploy/dev/staging/"))).toBe(true);
+    expect(plan.session?.configPaths.every((path) => path.includes(".wrangler-deploy/dev/staging/"))).toBe(true);
+
+    const renderedApiConfig = readFileSync(
+      resolve(exampleRoot, ".wrangler-deploy/dev/staging/workers/api/wrangler.rendered.jsonc"),
+      "utf-8",
+    );
+
+    story.and("the rendered config contains the stage bindings");
+    expect(renderedApiConfig).toContain('"database_id": "d1-stage-id"');
+    expect(renderedApiConfig).toContain('"id": "kv-token-id"');
+    expect(renderedApiConfig).toContain('"queue": "payment-outbox-staging"');
+    expect(renderedApiConfig).toContain('"service": "payment-batch-workflow-staging"');
+    expect(renderedApiConfig).not.toContain("placeholder");
+  });
+
+  it("includes matching companion commands in the plan", async ({ task }) => {
     story.init(task);
 
     const config = makeConfig({
@@ -160,7 +299,7 @@ describe("buildDevPlan", () => {
     });
 
     story.given("a worker-scoped companion command for batch-workflow");
-    const plan = buildDevPlan(config, exampleRoot, { basePort: 8787, filter: "workers/api" });
+    const plan = await buildDevPlan(config, exampleRoot, { basePort: 8787, filter: "workers/api" });
 
     story.then("only companions matching the filtered workers are included");
     expect(plan.companions).toEqual([
@@ -173,7 +312,7 @@ describe("buildDevPlan", () => {
     ]);
   });
 
-  it("throws when filter references an unknown worker", ({ task }) => {
+  it("throws when filter references an unknown worker", async ({ task }) => {
     story.init(task);
 
     const config = makeConfig();
@@ -181,12 +320,12 @@ describe("buildDevPlan", () => {
     story.given("a filter for a worker path that is not declared in the config");
 
     story.then("building the plan fails fast instead of producing an empty dev session");
-    expect(() =>
+    await expect(() =>
       buildDevPlan(config, exampleRoot, {
         basePort: 8787,
         filter: "workers/missing-worker",
       }),
-    ).toThrow(/unknown worker/i);
+    ).rejects.toThrow(/unknown worker/i);
   });
 
   it("startDev preserves explicit planned ports instead of compacting them", async ({ task }) => {
@@ -355,5 +494,291 @@ describe("buildDevPlan", () => {
     expect(handle.ports).toEqual({
       "workers/api": 8787,
     });
+  });
+
+  it("read-mode: only starts filter target and populates serviceBindingFallbacks from state", async ({ task }) => {
+    story.init(task);
+
+    const mockState: StageState = {
+      stage: "staging",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+      resources: {},
+      workers: {
+        "workers/batch-workflow": { name: "batch-workflow-staging" },
+      },
+      secrets: {},
+    };
+    const mockProvider: StateProvider = {
+      read: vi.fn().mockResolvedValue(mockState),
+      write: vi.fn(),
+      delete: vi.fn(),
+      list: vi.fn(),
+    };
+
+    const config = makeConfig({
+      workers: ["workers/api", "workers/batch-workflow", "workers/event-router"],
+      serviceBindings: {
+        "workers/api": { WORKFLOWS: "workers/batch-workflow" },
+      },
+    });
+
+    story.given("a config with api -> batch-workflow, and a fallback stage with batch-workflow deployed");
+    const plan = await buildDevPlan(config, exampleRoot, {
+      basePort: 8787,
+      filter: "workers/api",
+      fallbackStage: "staging",
+      stateProvider: mockProvider,
+    });
+
+    story.then("only workers/api is started and WORKFLOWS binding maps to the deployed name");
+    expect(plan.workers).toHaveLength(1);
+    expect(plan.workers[0]!.workerPath).toBe("workers/api");
+    expect(plan.workers[0]!.serviceBindingFallbacks).toEqual({ WORKFLOWS: "batch-workflow-staging" });
+  });
+
+  it("read-mode: warns and maps to null when excluded worker is not in fallback state", async ({ task }) => {
+    story.init(task);
+
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const mockState: StageState = {
+      stage: "staging",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+      resources: {},
+      workers: {},  // batch-workflow not in state
+      secrets: {},
+    };
+    const mockProvider: StateProvider = {
+      read: vi.fn().mockResolvedValue(mockState),
+      write: vi.fn(),
+      delete: vi.fn(),
+      list: vi.fn(),
+    };
+
+    const config = makeConfig({
+      workers: ["workers/api", "workers/batch-workflow"],
+      serviceBindings: {
+        "workers/api": { WORKFLOWS: "workers/batch-workflow" },
+      },
+    });
+
+    story.given("a config with api -> batch-workflow, and fallback state that does not include batch-workflow");
+    const plan = await buildDevPlan(config, exampleRoot, {
+      basePort: 8787,
+      filter: "workers/api",
+      fallbackStage: "staging",
+      stateProvider: mockProvider,
+    });
+
+    story.then("the binding is mapped to null and a warning is logged");
+    expect(plan.workers[0]!.serviceBindingFallbacks).toEqual({ WORKFLOWS: null });
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("workers/batch-workflow"));
+    warnSpy.mockRestore();
+  });
+
+  it("read-mode: throws when fallback stage state is not found", async ({ task }) => {
+    story.init(task);
+
+    const mockProvider: StateProvider = {
+      read: vi.fn().mockResolvedValue(null),
+      write: vi.fn(),
+      delete: vi.fn(),
+      list: vi.fn(),
+    };
+
+    const config = makeConfig({
+      workers: ["workers/api", "workers/batch-workflow"],
+      serviceBindings: {
+        "workers/api": { WORKFLOWS: "workers/batch-workflow" },
+      },
+    });
+
+    story.given("a fallback stage that has no state on disk");
+    story.then("buildDevPlan throws with a helpful error");
+    await expect(
+      buildDevPlan(config, exampleRoot, {
+        basePort: 8787,
+        filter: "workers/api",
+        fallbackStage: "staging",
+        stateProvider: mockProvider,
+      }),
+    ).rejects.toThrow(/fallback stage "staging" not found/i);
+  });
+
+  it("filter without fallback stage still expands transitive deps (existing behavior unchanged)", async ({ task }) => {
+    story.init(task);
+
+    const config = makeConfig({
+      workers: ["workers/api", "workers/batch-workflow", "workers/event-router"],
+      serviceBindings: {
+        "workers/api": { WORKFLOWS: "workers/batch-workflow" },
+        "workers/batch-workflow": { EVENTS: "workers/event-router" },
+      },
+    });
+
+    story.given("a filter with no fallback stage");
+    const plan = await buildDevPlan(config, exampleRoot, { basePort: 8787, filter: "workers/api" });
+
+    story.then("plan includes all transitive deps and no serviceBindingFallbacks");
+    const paths = plan.workers.map((w) => w.workerPath);
+    expect(paths).toContain("workers/api");
+    expect(paths).toContain("workers/batch-workflow");
+    expect(paths).toContain("workers/event-router");
+    expect(plan.workers.every((w) => !w.serviceBindingFallbacks)).toBe(true);
+  });
+
+  it("read-mode: starts filter target cleanly when it has no service bindings", async ({ task }) => {
+    story.init(task);
+
+    const mockState: StageState = {
+      stage: "staging",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+      resources: {},
+      workers: {},
+      secrets: {},
+    };
+    const mockProvider: StateProvider = {
+      read: vi.fn().mockResolvedValue(mockState),
+      write: vi.fn(),
+      delete: vi.fn(),
+      list: vi.fn(),
+    };
+
+    const config = makeConfig({
+      workers: ["workers/api", "workers/batch-workflow"],
+      serviceBindings: {},
+    });
+
+    story.given("a config where the filter target has no outgoing service bindings");
+    const plan = await buildDevPlan(config, exampleRoot, {
+      basePort: 8787,
+      filter: "workers/api",
+      fallbackStage: "staging",
+      stateProvider: mockProvider,
+    });
+
+    story.then("the plan starts only the filter target with no fallback bindings");
+    expect(plan.workers).toHaveLength(1);
+    expect(plan.workers[0]!.workerPath).toBe("workers/api");
+    expect(plan.workers[0]!.serviceBindingFallbacks).toBeUndefined();
+  });
+
+  it("startDev: writes dev override config and passes --config when worker has serviceBindingFallbacks", async ({ task }) => {
+    story.init(task);
+    story.given("a workers-mode plan where workers/api has a fallback binding to batch-workflow-staging");
+
+    vi.resetModules();
+
+    const spawnMock = vi.fn(() => ({
+      stdout: { on: vi.fn() },
+      stderr: { on: vi.fn() },
+      kill: vi.fn(),
+    }));
+
+    const writeFileSyncMock = vi.fn();
+    const mkdirSyncMock = vi.fn();
+
+    const findAvailablePortsMock = vi
+      .fn()
+      .mockResolvedValueOnce([9000])
+      .mockResolvedValueOnce([9229]);
+
+    vi.doMock("node:child_process", () => ({ spawn: spawnMock }));
+    vi.doMock("node:fs", () => ({
+      existsSync: vi.fn().mockReturnValue(true),
+      writeFileSync: writeFileSyncMock,
+      mkdirSync: mkdirSyncMock,
+    }));
+    vi.doMock("./port-finder.js", () => ({ findAvailablePorts: findAvailablePortsMock }));
+
+    const { startDev } = await import("./dev.js");
+
+    const overrideDir = "/repo/.wrangler-deploy/dev/workers/api";
+    const overridePath = `${overrideDir}/wrangler.dev.jsonc`;
+
+    await startDev(
+      {
+        mode: "workers",
+        workers: [
+          {
+            workerPath: "workers/api",
+            cwd: "/repo/workers/api",
+            configPath: "/repo/workers/api/wrangler.jsonc",
+            port: 9000,
+            args: [],
+            serviceBindingFallbacks: { WORKFLOWS: "batch-workflow-staging" },
+          },
+        ],
+        companions: [],
+        ports: { "workers/api": 9000 },
+      },
+      { output: () => {}, rootDir: "/repo" },
+    );
+
+    story.then("the override config file is written and --config is passed to wrangler");
+    expect(mkdirSyncMock).toHaveBeenCalledWith(overrideDir, { recursive: true });
+    expect(writeFileSyncMock).toHaveBeenCalledWith(
+      overridePath,
+      expect.stringContaining('"WORKFLOWS"'),
+    );
+    expect(writeFileSyncMock).toHaveBeenCalledWith(
+      overridePath,
+      expect.stringContaining('"batch-workflow-staging"'),
+    );
+    expect(spawnMock).toHaveBeenCalledWith(
+      "npx",
+      expect.arrayContaining(["--config", overridePath]),
+      expect.anything(),
+    );
+    vi.resetModules();
+  });
+
+  it("throws when fallbackStage is provided without stateProvider", async ({ task }) => {
+    story.init(task);
+
+    const config = makeConfig({
+      workers: ["workers/api"],
+    });
+
+    story.given("fallbackStage is set but stateProvider is omitted");
+    story.then("buildDevPlan throws immediately rather than silently falling back to transitive-dep mode");
+    await expect(
+      buildDevPlan(config, exampleRoot, {
+        basePort: 8787,
+        fallbackStage: "staging",
+        // stateProvider intentionally omitted
+      }),
+    ).rejects.toThrow(/stage\/fallback-stage dev requires stateProvider/i);
+  });
+
+  it("throws when read-mode and session mode are combined", async ({ task }) => {
+    story.init(task);
+
+    const mockProvider: StateProvider = {
+      read: vi.fn().mockResolvedValue(null),
+      write: vi.fn(),
+      delete: vi.fn(),
+      list: vi.fn(),
+    };
+
+    const config = makeConfig({
+      workers: ["workers/api"],
+      dev: { session: { enabled: true } },
+    });
+
+    story.given("both fallbackStage and session mode are requested");
+    story.then("buildDevPlan throws since read-mode + session are incompatible");
+    await expect(
+      buildDevPlan(config, exampleRoot, {
+        basePort: 8787,
+        filter: "workers/api",
+        fallbackStage: "staging",
+        stateProvider: mockProvider,
+        session: true,
+      }),
+    ).rejects.toThrow(/not compatible with session mode/i);
   });
 });

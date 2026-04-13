@@ -1,4 +1,5 @@
 import type { CfStageConfig, StageState } from "../types.js";
+import { resourceId, resourceStagedName } from "../types.js";
 
 export interface ManagedEnvSection {
   kv_namespaces?: Array<{ binding: string; id: string }>;
@@ -22,27 +23,30 @@ export function writeManagedBindings(
     if (bindingForWorker === undefined) continue;
 
     const resourceState = state.resources[resourceName];
-    if (!resourceState?.observed.id) continue;
+    if (!resourceState?.output) continue;
 
-    const id = resourceState.observed.id;
-    const desiredName = resourceState.desired.name;
+    const rid = resourceId(resourceState);
+    const stagedName = resourceStagedName(resourceState);
 
     if (resource.type === "kv") {
+      if (!rid) continue;
       const bindingName = typeof bindingForWorker === "string" ? bindingForWorker : String(bindingForWorker);
       section.kv_namespaces ??= [];
-      section.kv_namespaces.push({ binding: bindingName, id });
+      section.kv_namespaces.push({ binding: bindingName, id: rid });
     } else if (resource.type === "d1") {
+      if (!rid) continue;
       const bindingName = typeof bindingForWorker === "string" ? bindingForWorker : String(bindingForWorker);
       section.d1_databases ??= [];
-      section.d1_databases.push({ binding: bindingName, database_id: id, database_name: desiredName });
+      section.d1_databases.push({ binding: bindingName, database_id: rid, database_name: stagedName });
     } else if (resource.type === "hyperdrive") {
+      if (!rid) continue;
       const bindingName = typeof bindingForWorker === "string" ? bindingForWorker : String(bindingForWorker);
       section.hyperdrive ??= [];
-      section.hyperdrive.push({ binding: bindingName, id });
+      section.hyperdrive.push({ binding: bindingName, id: rid });
     } else if (resource.type === "r2") {
       const bindingName = typeof bindingForWorker === "string" ? bindingForWorker : String(bindingForWorker);
       section.r2_buckets ??= [];
-      section.r2_buckets.push({ binding: bindingName, bucket_name: desiredName });
+      section.r2_buckets.push({ binding: bindingName, bucket_name: stagedName });
     } else if (resource.type === "queue") {
       // Queue bindings can be producer or consumer
       if (
@@ -53,7 +57,7 @@ export function writeManagedBindings(
         const qb = bindingForWorker as { producer: string };
         section.queues ??= {};
         section.queues.producers ??= [];
-        section.queues.producers.push({ binding: qb.producer, queue: desiredName });
+        section.queues.producers.push({ binding: qb.producer, queue: stagedName });
       }
       // Consumers don't need wrangler binding entries here (queue config handles them)
     }

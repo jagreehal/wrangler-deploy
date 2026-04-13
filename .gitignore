@@ -8,3 +8,5 @@ dist/
 ___temp
 .DS_Store
 **/.astro
+___temp
+.playwright-cli

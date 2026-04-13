@@ -9,9 +9,13 @@ wrangler-deploy sits on top of wrangler. It is a deploy tool, but it is also a d
 
 This is intentionally not a pitch to move away from `wrangler.jsonc`. `wrangler.jsonc` works fine. The goal is to keep it and add the missing repo-level workflows around it.
 
+`wrangler.jsonc` stays the authoring surface for local development. wrangler-deploy reads it, renders stage-specific configs only when needed, and leaves your checked-in worker configs in place.
+
 That extra file tells wrangler-deploy what resources exist, which workers use them, and how stages should behave. From there it can create stage-specific resources, render stage-specific `wrangler.jsonc` files with the right IDs, deploy in the right order, and tear everything down when the stage is done.
 
 Wrangler still provides the underlying primitives. The value here is that wrangler-deploy turns those primitives into repo-aware workflows. Instead of remembering which worker owns a Queue binding, which local port it landed on, or which ad hoc route to hit in development, you use logical names from one project config and let the tool resolve the rest.
+
+That same config also gives you typed Worker `Env` objects through `workerEnv(...)` and `typeof api.Env`. The type is inferred from the bindings you declare, so you get compile-time safety without code generation or a runtime helper library just to produce the type.
 
 ## The problem
 
@@ -92,6 +96,8 @@ The other important split is:
 - wrangler-deploy gives you app-level commands across the whole repo.
 
 That is why commands like `wd dev doctor`, `wd cron trigger`, and `wd queue send` matter. They are not replacing Wrangler's runtime. They are removing the need to remember which worker, which port, and which local convention applies in a given repo.
+
+It is also why the config exports a phantom `Env` type for each worker. You write the bindings once, then import the inferred type where you use it.
 
 That is why JSONC stays first-class instead of turning into something you have to work around.
 

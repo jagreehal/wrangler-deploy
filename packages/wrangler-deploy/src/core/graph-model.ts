@@ -1,4 +1,5 @@
-import type { CfStageConfig, StageState } from "../types.js";
+import type { CfStageConfig, LifecycleStatus, StageState } from "../types.js";
+import { resourceId } from "../types.js";
 
 export type RichNodeType = "worker" | "kv" | "queue" | "d1" | "hyperdrive" | "r2" | "vectorize";
 
@@ -7,7 +8,7 @@ export interface RichNode {
   type: RichNodeType;
   label: string;
   resourceId?: string;
-  status?: "active" | "missing" | "drifted" | "orphaned";
+  status?: LifecycleStatus;
   deployedName?: string;
 }
 
@@ -49,8 +50,8 @@ export function buildRichGraph(config: CfStageConfig, state?: StageState): RichG
       id: resourceName,
       type: resource.type,
       label: resourceName,
-      ...(resourceState?.observed.id !== undefined ? { resourceId: resourceState.observed.id } : {}),
-      ...(resourceState?.observed.status !== undefined ? { status: resourceState.observed.status } : {}),
+      ...(resourceState && resourceId(resourceState) !== undefined ? { resourceId: resourceId(resourceState) } : {}),
+      ...(resourceState !== undefined ? { status: resourceState.lifecycleStatus } : {}),
     };
     nodes.push(node);
 

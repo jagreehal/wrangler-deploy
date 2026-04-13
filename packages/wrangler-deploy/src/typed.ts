@@ -30,6 +30,8 @@
  * ```
  */
 
+import type { D1Output, KvOutput, QueueOutput, R2Output, HyperdriveOutput, VectorizeOutput } from "./types.js";
+
 // ============================================================================
 // Resource marker types — carry type information, no runtime value
 // ============================================================================
@@ -37,27 +39,32 @@
 export interface KvMarker {
   readonly __wsType: "kv";
   readonly name: string;
+  output?: KvOutput;
 }
 
 export interface QueueMarker<Body = unknown> {
   readonly __wsType: "queue";
   readonly __body: Body;
   readonly name: string;
+  output?: QueueOutput;
 }
 
 export interface HyperdriveMarker {
   readonly __wsType: "hyperdrive";
   readonly name: string;
+  output?: HyperdriveOutput;
 }
 
 export interface D1Marker {
   readonly __wsType: "d1";
   readonly name: string;
+  output?: D1Output;
 }
 
 export interface R2Marker {
   readonly __wsType: "r2";
   readonly name: string;
+  output?: R2Output;
 }
 
 export interface WorkerMarker {
@@ -74,6 +81,7 @@ export interface WorkflowMarker<Params = unknown> {
 export interface VectorizeMarker {
   readonly __wsType: "vectorize";
   readonly name: string;
+  output?: VectorizeOutput;
 }
 
 export interface SecretMarker {

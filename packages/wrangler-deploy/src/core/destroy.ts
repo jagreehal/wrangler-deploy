@@ -1,4 +1,5 @@
 import type { CfStageConfig } from "../types.js";
+import { resourceId, resourceStagedName } from "../types.js";
 import { isStageProtected } from "./naming.js";
 import type { StateProvider } from "./state.js";
 import type { WranglerRunner } from "./wrangler-runner.js";
@@ -17,7 +18,17 @@ export type DestroyDeps = {
   config: CfStageConfig;
   state: StateProvider;
   wrangler: WranglerRunner;
+  logger?: Pick<Console, "log" | "warn" | "error">;
 };
+
+export interface DestroyResult {
+  stage: string;
+  detachedConsumers: Array<{ queue: string; worker: string }>;
+  destroyedWorkers: string[];
+  destroyedResources: string[];
+  stateDeleted: boolean;
+  partialFailures: boolean;
+}
 
 function wranglerWithIdempotentDelete(runner: WranglerRunner, args: string[], cwd: string): string {
   try {
@@ -39,9 +50,9 @@ function wranglerWithIdempotentDelete(runner: WranglerRunner, args: string[], cw
   }
 }
 
-export async function destroy(args: DestroyArgs, deps: DestroyDeps): Promise<void> {
+export async function destroy(args: DestroyArgs, deps: DestroyDeps): Promise<DestroyResult> {
   const { stage, force } = args;
-  const { rootDir, config, state: provider, wrangler } = deps;
+  const { rootDir, config, state: provider, wrangler, logger = console } = deps;
 
   if (isStageProtected(stage, config.stages) && !force) {
     throw new Error(`Stage "${stage}" is protected. Use --force to destroy it.`);
@@ -49,14 +60,24 @@ export async function destroy(args: DestroyArgs, deps: DestroyDeps): Promise<voi
 
   const state = await provider.read(stage);
   if (!state) {
-    console.log(`  No state found for stage "${stage}". Nothing to destroy.`);
-    return;
+    logger.log(`  No state found for stage "${stage}". Nothing to destroy.`);
+    return {
+      stage,
+      detachedConsumers: [],
+      destroyedWorkers: [],
+      destroyedResources: [],
+      stateDeleted: false,
+      partialFailures: false,
+    };
   }
 
-  console.log(`\n  wrangler-deploy destroy --stage ${stage}\n`);
+  logger.log(`\n  wrangler-deploy destroy --stage ${stage}\n`);
 
   // Track whether any deletion fails — if so, preserve state for recovery
   let hasFailures = false;
+  const destroyedWorkers: string[] = [];
+  const destroyedResources: string[] = [];
+  const detachedConsumerList: Array<{ queue: string; worker: string }> = [];
 
   // First: remove queue consumers (must happen before worker deletion).
   // Walk config.resources for known consumer bindings.
@@ -67,20 +88,22 @@ export async function destroy(args: DestroyArgs, deps: DestroyDeps): Promise<voi
       if (typeof binding === "object" && "consumer" in binding) {
         const workerState = state.workers[workerPath];
         if (!workerState) continue;
-        const queueName = state.resources[logicalName]?.desired.name;
+        const stateRes = state.resources[logicalName];
+        const queueName = stateRes ? resourceStagedName(stateRes) : undefined;
         if (!queueName) continue;
         detachedConsumers.add(`${queueName}:${workerState.name}`);
-        console.log(`  - removing queue consumer ${workerState.name} from ${queueName}...`);
+        detachedConsumerList.push({ queue: queueName, worker: workerState.name });
+        logger.log(`  - removing queue consumer ${workerState.name} from ${queueName}...`);
         try {
           wranglerWithIdempotentDelete(
             wrangler,
             ["queues", "consumer", "remove", queueName, workerState.name],
             rootDir,
           );
-          console.log(`    removed`);
+          logger.log(`    removed`);
         } catch (err) {
           hasFailures = true;
-          console.error(`    FAILED: ${(err as Error).message}`);
+          logger.error(`    FAILED: ${(err as Error).message}`);
         }
       }
     }
@@ -92,22 +115,22 @@ export async function destroy(args: DestroyArgs, deps: DestroyDeps): Promise<voi
   for (const [logicalName, resource] of Object.entries(state.resources)) {
     if (resource.type !== "queue") continue;
     if (config.resources[logicalName]) continue; // already handled above
-    const queueName = resource.desired.name;
+    const queueName = resourceStagedName(resource);
     for (const [, workerState] of Object.entries(state.workers)) {
       const key = `${queueName}:${workerState.name}`;
       if (detachedConsumers.has(key)) continue;
       detachedConsumers.add(key);
-      console.log(`  - removing queue consumer ${workerState.name} from ${queueName}...`);
+      logger.log(`  - removing queue consumer ${workerState.name} from ${queueName}...`);
       try {
         wranglerWithIdempotentDelete(
           wrangler,
           ["queues", "consumer", "remove", queueName, workerState.name],
           rootDir,
         );
-        console.log(`    removed`);
+        logger.log(`    removed`);
       } catch (err) {
         hasFailures = true;
-        console.error(`    FAILED: ${(err as Error).message}`);
+        logger.error(`    FAILED: ${(err as Error).message}`);
       }
     }
   }
@@ -118,7 +141,7 @@ export async function destroy(args: DestroyArgs, deps: DestroyDeps): Promise<voi
     const workerState = state.workers[workerPath];
     if (!workerState) continue;
 
-    console.log(`  - deleting worker ${workerState.name}...`);
+    logger.log(`  - deleting worker ${workerState.name}...`);
     try {
       wranglerWithIdempotentDelete(
         wrangler,
@@ -126,17 +149,18 @@ export async function destroy(args: DestroyArgs, deps: DestroyDeps): Promise<voi
         rootDir,
       );
       delete state.workers[workerPath];
+      destroyedWorkers.push(workerState.name);
       await provider.write(stage, state);
-      console.log(`    deleted`);
+      logger.log(`    deleted`);
     } catch (err) {
       hasFailures = true;
-      console.error(`    FAILED: ${(err as Error).message}`);
+      logger.error(`    FAILED: ${(err as Error).message}`);
     }
   }
 
   // Delete orphaned workers still in state but no longer in config
   for (const [workerPath, workerState] of Object.entries(state.workers)) {
-    console.log(`  - deleting orphaned worker ${workerState.name}...`);
+    logger.log(`  - deleting orphaned worker ${workerState.name}...`);
     try {
       wranglerWithIdempotentDelete(
         wrangler,
@@ -144,11 +168,12 @@ export async function destroy(args: DestroyArgs, deps: DestroyDeps): Promise<voi
         rootDir,
       );
       delete state.workers[workerPath];
+      destroyedWorkers.push(workerState.name);
       await provider.write(stage, state);
-      console.log(`    deleted`);
+      logger.log(`    deleted`);
     } catch (err) {
       hasFailures = true;
-      console.error(`    FAILED: ${(err as Error).message}`);
+      logger.error(`    FAILED: ${(err as Error).message}`);
     }
   }
 
@@ -159,61 +184,75 @@ export async function destroy(args: DestroyArgs, deps: DestroyDeps): Promise<voi
     if (!resource) continue;
     if (resource.source !== "managed") continue;
 
-    console.log(`  - deleting ${resource.desired.name} (${resource.type})...`);
+    logger.log(`  - deleting ${resourceStagedName(resource)} (${resource.type})...`);
 
     try {
       switch (resource.type) {
-        case "kv":
-          if (resource.observed.id) {
+        case "kv": {
+          const rid = resourceId(resource);
+          if (rid) {
             wranglerWithIdempotentDelete(
               wrangler,
-              ["kv", "namespace", "delete", "--namespace-id", resource.observed.id],
+              ["kv", "namespace", "delete", "--namespace-id", rid],
               rootDir,
             );
           }
           break;
+        }
         case "queue":
           wranglerWithIdempotentDelete(
             wrangler,
-            ["queues", "delete", resource.desired.name],
+            ["queues", "delete", resourceStagedName(resource)],
             rootDir,
           );
           break;
-        case "hyperdrive":
-          if (resource.observed.id) {
+        case "hyperdrive": {
+          const rid = resourceId(resource);
+          if (rid) {
             wranglerWithIdempotentDelete(
               wrangler,
-              ["hyperdrive", "delete", resource.observed.id],
+              ["hyperdrive", "delete", rid],
               rootDir,
             );
           }
           break;
+        }
         case "vectorize":
-          deleteVectorizeIndex(resource.desired.name, rootDir);
+          deleteVectorizeIndex(resourceStagedName(resource), rootDir);
           break;
         case "d1":
-          deleteD1Database(resource.desired.name, rootDir);
+          deleteD1Database(resourceStagedName(resource), rootDir);
           break;
         case "r2":
-          deleteR2Bucket(resource.desired.name, rootDir);
+          deleteR2Bucket(resourceStagedName(resource), rootDir);
           break;
       }
 
       delete state.resources[logicalName];
+      destroyedResources.push(resourceStagedName(resource));
       await provider.write(stage, state);
-      console.log(`    deleted`);
+      logger.log(`    deleted`);
     } catch (err) {
       hasFailures = true;
-      console.error(`    FAILED: ${(err as Error).message}`);
+      logger.error(`    FAILED: ${(err as Error).message}`);
     }
   }
 
   // Only delete state if everything was cleaned up successfully.
   // Partial failures preserve state so the user can re-run destroy.
   if (hasFailures) {
-    console.log(`\n  Stage "${stage}" partially destroyed. State preserved — re-run to retry.\n`);
+    logger.log(`\n  Stage "${stage}" partially destroyed. State preserved — re-run to retry.\n`);
   } else {
     await provider.delete(stage);
-    console.log(`\n  Stage "${stage}" destroyed.\n`);
+    logger.log(`\n  Stage "${stage}" destroyed.\n`);
   }
+
+  return {
+    stage,
+    detachedConsumers: detachedConsumerList,
+    destroyedWorkers,
+    destroyedResources,
+    stateDeleted: !hasFailures,
+    partialFailures: hasFailures,
+  };
 }

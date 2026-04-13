@@ -3,7 +3,7 @@ title: Typed Bindings
 description: Zero-codegen phantom Env types
 ---
 
-Declare resources in config, get Worker Env types automatically. No codegen step, no generated files.
+Declare resources in config, get Worker Env types automatically. No codegen step, no generated files, and no runtime dependency needed for the typing itself.
 
 ## How it works
 
@@ -25,7 +25,7 @@ import type { api } from "../wrangler-deploy.config.ts";
 type Env = typeof api.Env;
 ```
 
-`Env` resolves to:
+`Env` resolves to the Worker runtime shape inferred from the config:
 
 ```ts
 {
@@ -49,6 +49,35 @@ type Env = typeof api.Env;
 | Workflow   | `workflow<P>()` | `Workflow<P>` |
 | Secret     | `secret()`      | `string`      |
 
-## No codegen
+## No codegen, no runtime helper required
 
-The types are resolved at compile time through TypeScript's conditional type system. No build step, no generated files. Change a binding name in the config and TypeScript catches mismatches everywhere.
+The types are resolved at compile time through TypeScript's conditional type system. No build step, no generated files, and no Effect-like runtime library. Change a binding name in the config and TypeScript catches mismatches everywhere.
+
+## Enriched markers at runtime
+
+In local development (`wd dev`), resource markers don't have access to actual Cloudflare IDs until apply runs. The `enrichMarkers()` function attaches `output` from state to markers at runtime:
+
+```ts
+import { enrichMarkers, loadStateOutputs } from "wrangler-deploy";
+import type { ResourceMarker } from "wrangler-deploy/typed";
+
+export function onRequestGet(request: Request, env: Env, ctx: ExecutionContext) {
+  // env.DB has the binding, but what about the database ID?
+  // enrichMarkers mutates the marker objects in place
+  enrichMarkers(env.DB.__marker, env.__state);
+
+  // Now the marker has output attached
+  console.log(env.DB.__marker.output?.id); // "abc123..."
+
+  // Or get all outputs as a flat object
+  const outputs = loadStateOutputs(env.__state);
+  console.log(outputs["database"]?.id);
+}
+```
+
+The `output` property contains the real Cloudflare resource IDs, secrets, and connection strings from state. This is useful for:
+
+- Debugging which real resource a binding points to
+- Accessing D1 database IDs for direct SQL connections
+- Reading R2 bucket names for direct uploads
+- Conditional logic based on resource properties

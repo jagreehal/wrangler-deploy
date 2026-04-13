@@ -1,10 +1,13 @@
 import { execFileSync } from "node:child_process";
+import { getWranglerEnv } from "../core/auth.js";
+import type { D1Output } from "../types.js";
 
 function wrangler(args: string[], cwd: string): string {
   try {
     return execFileSync("npx", ["wrangler", ...args], {
       encoding: "utf-8",
       cwd,
+      env: getWranglerEnv(cwd),
       stdio: ["pipe", "pipe", "pipe"],
     }).trim();
   } catch (err: unknown) {
@@ -17,10 +20,10 @@ function wrangler(args: string[], cwd: string): string {
   }
 }
 
-export function createD1Database(name: string, cwd: string): string | undefined {
+export function createD1Database(name: string, cwd: string): D1Output {
   const output = wrangler(["d1", "create", name], cwd);
-  const match = output.match(/([a-f0-9-]{36})/);
-  return match?.[1];
+  const match = output.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+  return { id: match?.[1], name, version: "v1" };
 }
 
 export function deleteD1Database(name: string, cwd: string): void {

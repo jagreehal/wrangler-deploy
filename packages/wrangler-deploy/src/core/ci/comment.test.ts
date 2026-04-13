@@ -22,8 +22,9 @@ const state: StageState = {
   resources: {
     myKv: {
       type: "kv",
-      desired: { name: "my-kv-pr-42" },
-      observed: { id: "abc123", status: "active" },
+      lifecycleStatus: "created",
+      props: { type: "kv", name: "my-kv-pr-42", bindings: {} },
+      output: { id: "abc123", title: "my-kv-pr-42" },
       source: "managed",
     },
   },

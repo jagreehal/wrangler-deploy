@@ -61,10 +61,26 @@ graph TD
 
 ## Live state overlay
 
-When `--stage` is provided, the graph shows resource IDs and worker URLs from the actual deployed state:
+When `--stage` is provided, the graph shows resource lifecycle status from state:
 
 ```bash
 $ wd graph --stage staging
+[worker] api → https://api.staging.example.com [STATUS: deployed]
+├── (binding: DB) [d1] payments-db [STATUS: observed]
+├── (binding: TOKEN_KV) [kv] token-kv [STATUS: observed]
+├── (producer: OUTBOX_QUEUE) [queue] payment-outbox [STATUS: observed]
+└── (service-binding: WORKFLOWS) [worker] batch-workflow [STATUS: existing]
 ```
 
-This is the same information `wd status` prints, but as a visual graph.
+Each resource shows its lifecycle status:
+
+| Status     | Meaning                                         |
+| ---------- | ----------------------------------------------- |
+| `creating` | Create command sent, waiting on first response  |
+| `created`  | Successful initial provision                    |
+| `updating` | Update detected, applying changes               |
+| `observed` | Matches the desired state in Cloudflare         |
+| `missing`  | Resource deleted in Cloudflare but not unlinked |
+| `unknown`  | State file missing or unreadable                |
+
+This is useful for diagnosing drift, reviewing what changed in the last deploy, or auditing resource state across stages.

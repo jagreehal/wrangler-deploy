@@ -1,6 +1,12 @@
 import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync } from "node:fs";
+import { loadProjectContext } from "./project-context.js";
 
-let resolvedAccountId: string | null = null;
+const resolvedAccountIds = new Map<string, string>();
+
+export function resetResolvedAccountId(): void {
+  resolvedAccountIds.clear();
+}
 
 /**
  * Resolve the Cloudflare account ID for all wrangler commands.
@@ -16,12 +22,19 @@ let resolvedAccountId: string | null = null;
  * the account ID for write operations, even when `wrangler whoami` succeeds.
  */
 export function resolveAccountId(cwd: string): string {
-  if (resolvedAccountId) return resolvedAccountId;
+  const cached = resolvedAccountIds.get(cwd);
+  if (cached) return cached;
+
+  const projectContextAccountId = loadProjectContext(cwd).accountId;
+  if (projectContextAccountId) {
+    resolvedAccountIds.set(cwd, projectContextAccountId);
+    return projectContextAccountId;
+  }
 
   // 1. Check env var (CI/CD flow)
   const envId = process.env.CLOUDFLARE_ACCOUNT_ID;
   if (envId) {
-    resolvedAccountId = envId;
+    resolvedAccountIds.set(cwd, envId);
     return envId;
   }
 
@@ -37,7 +50,7 @@ export function resolveAccountId(cwd: string): string {
     const match = output.match(/│\s+\S.*?\s+│\s+([a-f0-9]{32})\s+│/);
     const matchedId = match?.[1];
     if (matchedId) {
-      resolvedAccountId = matchedId;
+      resolvedAccountIds.set(cwd, matchedId);
       return matchedId;
     }
 
@@ -45,11 +58,27 @@ export function resolveAccountId(cwd: string): string {
     const hexMatch = output.match(/\b([a-f0-9]{32})\b/);
     const hexId = hexMatch?.[1];
     if (hexId) {
-      resolvedAccountId = hexId;
+      resolvedAccountIds.set(cwd, hexId);
       return hexId;
     }
   } catch {
     // whoami failed — not logged in
+  }
+
+  const fallbackPath = process.env.HOME
+    ? `${process.env.HOME}/.wrangler/config/default.toml`
+    : undefined;
+  if (fallbackPath && existsSync(fallbackPath)) {
+    try {
+      const content = readFileSync(fallbackPath, "utf-8");
+      const match = content.match(/account_id\s*=\s*["']([a-f0-9]{32})["']/i);
+      if (match?.[1]) {
+        resolvedAccountIds.set(cwd, match[1]);
+        return match[1];
+      }
+    } catch {
+      // Ignore config parse failures and continue to the hard error below.
+    }
   }
 
   throw new Error(

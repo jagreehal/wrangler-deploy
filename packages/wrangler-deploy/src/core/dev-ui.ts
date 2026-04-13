@@ -15,10 +15,13 @@ import {
 } from "./runtime.js";
 import { readActiveDevState } from "./dev-runtime-state.js";
 import { appendDevUiHistory, getDevUiHistoryEntry, readDevUiHistory } from "./dev-ui-history.js";
+import { cliManifest } from "./cli-manifest.js";
 import { listSnapshots, loadSnapshot, saveSnapshot } from "./snapshots.js";
+import { loadProjectContextDetails } from "./project-context.js";
 import { verifyLocal } from "./verify.js";
 import { createWranglerRunner } from "./wrangler-runner.js";
 import { readWranglerConfig } from "./wrangler.js";
+import type { ProjectContext } from "../types.js";
 
 export interface DevUiHandle {
   port: number;
@@ -59,13 +62,51 @@ function readCronWorkers(config: CfStageConfig, rootDir: string): Array<{ worker
     .filter((entry) => entry.crons.length > 0);
 }
 
-function renderDevUi(
+function formatProjectContextValue(key: keyof ProjectContext, value: ProjectContext[keyof ProjectContext] | undefined): string {
+  if (value === undefined) return "unset";
+  if (key === "statePassword") return "[set]";
+  if (key === "databaseUrl" && typeof value === "string") {
+    try {
+      const url = new URL(value);
+      url.password = "";
+      return url.toString();
+    } catch {
+      return "[set]";
+    }
+  }
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (typeof value === "number") return String(value);
+  return value;
+}
+
+export async function renderDevUi(
   config: CfStageConfig,
   rootDir: string,
   options?: { actionResult?: ActionResult; autoRefresh?: boolean },
-): string {
+): Promise<string> {
   const activeState = readActiveDevState(rootDir);
-  const workerRoutes = listWorkerRoutes(config, rootDir);
+  const projectContext = loadProjectContextDetails(rootDir);
+  const projectContextEntries: Array<[keyof ProjectContext, string]> = [
+    ["stage", formatProjectContextValue("stage", projectContext.context.stage)],
+    ["fallbackStage", formatProjectContextValue("fallbackStage", projectContext.context.fallbackStage)],
+    ["basePort", formatProjectContextValue("basePort", projectContext.context.basePort)],
+    ["filter", formatProjectContextValue("filter", projectContext.context.filter)],
+    ["session", formatProjectContextValue("session", projectContext.context.session)],
+    ["persistTo", formatProjectContextValue("persistTo", projectContext.context.persistTo)],
+    ["accountId", formatProjectContextValue("accountId", projectContext.context.accountId)],
+    ["databaseUrl", formatProjectContextValue("databaseUrl", projectContext.context.databaseUrl)],
+    ["statePassword", formatProjectContextValue("statePassword", projectContext.context.statePassword)],
+  ];
+  const commandMetadata = {
+    commandCount: cliManifest.commands.length,
+    machineReadableDefaults: Object.entries(cliManifest.machineReadableDefaults)
+      .map(([key, value]) => `${key}: ${value ? "on" : "off"}`)
+      .join(", "),
+    highlighted: cliManifest.commands
+      .filter((command) => ["schema", "tools", "context", "dev"].includes(command.name))
+      .map((command) => command.name),
+  };
+  const workerRoutes = await listWorkerRoutes(config, rootDir);
   const queues = listQueueRoutes(config);
   const databases = Object.keys(config.resources)
     .filter((name) => getD1Database(config, name) !== undefined)
@@ -78,6 +119,40 @@ function renderDevUi(
   const verifyPacks = Object.entries(config.verifyLocal?.packs ?? {});
   const snapshots = listSnapshots(rootDir);
   const history = readDevUiHistory(rootDir).slice(0, 8);
+  const contextCard = `
+    <section class="card">
+      <div class="card-header">
+        <h2>Project Context</h2>
+        <span class="badge">${escapeHtml(projectContext.path ?? ".wdrc")}</span>
+      </div>
+      <p class="card-description">Resolved from the nearest <code>.wdrc</code> or <code>.wdrc.json</code> above the repo root.</p>
+      <dl class="meta-list meta-list-wide">
+        ${projectContextEntries.map(([key, value]) => `
+          <dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd>
+        `).join("")}
+      </dl>
+      <div class="stack compact">
+        <small>Use <code>wd context get</code>, <code>wd context set</code>, <code>wd context unset</code>, or <code>wd context clear</code> to edit these defaults.</small>
+      </div>
+    </section>
+  `;
+
+  const metadataCard = `
+    <section class="card">
+      <div class="card-header">
+        <h2>Agent Metadata</h2>
+        <span class="badge">${commandMetadata.commandCount} commands</span>
+      </div>
+      <p class="card-description">The UI uses the same manifest that powers <code>wd schema</code> and <code>wd tools</code>.</p>
+      <dl class="meta-list meta-list-wide">
+        <dt>Machine-readable defaults</dt><dd>${escapeHtml(commandMetadata.machineReadableDefaults)}</dd>
+        <dt>Highlighted commands</dt><dd>${escapeHtml(commandMetadata.highlighted.join(", "))}</dd>
+      </dl>
+      <div class="stack compact">
+        <small>Agents can introspect this package with <code>wd schema --json</code>, <code>wd tools --json</code>, and <code>wd context get stage</code>.</small>
+      </div>
+    </section>
+  `;
 
   const workerCards = workerRoutes.map((route) => `
     <section class="card">
@@ -398,6 +473,12 @@ function renderDevUi(
         gap: 16px;
       }
       .page-meta span { display: flex; align-items: center; gap: 4px; }
+      .top-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 12px;
+        margin-bottom: 8px;
+      }
       /* Section headers */
       .section-header {
         display: flex;
@@ -486,6 +567,7 @@ function renderDevUi(
       }
       dl.meta-list dt { color: var(--muted-foreground); white-space: nowrap; }
       dl.meta-list dd { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      dl.meta-list-wide dd { white-space: normal; }
       /* Badges */
       .badge {
         display: inline-flex;
@@ -543,6 +625,7 @@ function renderDevUi(
         padding-top: 12px;
         border-top: 1px solid var(--border);
       }
+      .stack.compact { margin-top: 8px; padding-top: 8px; }
       .stack:first-of-type { border-top: none; padding-top: 0; }
       /* Actions row */
       .actions {
@@ -642,6 +725,8 @@ function renderDevUi(
       </p>
 
       ${resultCard}
+
+      <div class="top-grid">${contextCard}${metadataCard}</div>
 
       <div class="section-header"><h2>Workers</h2><span class="section-count">${workerRoutes.length}</span></div>
       <div class="grid">${workerCards || '<section class="card"><p class="empty-state">No workers configured.</p></section>'}</div>
@@ -763,7 +848,7 @@ async function runAction(config: CfStageConfig, rootDir: string, rawBody: string
       const worker = form.get("worker");
       const cron = form.get("cron") || undefined;
       if (!worker) throw new Error("Missing cron worker.");
-      const port = listWorkerRoutes(config, rootDir).find((route) => route.workerPath === worker)?.port;
+      const port = (await listWorkerRoutes(config, rootDir)).find((route) => route.workerPath === worker)?.port;
       if (!port) throw new Error(`No local port found for ${worker}.`);
       const result = await triggerCron({ port, cron });
       return {
@@ -887,7 +972,7 @@ export async function startDevUi(
   const server = createServer(async (req, res) => {
     try {
       if (req.method === "GET" && (req.url === "/" || req.url === "/index.html")) {
-        const html = renderDevUi(config, rootDir, { autoRefresh: true });
+        const html = await renderDevUi(config, rootDir, { autoRefresh: true });
         res.setHeader("content-type", "text/html; charset=utf-8");
         res.end(html);
         return;
@@ -906,7 +991,7 @@ export async function startDevUi(
           body: result.body,
           form: formToRecord(form),
         });
-        const html = renderDevUi(config, rootDir, { actionResult: result, autoRefresh: false });
+        const html = await renderDevUi(config, rootDir, { actionResult: result, autoRefresh: false });
         res.setHeader("content-type", "text/html; charset=utf-8");
         res.end(html);
         return;

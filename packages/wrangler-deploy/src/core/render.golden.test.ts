@@ -8,7 +8,9 @@ const baseApiConfig: WranglerConfig = {
   main: "src/index.ts",
   compatibility_date: "2026-03-18",
   compatibility_flags: ["nodejs_compat"],
+  d1_databases: [{ binding: "DB", database_id: "placeholder", database_name: "payments-db" }],
   kv_namespaces: [{ binding: "CACHE", id: "placeholder" }],
+  r2_buckets: [{ binding: "ASSETS", bucket_name: "placeholder" }],
   queues: {
     producers: [{ queue: "events", binding: "EVENT_QUEUE" }],
   },
@@ -49,6 +51,14 @@ const config: CfStageConfig = {
       type: "kv",
       bindings: { "apps/api": "CACHE" },
     },
+    "app-assets": {
+      type: "r2",
+      bindings: { "apps/api": "ASSETS" },
+    },
+    "app-db": {
+      type: "d1",
+      bindings: { "apps/api": "DB" },
+    },
     "events": {
       type: "queue",
       bindings: {
@@ -62,7 +72,7 @@ const config: CfStageConfig = {
         "apps/router": { deadLetterFor: "events" },
       },
     },
-    "app-db": {
+    "app-hd": {
       type: "hyperdrive",
       bindings: { "apps/api": "DB" },
     },
@@ -79,26 +89,44 @@ const state: StageState = {
   resources: {
     "app-cache": {
       type: "kv",
-      desired: { name: "app-cache-staging" },
-      observed: { id: "abc123def456", status: "active", lastSeenAt: "2026-01-01T00:00:00Z" },
+      lifecycleStatus: "created",
+      props: { type: "kv", name: "app-cache-staging", bindings: {} },
+      output: { id: "abc123def456", title: "app-cache-staging" },
+      source: "managed",
+    },
+    "app-assets": {
+      type: "r2",
+      lifecycleStatus: "created",
+      props: { type: "r2", name: "app-assets-staging", bindings: {} },
+      output: { name: "app-assets-staging" },
+      source: "managed",
+    },
+    "app-db": {
+      type: "d1",
+      lifecycleStatus: "created",
+      props: { type: "d1", name: "app-db-staging", bindings: {} },
+      output: { id: "d1-123", name: "app-db-staging", version: "v1" },
       source: "managed",
     },
     "events": {
       type: "queue",
-      desired: { name: "events-staging" },
-      observed: { status: "active", lastSeenAt: "2026-01-01T00:00:00Z" },
+      lifecycleStatus: "created",
+      props: { type: "queue", name: "events-staging", bindings: {} },
+      output: { name: "events-staging" },
       source: "managed",
     },
     "events-dlq": {
       type: "queue",
-      desired: { name: "events-dlq-staging" },
-      observed: { status: "active", lastSeenAt: "2026-01-01T00:00:00Z" },
+      lifecycleStatus: "created",
+      props: { type: "queue", name: "events-dlq-staging", bindings: {} },
+      output: { name: "events-dlq-staging" },
       source: "managed",
     },
-    "app-db": {
+    "app-hd": {
       type: "hyperdrive",
-      desired: { name: "app-db-staging" },
-      observed: { id: "hd-999-888", status: "active", lastSeenAt: "2026-01-01T00:00:00Z" },
+      lifecycleStatus: "created",
+      props: { type: "hyperdrive", name: "app-hd-staging", bindings: {} },
+      output: { id: "hd-999-888", name: "app-hd-staging", origin: "postgresql://user:pass@host/db" },
       source: "managed",
     },
   },
@@ -124,6 +152,14 @@ describe("golden: renderWranglerConfig", () => {
 
     story.and("KV ID is replaced from state");
     expect(rendered.kv_namespaces).toEqual([{ binding: "CACHE", id: "abc123def456" }]);
+
+    story.and("R2 bucket name is replaced from state");
+    expect(rendered.r2_buckets).toEqual([{ binding: "ASSETS", bucket_name: "app-assets-staging" }]);
+
+    story.and("D1 database ID and name are replaced from state");
+    expect(rendered.d1_databases).toEqual([
+      { binding: "DB", database_id: "d1-123", database_name: "app-db-staging" },
+    ]);
 
     story.and("queue name is stage-suffixed");
     expect(rendered.queues?.producers).toEqual([
@@ -181,20 +217,30 @@ describe("golden: renderWranglerConfig", () => {
       resources: {
         "app-cache": {
           type: "kv",
-          desired: { name: "app-cache-pr-123" },
-          observed: { id: "pr-kv-id", status: "active" as const, lastSeenAt: "2026-01-01T00:00:00Z" },
+          lifecycleStatus: "created",
+          props: { type: "kv", name: "app-cache-pr-123", bindings: {} },
+          output: { id: "pr-kv-id", title: "app-cache-pr-123" },
           source: "managed",
         },
         "events": {
           type: "queue",
-          desired: { name: "events-pr-123" },
-          observed: { status: "active" as const, lastSeenAt: "2026-01-01T00:00:00Z" },
+          lifecycleStatus: "created",
+          props: { type: "queue", name: "events-pr-123", bindings: {} },
+          output: { name: "events-pr-123" },
           source: "managed",
         },
         "events-dlq": {
           type: "queue",
-          desired: { name: "events-dlq-pr-123" },
-          observed: { status: "active" as const, lastSeenAt: "2026-01-01T00:00:00Z" },
+          lifecycleStatus: "created",
+          props: { type: "queue", name: "events-dlq-pr-123", bindings: {} },
+          output: { name: "events-dlq-pr-123" },
+          source: "managed",
+        },
+        "app-hd": {
+          type: "hyperdrive",
+          lifecycleStatus: "created",
+          props: { type: "hyperdrive", name: "app-hd-pr-123", bindings: {} },
+          output: { id: "hd-pr-123", name: "app-hd-pr-123", origin: "postgresql://user:pass@host/db" },
           source: "managed",
         },
       },
@@ -219,15 +265,15 @@ describe("golden: renderWranglerConfig", () => {
   it("strips placeholder KV IDs from output", ({ task }) => {
     story.init(task);
 
-    story.given("a KV resource in state with no real ID");
+    story.given("a KV resource in state with no provisioned output");
     const stateNoKv: StageState = {
       ...state,
       resources: {
         ...state.resources,
         "app-cache": {
           type: "kv",
-          desired: { name: "app-cache-staging" },
-          observed: { status: "active" as const, lastSeenAt: "2026-01-01T00:00:00Z" },
+          lifecycleStatus: "creating",
+          props: { type: "kv", name: "app-cache-staging", bindings: {} },
           source: "managed",
         },
       },
@@ -299,15 +345,15 @@ describe("golden: renderWranglerConfig", () => {
   it("strips placeholder Hyperdrive IDs from output", ({ task }) => {
     story.init(task);
 
-    story.given("a Hyperdrive resource in state with no real ID");
+    story.given("a Hyperdrive resource in state with no provisioned output");
     const stateNoHd: StageState = {
       ...state,
       resources: {
         ...state.resources,
-        "app-db": {
+        "app-hd": {
           type: "hyperdrive",
-          desired: { name: "app-db-staging" },
-          observed: { status: "active" as const, lastSeenAt: "2026-01-01T00:00:00Z" },
+          lifecycleStatus: "creating",
+          props: { type: "hyperdrive", name: "app-hd-staging", bindings: {} },
           source: "managed",
         },
       },
@@ -357,14 +403,16 @@ describe("golden: renderWranglerConfig", () => {
       resources: {
         events: {
           type: "queue",
-          desired: { name: "events-staging" },
-          observed: { status: "active", lastSeenAt: "2026-01-01T00:00:00Z" },
+          lifecycleStatus: "created",
+          props: { type: "queue", name: "events-staging", bindings: {} },
+          output: { name: "events-staging" },
           source: "managed",
         },
         audit: {
           type: "queue",
-          desired: { name: "audit-staging" },
-          observed: { status: "active", lastSeenAt: "2026-01-01T00:00:00Z" },
+          lifecycleStatus: "created",
+          props: { type: "queue", name: "audit-staging", bindings: {} },
+          output: { name: "audit-staging" },
           source: "managed",
         },
       },
@@ -399,8 +447,9 @@ describe("golden: renderWranglerConfig", () => {
         ...state.resources,
         events: {
           type: "queue",
-          desired: { name: "custom-events-staging" },
-          observed: { status: "active", lastSeenAt: "2026-01-01T00:00:00Z" },
+          lifecycleStatus: "created",
+          props: { type: "queue", name: "custom-events-staging", bindings: {} },
+          output: { name: "custom-events-staging" },
           source: "managed",
         },
       },

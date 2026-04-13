@@ -5,7 +5,7 @@ sidebar:
 description: Get wrangler-deploy running in 2 minutes
 ---
 
-If your project already has `wrangler.jsonc` files, this is the path. You do not rewrite them, migrate them, or stop using them. wrangler-deploy reads them, generates one project-level config, and uses rendered JSONC files only when it is time to deploy.
+If your project already has `wrangler.jsonc` files, this is the path. You do not rewrite them, migrate them, or stop using them. wrangler-deploy reads them, generates one project-level config, and uses rendered JSONC files only when it is time to deploy or run stage-aware local dev.
 
 At the end of this guide you will have:
 
@@ -13,7 +13,9 @@ At the end of this guide you will have:
 - A generated `wrangler-deploy.config.ts`
 - A stage you can plan, apply, deploy, and destroy
 - The option to run all workers locally with `wd dev`
+- The option to run `wd dev --stage <stage>` against rendered stage bindings
 - The option to switch Queue-heavy local development into a shared Wrangler session
+- If you are starting from scratch, a ready-made Vite starter via `wd create vite`
 
 ## Install
 
@@ -21,6 +23,23 @@ At the end of this guide you will have:
 npm install -D wrangler-deploy
 # or
 pnpm add -D wrangler-deploy
+```
+
+## Start fresh
+
+If you are starting a new project, scaffold the starter first:
+
+```bash
+$ wd create vite my-app
+  Created vite starter in /repo/my-app
+```
+
+Then install dependencies and start the local frontend plus worker pair:
+
+```bash
+cd my-app
+pnpm install
+pnpm dev
 ```
 
 ## Initialize
@@ -36,6 +55,8 @@ $ wd init
 ```
 
 `wd init` is built around existing Wrangler projects. It scans your `wrangler.jsonc` files and generates a matching `wrangler-deploy.config.ts`. Your Wrangler files stay untouched.
+
+That is the trust boundary: `wrangler.jsonc` is still the thing you author and keep in the repo. `wrangler-deploy` adds stage orchestration around it instead of replacing it.
 
 ## Plan
 
@@ -123,6 +144,8 @@ Starting local dev session:
   workers/api -> http://localhost:8787
   includes: workers/batch-workflow, workers/event-router
 ```
+
+If you already applied a stage, `wd dev --stage staging` uses the rendered stage configs directly so local bindings match deploy-time state instead of the raw placeholders in checked-in `wrangler.jsonc` files.
 
 For local runtime workflows on top of that:
 

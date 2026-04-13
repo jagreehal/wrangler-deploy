@@ -2,9 +2,9 @@
 
 | Key | Value |
 | --- | --- |
-| Date | 2026-04-07T19:41:07.415Z |
-| Version | 1.1.0 |
-| Git SHA | 6710ca8 |
+| Date | 2026-04-14T15:04:11.087Z |
+| Version | 1.2.0 |
+| Git SHA | 6cfff03 |
 
 ## src/github.test.ts
 
@@ -28,76 +28,6 @@
 - **When** the workflow has a schedule-conditional cleanup job
 - **Then** the workflow must declare a schedule trigger
 
-## src/providers/cloudflare-api.test.ts
-
-### cloudflare-api
-
-### ✅ uses CLOUDFLARE_ACCOUNT_ID without fetching
-
-- **Given** CLOUDFLARE_ACCOUNT_ID is set in the environment
-- **When** resolveAccountId is called
-- **Then** it returns the env var value without making any API calls
-
-### ✅ caches resolved account ids between calls
-
-- **Given** no CLOUDFLARE_ACCOUNT_ID in the environment
-- **And** the API returns an account ID
-- **When** resolveAccountId is called twice
-- **Then** only one API call is made
-
-### ✅ formats API errors from cfApiResult
-
-- **Given** an API response with multiple error codes
-- **When** cfApiResult parses the response
-- **Then** it throws with all error codes and messages formatted
-
-## src/providers/local-cli.test.ts
-
-### local CLI-backed providers
-
-### ✅ extracts the created D1 database id from wrangler output
-
-- **Given** wrangler output containing a D1 database UUID
-- **When** the UUID regex runs against the output
-- **Then** the database ID is extracted
-
-### ✅ treats existing R2 buckets as non-fatal based on error message matching
-
-- **Given** an error message indicating a bucket already exists
-- **When** the error is checked for the 'already exists' pattern
-- **Then** the match succeeds, allowing the error to be treated as non-fatal
-
-## src/providers/resources.test.ts
-
-### providers
-
-### ✅ adopts an existing KV namespace when create reports conflict
-
-- **Given** the Cloudflare API rejects KV creation with a conflict error
-- **And** a subsequent list call returns the existing namespace
-- **When** createKvNamespace is called
-- **Then** the existing namespace is adopted
-
-### ✅ adopts an existing queue when create returns conflict
-
-- **Given** the Cloudflare API rejects queue creation with a 409 conflict
-- **And** a subsequent list call returns the existing queue
-- **When** createQueue is called
-- **Then** the existing queue is adopted
-
-### ✅ adopts an existing Hyperdrive config when create returns conflict
-
-- **Given** the Cloudflare API rejects Hyperdrive creation with a 409 conflict
-- **And** a subsequent list call returns the existing config
-- **When** createHyperdrive is called
-- **Then** the existing Hyperdrive config is adopted
-
-### ✅ treats worker deletion as idempotent on 404
-
-- **Given** the Cloudflare API returns 404 for a worker deletion
-- **When** deleteWorker is called
-- **Then** it resolves without error
-
 ## src/core/apply.test.ts
 
 ### plan
@@ -110,7 +40,7 @@
 
 ### ✅ reports resources as in-sync when state has them active
 
-- **Given** state with both resources active
+- **Given** state with both resources created
 - **When** plan is computed
 - **Then** all resources should be in-sync
 
@@ -144,12 +74,12 @@
 
 - **Given** a config with KV and D1 resources and no existing state
 - **When** apply is called
-- **Then** state should contain both resources as active
-- **And** state should be written after each resource plus once for workers
+- **Then** state should contain both resources as created
+- **And** state should be written twice per resource (creating + created) plus once for workers
 
 ### ✅ skips resources already active in state
 
-- **Given** state already has the KV resource active
+- **Given** state already has the KV resource created
 - **When** apply is called
 - **Then** KV should not be recreated, D1 should be created
 
@@ -157,7 +87,7 @@
 
 - **Given** D1 creation fails
 - **When** apply is called
-- **Then** the KV resource should still be persisted in state
+- **Then** the KV resource should still be persisted in state as created
 
 ### ✅ removes workers from state that are no longer declared in the manifest
 
@@ -170,6 +100,34 @@
 - **Given** a config with one worker
 - **When** apply is called
 - **Then** the worker name should be stage-suffixed
+
+### ✅ writes lifecycleStatus 'creating' before calling the provider and 'created' after
+
+- **Given** a config with a KV resource and no existing state
+- **When** apply is called
+- **Then** state was written with 'creating' before the provider call and 'created' after
+
+### ✅ skips resources already 'created' and retries resources stuck in 'creating' (crash recovery)
+
+- **Given** state with cache-kv already 'created' and payments-db stuck in 'creating'
+- **When** apply is called (resume after crash)
+- **Then** createD1 was called once (retried) but KV wrangler was NOT called
+
+## src/core/auth.test.ts
+
+### auth
+
+### ✅ falls back to wrangler config when wrangler whoami fails
+
+- **Given** wrangler whoami throws and a local wrangler config exists
+- **When** resolveAccountId is called
+- **Then** the account id is read from the local config
+
+### ✅ prefers the project context account id when present
+
+- **Given** a project context file provides an explicit account id
+- **When** resolveAccountId is called
+- **Then** the account id comes from the project context
 
 ## src/core/completions.test.ts
 
@@ -192,6 +150,39 @@
 - **Given** fish shell requested
 - **Then** output contains complete -c wd directive
 - **And** output contains expected command names
+
+## src/core/crypto.test.ts
+
+### ✅ round-trips a plain string
+
+- **Given** a plaintext string and a password
+- **When** encrypted then decrypted
+- **Then** the result equals the original plaintext
+
+### ✅ produces different ciphertext each call (random IV)
+
+- **Given** the same plaintext encrypted twice
+- **Then** ciphertexts differ due to random IV
+
+### ✅ throws on wrong password
+
+- **Given** a ciphertext encrypted with password A
+- **When** decrypted with password B
+- **Then** it throws
+
+### ✅ encrypts hyperdrive origin and storedSecrets, leaves other fields plain
+
+- **Given** a StageState with a Hyperdrive resource and storedSecrets
+- **When** encryptState is called with a password
+- **Then** hyperdrive origin is no longer plaintext
+- **And** storedSecrets values are encrypted
+- **And** kv output is unchanged (no sensitive fields)
+
+### ✅ decryptState reverses encryptState
+
+- **Given** an encrypted state
+- **When** decryptState is called with the same password
+- **Then** all values are restored to their original plaintext
 
 ## src/core/deploy.test.ts
 
@@ -320,6 +311,12 @@
 - **Given** a config opting into Wrangler's multi-config local session
 - **Then** the plan uses a single session with all worker configs and shared state
 
+### ✅ renders stage bindings directly when stage is provided
+
+- **Given** an example config and a rendered staging state
+- **Then** dev config paths point at rendered stage configs
+- **And** the rendered config contains the stage bindings
+
 ### ✅ includes matching companion commands in the plan
 
 - **Given** a worker-scoped companion command for batch-workflow
@@ -339,6 +336,46 @@
 
 - **Given** a session-mode plan with one companion command
 - **Then** wrangler is spawned once for the shared session and once for the companion
+
+### ✅ read-mode: only starts filter target and populates serviceBindingFallbacks from state
+
+- **Given** a config with api -> batch-workflow, and a fallback stage with batch-workflow deployed
+- **Then** only workers/api is started and WORKFLOWS binding maps to the deployed name
+
+### ✅ read-mode: warns and maps to null when excluded worker is not in fallback state
+
+- **Given** a config with api -> batch-workflow, and fallback state that does not include batch-workflow
+- **Then** the binding is mapped to null and a warning is logged
+
+### ✅ read-mode: throws when fallback stage state is not found
+
+- **Given** a fallback stage that has no state on disk
+- **Then** buildDevPlan throws with a helpful error
+
+### ✅ filter without fallback stage still expands transitive deps (existing behavior unchanged)
+
+- **Given** a filter with no fallback stage
+- **Then** plan includes all transitive deps and no serviceBindingFallbacks
+
+### ✅ read-mode: starts filter target cleanly when it has no service bindings
+
+- **Given** a config where the filter target has no outgoing service bindings
+- **Then** the plan starts only the filter target with no fallback bindings
+
+### ✅ startDev: writes dev override config and passes --config when worker has serviceBindingFallbacks
+
+- **Given** a workers-mode plan where workers/api has a fallback binding to batch-workflow-staging
+- **Then** the override config file is written and --config is passed to wrangler
+
+### ✅ throws when fallbackStage is provided without stateProvider
+
+- **Given** fallbackStage is set but stateProvider is omitted
+- **Then** buildDevPlan throws immediately rather than silently falling back to transitive-dep mode
+
+### ✅ throws when read-mode and session mode are combined
+
+- **Given** both fallbackStage and session mode are requested
+- **Then** buildDevPlan throws since read-mode + session are incompatible
 
 ## src/core/doctor.test.ts
 
@@ -403,6 +440,31 @@
 - **And** the live list only contains a different database whose name contains that string
 - **When** drift detection runs
 - **Then** the D1 resource should not be reported as in-sync
+
+## src/core/enrich.test.ts
+
+### enrichMarkers
+
+### ✅ attaches output to D1 and KV markers by resource name
+
+- **Given** marker objects and a StageState with matching resource entries
+- **When** enrichMarkers is called
+- **Then** db and cache markers carry their output from state
+- **And** the unknown marker output remains undefined
+
+### ✅ is idempotent — calling twice does not corrupt output
+
+- **Given** a marker already enriched
+- **When** enriched again
+- **Then** output is unchanged
+
+### loadStateOutputs
+
+### ✅ returns a map of resource name → output from a StageState
+
+- **Given** a StageState passed directly
+- **When** loadStateOutputs is called with the state
+- **Then** it returns a record keyed by logical resource name
 
 ## src/core/gc.test.ts
 
@@ -491,6 +553,11 @@
 
 - **Given** a worker with a KV binding
 - **Then** worker node depends on resource
+
+### ✅ ignores unbound managed resources when building worker edges
+
+- **Given** a config with an unbound vectorize resource
+- **Then** worker graph still builds without depending on the vector index
 
 ### validateGraph
 
@@ -736,11 +803,11 @@
 - **And** Queue producer bindings are included
 - **And** Service bindings map target worker to deployed name
 
-### ✅ skips resources without observed IDs
+### ✅ skips resources without provisioned output
 
-- **Given** a state where cache-kv has no observed ID (missing)
+- **Given** a state where cache-kv has no output (missing lifecycle)
 - **Then** KV bindings are not generated for the missing resource
-- **And** D1 bindings are still generated (has an ID)
+- **And** D1 bindings are still generated (has output)
 
 ## src/core/naming.test.ts
 
@@ -836,6 +903,8 @@
 - **When** renderWranglerConfig is called for staging
 - **Then** the worker name is stage-suffixed
 - **And** KV ID is replaced from state
+- **And** R2 bucket name is replaced from state
+- **And** D1 database ID and name are replaced from state
 - **And** queue name is stage-suffixed
 - **And** service binding target is stage-suffixed
 - **And** Hyperdrive ID is replaced and localConnectionString removed
@@ -859,7 +928,7 @@
 
 ### ✅ strips placeholder KV IDs from output
 
-- **Given** a KV resource in state with no real ID
+- **Given** a KV resource in state with no provisioned output
 - **When** renderWranglerConfig is called
 - **Then** the KV namespace is excluded from the rendered config
 
@@ -878,7 +947,7 @@
 
 ### ✅ strips placeholder Hyperdrive IDs from output
 
-- **Given** a Hyperdrive resource in state with no real ID
+- **Given** a Hyperdrive resource in state with no provisioned output
 - **When** renderWranglerConfig is called
 - **Then** the Hyperdrive binding is excluded from the rendered config
 
@@ -1084,6 +1153,20 @@
 - **When** the provider reads a stage from remote state
 - **Then** it should parse the JSON text body into stage state
 
+### LocalStateProvider with encryption
+
+### ✅ reads back a state with decrypted Hyperdrive origin when password is provided
+
+- **Given** a state file where hyperdrive origin is stored encrypted
+- **When** the provider reads the state with the correct password
+- **Then** the hyperdrive origin is decrypted
+
+### ✅ writes state with Hyperdrive origin encrypted
+
+- **Given** a state with a plaintext Hyperdrive origin and a password
+- **When** the provider writes the state
+- **Then** the stored file has the origin encrypted
+
 ## src/core/validate-config.test.ts
 
 ### validateConfig
@@ -1169,6 +1252,82 @@
 
 - **Given** a config without verifyLocal
 - **Then** the command fails fast with a configuration check
+
+## src/providers/cloudflare-api.test.ts
+
+### cloudflare-api
+
+### ✅ uses CLOUDFLARE_ACCOUNT_ID without fetching
+
+- **Given** CLOUDFLARE_ACCOUNT_ID is set in the environment
+- **When** resolveAccountId is called
+- **Then** it returns the env var value without making any API calls
+
+### ✅ caches resolved account ids between calls
+
+- **Given** no CLOUDFLARE_ACCOUNT_ID in the environment
+- **And** the API returns an account ID
+- **When** resolveAccountId is called twice
+- **Then** only one API call is made
+
+### ✅ formats API errors from cfApiResult
+
+- **Given** an API response with multiple error codes
+- **When** cfApiResult parses the response
+- **Then** it throws with all error codes and messages formatted
+
+## src/providers/local-cli.test.ts
+
+### local CLI-backed providers
+
+### ✅ returns a typed D1Output with the extracted database id
+
+- **Given** wrangler output containing a D1 database UUID
+- **When** createD1Database is called with a name and cwd
+- **Then** the returned struct contains the extracted id, name, and version
+
+### ✅ returns a typed R2Output with the bucket name
+
+- **Given** wrangler output for an R2 bucket creation
+- **When** createR2Bucket is called with a name and cwd
+- **Then** the returned struct contains the bucket name
+
+### ✅ returns a typed VectorizeOutput with the index metadata
+
+- **Given** wrangler output containing a Vectorize index UUID
+- **When** createVectorizeIndex is called with a name, config, and cwd
+- **Then** the returned struct contains the name, dimensions, and metric
+
+## src/providers/resources.test.ts
+
+### providers
+
+### ✅ adopts an existing KV namespace when create reports conflict
+
+- **Given** the Cloudflare API rejects KV creation with a conflict error
+- **And** a subsequent list call returns the existing namespace
+- **When** createKvNamespace is called
+- **Then** the existing namespace is adopted
+
+### ✅ adopts an existing queue when create returns conflict
+
+- **Given** the Cloudflare API rejects queue creation with a 409 conflict
+- **And** a subsequent list call returns the existing queue
+- **When** createQueue is called
+- **Then** the existing queue is adopted
+
+### ✅ adopts an existing Hyperdrive config when create returns conflict
+
+- **Given** the Cloudflare API rejects Hyperdrive creation with a 409 conflict
+- **And** a subsequent list call returns the existing config
+- **When** createHyperdrive is called
+- **Then** the existing Hyperdrive config is adopted
+
+### ✅ treats worker deletion as idempotent on 404
+
+- **Given** the Cloudflare API returns 404 for a worker deletion
+- **When** deleteWorker is called
+- **Then** it resolves without error
 
 ## src/core/ci/check.test.ts
 

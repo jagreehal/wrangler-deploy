@@ -39,26 +39,30 @@ const state: StageState = {
   resources: {
     "cache-kv": {
       type: "kv",
-      desired: { name: "cache-kv-staging" },
-      observed: { id: "kv-id-abc", status: "active" },
+      lifecycleStatus: "created",
+      props: { type: "kv", name: "cache-kv-staging", bindings: {} },
+      output: { id: "kv-id-abc", title: "cache-kv-staging" },
       source: "managed",
     },
     "payments-db": {
       type: "d1",
-      desired: { name: "payments-db-staging" },
-      observed: { id: "d1-id-xyz", status: "active" },
+      lifecycleStatus: "created",
+      props: { type: "d1", name: "payments-db-staging", bindings: {} },
+      output: { id: "d1-id-xyz", name: "payments-db-staging" },
       source: "managed",
     },
     "payments-hyperdrive": {
       type: "hyperdrive",
-      desired: { name: "payments-hyperdrive-staging" },
-      observed: { id: "hd-id-123", status: "active" },
+      lifecycleStatus: "created",
+      props: { type: "hyperdrive", name: "payments-hyperdrive-staging", bindings: {} },
+      output: { id: "hd-id-123", name: "payments-hyperdrive-staging", origin: "postgresql://user:pass@host/db" },
       source: "managed",
     },
     "payment-queue": {
       type: "queue",
-      desired: { name: "payment-queue-staging" },
-      observed: { id: "q-id-456", status: "active" },
+      lifecycleStatus: "created",
+      props: { type: "queue", name: "payment-queue-staging", bindings: {} },
+      output: { name: "payment-queue-staging" },
       source: "managed",
     },
   },
@@ -75,8 +79,8 @@ const stateWithMissingId: StageState = {
     ...state.resources,
     "cache-kv": {
       type: "kv",
-      desired: { name: "cache-kv-staging" },
-      observed: { status: "missing" },
+      lifecycleStatus: "missing",
+      props: { type: "kv", name: "cache-kv-staging", bindings: {} },
       source: "managed",
     },
   },
@@ -109,16 +113,16 @@ describe("writeManagedBindings", () => {
     expect(result.services).toEqual([{ binding: "BATCH", service: "batch-workflow-staging" }]);
   });
 
-  it("skips resources without observed IDs", ({ task }) => {
+  it("skips resources without provisioned output", ({ task }) => {
     story.init(task);
-    story.given("a state where cache-kv has no observed ID (missing)");
+    story.given("a state where cache-kv has no output (missing lifecycle)");
 
     const result = writeManagedBindings("apps/api", config, stateWithMissingId);
 
     story.then("KV bindings are not generated for the missing resource");
     expect(result.kv_namespaces).toBeUndefined();
 
-    story.then("D1 bindings are still generated (has an ID)");
+    story.then("D1 bindings are still generated (has output)");
     expect(result.d1_databases).toBeDefined();
   });
 });

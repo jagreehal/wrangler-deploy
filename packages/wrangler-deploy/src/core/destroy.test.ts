@@ -39,7 +39,7 @@ describe("destroy", () => {
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
 
     story.when("destroy is run against the stage");
-    await destroy(
+    const result = await destroy(
       { stage: "staging", force: true },
       {
         rootDir: "/repo",
@@ -59,6 +59,8 @@ describe("destroy", () => {
       "/repo",
     );
     expect(provider.delete).toHaveBeenCalledWith("staging");
+    expect(result.partialFailures).toBe(false);
+    expect(result.stateDeleted).toBe(true);
     logSpy.mockRestore();
   });
 
@@ -109,8 +111,9 @@ describe("destroy", () => {
       resources: {
         jobs: {
           type: "queue",
-          desired: { name: "jobs-staging" },
-          observed: { status: "active", lastSeenAt: "2026-04-03T00:00:00.000Z" },
+          lifecycleStatus: "created",
+          props: { type: "queue", name: "jobs-staging", bindings: {} },
+          output: { name: "jobs-staging" },
           source: "managed",
         },
       },
@@ -167,8 +170,9 @@ describe("destroy", () => {
       resources: {
         jobs: {
           type: "queue",
-          desired: { name: "jobs-staging" },
-          observed: { status: "active", lastSeenAt: "2026-04-03T00:00:00.000Z" },
+          lifecycleStatus: "created",
+          props: { type: "queue", name: "jobs-staging", bindings: {} },
+          output: { name: "jobs-staging" },
           source: "managed",
         },
       },

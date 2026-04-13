@@ -36,7 +36,7 @@ export function buildGraph(config: CfStageConfig): GraphNode[] {
 
     // Depend on resources bound to this worker
     for (const [resourceName, resource] of Object.entries(config.resources)) {
-      if (workerPath in resource.bindings) {
+      if (resource.bindings && workerPath in resource.bindings) {
         deps.push(resourceName);
       }
     }

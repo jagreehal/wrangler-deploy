@@ -18,10 +18,20 @@ export type {
   WorkerFixtureConfig,
   StageRule,
   StateConfig,
+  LifecycleStatus,
+  ResourceProps,
+  ResourceOutput,
+  D1Output,
+  KvOutput,
+  QueueOutput,
+  R2Output,
+  HyperdriveOutput,
+  VectorizeOutput,
 } from "./types.js";
+export { resourceId, resourceStagedName, isActive } from "./types.js";
 
 // State providers
-export { resolveStateProvider, LocalStateProvider, KvStateProvider } from "./core/state.js";
+export { resolveStateProvider, loadState, LocalStateProvider, KvStateProvider } from "./core/state.js";
 export type { StateProvider } from "./core/state.js";
 
 // Typed resource system — phantom Env types
@@ -40,6 +50,9 @@ export type {
   Bound,
   DeriveEnv,
 } from "./typed.js";
+
+// Enriched markers
+export { enrichMarkers, loadStateOutputs } from "./core/enrich.js";
 
 // Graph & Visibility
 export { buildRichGraph, type RichGraph, type RichNode, type RichEdge, type RichNodeType, type RichEdgeType } from "./core/graph-model.js";
@@ -151,3 +164,4 @@ export {
 
 // Timer
 export { createTimer } from "./core/timer.js";
+export { createViteStarter, type CreateStarterOptions, type CreateStarterResult } from "./core/create.js";

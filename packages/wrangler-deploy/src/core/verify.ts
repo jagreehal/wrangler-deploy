@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { CfStageConfig, LocalVerifyCheckConfig } from "../types.js";
+import { isActive, resourceStagedName } from "../types.js";
 import type { StateProvider } from "./state.js";
 import { getD1Fixture, getQueueFixture, getWorkerFixture } from "./fixtures.js";
 import { callWorker, executeLocalD1, resolvePlannedWorkerPort, sendQueueMessage, triggerCron } from "./runtime.js";
@@ -87,11 +88,11 @@ export async function verify(args: VerifyArgs, deps: VerifyDeps): Promise<Verify
 
   // 3. Every resource in state is active
   for (const [_name, resource] of Object.entries(state.resources)) {
-    const isActive = resource.observed.status === "active";
+    const active = isActive(resource);
     checks.push({
-      name: `Resource: ${resource.desired.name}`,
-      passed: isActive,
-      details: isActive ? undefined : `Status: ${resource.observed.status}`,
+      name: `Resource: ${resourceStagedName(resource)}`,
+      passed: active,
+      details: active ? undefined : `Status: ${resource.lifecycleStatus}`,
     });
   }
 
@@ -292,7 +293,7 @@ export async function verifyLocal(deps: LocalVerifyDeps): Promise<LocalVerifyRes
       }
 
       if (check.type === "cron") {
-        const port = resolvePlannedWorkerPortFn(config, rootDir, check.worker);
+        const port = await resolvePlannedWorkerPortFn(config, rootDir, check.worker);
         const result = await triggerCronFn({ port, cron: check.cron, time: check.time });
         const expectedStatus = check.expectStatus ?? 200;
         checks.push({

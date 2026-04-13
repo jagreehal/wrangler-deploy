@@ -116,12 +116,12 @@ describe("runtime helpers", () => {
     });
   });
 
-  it("lists worker routes and named endpoints", ({ task }) => {
+  it("lists worker routes and named endpoints", async ({ task }) => {
     story.init(task);
     story.given("a named local endpoint configured for workers/api");
 
     clearActiveDevState(exampleRoot);
-    const routes = listWorkerRoutes(config, exampleRoot);
+    const routes = await listWorkerRoutes(config, exampleRoot);
 
     story.then("the worker route summary includes the resolved local URL and endpoint");
     expect(routes.find((route) => route.workerPath === "workers/api")).toEqual({
@@ -205,7 +205,7 @@ describe("runtime helpers", () => {
     story.init(task);
     story.given("a configured local queue injection route for payment-outbox");
 
-    const target = resolveQueueSendTarget(config, "/repo", {
+    const target = await resolveQueueSendTarget(config, "/repo", {
       queue: "payment-outbox",
       port: 8788,
     });
@@ -249,7 +249,7 @@ describe("runtime helpers", () => {
     story.init(task);
     story.given("a local worker path with explicit query parameters");
 
-    const target = resolveWorkerCallTarget(config, "/repo", {
+    const target = await resolveWorkerCallTarget(config, "/repo", {
       worker: "workers/api",
       port: 8788,
       path: "/health",
@@ -395,11 +395,11 @@ describe("runtime helpers", () => {
     vi.unstubAllGlobals();
   });
 
-  it("runs dev doctor checks for entry workers, companions, and queues", ({ task }) => {
+  it("runs dev doctor checks for entry workers, companions, and queues", async ({ task }) => {
     story.init(task);
     story.given("a valid local runtime configuration");
 
-    const checks = runDevDoctor(config, exampleRoot, {
+    const checks = await runDevDoctor(config, exampleRoot, {
       workerExists: () => true,
       readWorkerConfig: () => ({ name: "worker", triggers: { crons: ["*/5 * * * *"] } }),
       pathExists: () => true,

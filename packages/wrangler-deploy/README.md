@@ -23,6 +23,7 @@ npm install -D wrangler-deploy
 Then in any project with a `wrangler.jsonc`:
 
 ```bash
+wd create vite my-app   # scaffold a new Vite starter
 wd init    # scans your wrangler configs, generates wrangler-deploy.config.ts
 wd plan --stage staging   # shows what would be created
 wd apply --stage staging  # creates the resources
@@ -87,6 +88,7 @@ Types resolve at compile time through TypeScript's conditional type system. Chan
 Both `wrangler-deploy` and `wd` work after install.
 
 ```
+wd create vite <directory>               # scaffold a new Vite starter
 wd init                                    # scan wrangler configs
 wd plan     --stage <name>                 # dry-run
 wd apply    --stage <name>                 # provision resources

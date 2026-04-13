@@ -1,0 +1,789 @@
+{
+  "package": "wrangler-deploy",
+  "version": 1,
+  "description": "Agent-facing context for wrangler-deploy. Use this package to orchestrate staged Cloudflare Workers environments, inspect topology, and run local repo-aware workflows.",
+  "entrypoints": {
+    "cli": "wd",
+    "binary": "wrangler-deploy",
+    "schema": "wd schema --json"
+  },
+  "machineReadable": {
+    "default": "json",
+    "fields": true,
+    "ndjson": true,
+    "preview": "dry-run"
+  },
+  "commands": [
+    {
+      "name": "create",
+      "kind": "generator",
+      "output": "text"
+    },
+    {
+      "name": "init",
+      "kind": "generator",
+      "output": "text"
+    },
+    {
+      "name": "introspect",
+      "kind": "generator",
+      "output": "json",
+      "mutating": true
+    },
+    {
+      "name": "plan",
+      "kind": "inspection",
+      "output": "json"
+    },
+    {
+      "name": "apply",
+      "kind": "mutating",
+      "output": "json",
+      "supportsDryRun": true
+    },
+    {
+      "name": "deploy",
+      "kind": "mutating",
+      "output": "json",
+      "supportsDryRun": true
+    },
+    {
+      "name": "destroy",
+      "kind": "mutating",
+      "output": "json",
+      "supportsDryRun": true
+    },
+    {
+      "name": "gc",
+      "kind": "mutating",
+      "output": "json"
+    },
+    {
+      "name": "status",
+      "kind": "inspection",
+      "output": "json"
+    },
+    {
+      "name": "verify",
+      "kind": "inspection",
+      "output": "json"
+    },
+    {
+      "name": "graph",
+      "kind": "inspection",
+      "output": "graph"
+    },
+    {
+      "name": "impact",
+      "kind": "inspection",
+      "output": "json"
+    },
+    {
+      "name": "diff",
+      "kind": "inspection",
+      "output": "json"
+    },
+    {
+      "name": "doctor",
+      "kind": "inspection",
+      "output": "json"
+    },
+    {
+      "name": "schema",
+      "kind": "inspection",
+      "output": "json"
+    },
+    {
+      "name": "context",
+      "kind": "workflow",
+      "output": "json",
+      "subcommands": [
+        "get",
+        "set",
+        "unset",
+        "clear"
+      ]
+    },
+    {
+      "name": "tools",
+      "kind": "inspection",
+      "output": "json"
+    },
+    {
+      "name": "secrets",
+      "kind": "workflow",
+      "output": "json",
+      "subcommands": [
+        "check",
+        "set",
+        "sync"
+      ]
+    },
+    {
+      "name": "snapshot",
+      "kind": "workflow",
+      "output": "json",
+      "subcommands": [
+        "list",
+        "save",
+        "load"
+      ]
+    },
+    {
+      "name": "fixture",
+      "kind": "workflow",
+      "output": "json",
+      "subcommands": [
+        "list"
+      ]
+    },
+    {
+      "name": "worker",
+      "kind": "workflow",
+      "output": "json",
+      "subcommands": [
+        "call",
+        "routes"
+      ]
+    },
+    {
+      "name": "d1",
+      "kind": "workflow",
+      "output": "json",
+      "subcommands": [
+        "list",
+        "inspect",
+        "exec",
+        "seed",
+        "reset"
+      ]
+    },
+    {
+      "name": "queue",
+      "kind": "workflow",
+      "output": "json",
+      "subcommands": [
+        "list",
+        "inspect",
+        "send",
+        "replay",
+        "tail"
+      ]
+    },
+    {
+      "name": "ci",
+      "kind": "workflow",
+      "output": "json",
+      "subcommands": [
+        "init",
+        "comment",
+        "check"
+      ]
+    },
+    {
+      "name": "completions",
+      "kind": "utility",
+      "output": "text"
+    },
+    {
+      "name": "help",
+      "kind": "utility",
+      "output": "json"
+    }
+  ],
+  "schema": {
+    "source": "src/types.ts",
+    "unions": {
+      "ResourceType": {
+        "description": "Cloudflare resource kinds supported by wrangler-deploy.",
+        "values": [
+          "kv",
+          "queue",
+          "hyperdrive",
+          "d1",
+          "r2",
+          "vectorize"
+        ]
+      },
+      "LifecycleStatus": {
+        "description": "Stage resource lifecycle states tracked in persisted state.",
+        "values": [
+          "creating",
+          "created",
+          "updating",
+          "updated",
+          "deleting",
+          "deleted",
+          "missing",
+          "drifted",
+          "orphaned"
+        ]
+      }
+    },
+    "interfaces": {
+      "CfStageConfig": {
+        "fields": [
+          {
+            "name": "version",
+            "type": "1",
+            "required": true
+          },
+          {
+            "name": "workers",
+            "type": "string[]",
+            "required": true
+          },
+          {
+            "name": "deployOrder",
+            "type": "string[]",
+            "required": false,
+            "description": "Explicit deploy order. If omitted, inferred from serviceBindings (dependencies first)."
+          },
+          {
+            "name": "resources",
+            "type": "Record<string, ResourceConfig>",
+            "required": true
+          },
+          {
+            "name": "serviceBindings",
+            "type": "Record<string, Record<string, string>>",
+            "required": false
+          },
+          {
+            "name": "stages",
+            "type": "Record<string, StageRule>",
+            "required": false
+          },
+          {
+            "name": "secrets",
+            "type": "Record<string, string[]>",
+            "required": false
+          },
+          {
+            "name": "verify",
+            "type": "Record<string, VerifyConfig>",
+            "required": false
+          },
+          {
+            "name": "routes",
+            "type": "Record<string, RouteConfig>",
+            "required": false
+          },
+          {
+            "name": "fixtures",
+            "type": "Record<string, FixtureConfig>",
+            "required": false,
+            "description": "Shared local fixtures for worker calls, queue sends, and D1 commands."
+          },
+          {
+            "name": "state",
+            "type": "StateConfig",
+            "required": false,
+            "description": "Remote state configuration"
+          },
+          {
+            "name": "verifyLocal",
+            "type": "LocalVerifyConfig",
+            "required": false,
+            "description": "Config-driven local integration checks for `wd verify local`."
+          },
+          {
+            "name": "dev",
+            "type": "DevConfig",
+            "required": false,
+            "description": "Local dev configuration"
+          },
+          {
+            "name": "statePassword",
+            "type": "string",
+            "required": false,
+            "description": "Optional password for encrypting sensitive resource outputs and storedSecrets in state. Falls back to WD_STATE_PASSWORD env var."
+          },
+          {
+            "name": "storedSecrets",
+            "type": "Record<string, Record<string, string>>",
+            "required": false,
+            "description": "Secret values to store encrypted in state (keyed by worker path → secret name → value)."
+          }
+        ]
+      },
+      "StageRule": {
+        "fields": [
+          {
+            "name": "protected",
+            "type": "boolean",
+            "required": true
+          },
+          {
+            "name": "ttl",
+            "type": "string",
+            "required": false
+          }
+        ]
+      },
+      "StateConfig": {
+        "fields": [
+          {
+            "name": "backend",
+            "type": "\"local\" | \"kv\"",
+            "required": true
+          },
+          {
+            "name": "namespaceId",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "keyPrefix",
+            "type": "string",
+            "required": false
+          }
+        ]
+      },
+      "DevConfig": {
+        "fields": [
+          {
+            "name": "ports",
+            "type": "Record<string, number>",
+            "required": false,
+            "description": "Per-worker port overrides for `wd dev`."
+          },
+          {
+            "name": "args",
+            "type": "string[]",
+            "required": false,
+            "description": "Extra args appended to each spawned `wrangler dev` process."
+          },
+          {
+            "name": "companions",
+            "type": "DevCompanionConfig[]",
+            "required": false,
+            "description": "Local-only helper commands to run alongside `wd dev`."
+          },
+          {
+            "name": "queues",
+            "type": "Record<string, DevQueueRouteConfig>",
+            "required": false,
+            "description": "Local queue injection routes keyed by logical queue name."
+          },
+          {
+            "name": "endpoints",
+            "type": "Record<string, DevEndpointConfig>",
+            "required": false,
+            "description": "Named local HTTP endpoints keyed by logical endpoint name."
+          },
+          {
+            "name": "d1",
+            "type": "Record<string, DevD1Config>",
+            "required": false,
+            "description": "Local D1 workflow hints keyed by logical database name."
+          },
+          {
+            "name": "session",
+            "type": "DevSessionConfig",
+            "required": false,
+            "description": "Wrangler local development session options."
+          },
+          {
+            "name": "snapshots",
+            "type": "DevSnapshotConfig",
+            "required": false,
+            "description": "Snapshot defaults for local reproducible environments."
+          },
+          {
+            "name": "fallbackStage",
+            "type": "string",
+            "required": false,
+            "description": "Stage to read deployed worker names from when --filter is used with --fallback-stage."
+          }
+        ]
+      },
+      "DevSessionConfig": {
+        "fields": [
+          {
+            "name": "enabled",
+            "type": "boolean",
+            "required": false,
+            "description": "Use a single `wrangler dev` process with repeated `-c` configs."
+          },
+          {
+            "name": "entryWorker",
+            "type": "string",
+            "required": false,
+            "description": "Worker to expose as the primary local HTTP entrypoint for the session."
+          },
+          {
+            "name": "persistTo",
+            "type": "string",
+            "required": false,
+            "description": "Shared Miniflare state directory, equivalent to Wrangler's `--persist-to`."
+          },
+          {
+            "name": "args",
+            "type": "string[]",
+            "required": false,
+            "description": "Extra args appended only in session mode."
+          }
+        ]
+      },
+      "DevQueueRouteConfig": {
+        "fields": [
+          {
+            "name": "worker",
+            "type": "string",
+            "required": true,
+            "description": "Worker that exposes the local debug route and owns the queue binding."
+          },
+          {
+            "name": "path",
+            "type": "string",
+            "required": false,
+            "description": "Local path to POST queue payloads to. Defaults to `/__wd/queues/<logical-name>`."
+          }
+        ]
+      },
+      "DevEndpointConfig": {
+        "fields": [
+          {
+            "name": "worker",
+            "type": "string",
+            "required": true,
+            "description": "Worker that exposes this local endpoint."
+          },
+          {
+            "name": "path",
+            "type": "string",
+            "required": true,
+            "description": "Local path to call, for example `/health` or `/__wd/echo`."
+          },
+          {
+            "name": "method",
+            "type": "string",
+            "required": false,
+            "description": "Optional default method when calling by endpoint name."
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "required": false,
+            "description": "Optional description shown in route listings and the dev UI."
+          }
+        ]
+      },
+      "DevD1Config": {
+        "fields": [
+          {
+            "name": "worker",
+            "type": "string",
+            "required": false,
+            "description": "Worker to run local wrangler d1 commands from when multiple workers bind the same DB."
+          },
+          {
+            "name": "seedFile",
+            "type": "string",
+            "required": false,
+            "description": "Optional SQL file used by `wd d1 seed <db>` when --file is omitted."
+          },
+          {
+            "name": "resetFile",
+            "type": "string",
+            "required": false,
+            "description": "Optional SQL file used by `wd d1 reset <db>` when --file is omitted."
+          }
+        ]
+      },
+      "ProjectContext": {
+        "fields": [
+          {
+            "name": "stage",
+            "type": "string",
+            "required": false,
+            "description": "Default stage when commands omit --stage."
+          },
+          {
+            "name": "fallbackStage",
+            "type": "string",
+            "required": false,
+            "description": "Default fallback stage for `wd dev --filter ...` read mode."
+          },
+          {
+            "name": "basePort",
+            "type": "number",
+            "required": false,
+            "description": "Default base port for `wd dev`."
+          },
+          {
+            "name": "filter",
+            "type": "string",
+            "required": false,
+            "description": "Default filter for `wd dev`."
+          },
+          {
+            "name": "session",
+            "type": "boolean",
+            "required": false,
+            "description": "Default session mode for `wd dev`."
+          },
+          {
+            "name": "persistTo",
+            "type": "string",
+            "required": false,
+            "description": "Default Miniflare persistence path for `wd dev --session`."
+          },
+          {
+            "name": "accountId",
+            "type": "string",
+            "required": false,
+            "description": "Default account ID for Cloudflare auth and KV-backed state."
+          },
+          {
+            "name": "databaseUrl",
+            "type": "string",
+            "required": false,
+            "description": "Default Hyperdrive database URL when not passed on the command line."
+          },
+          {
+            "name": "statePassword",
+            "type": "string",
+            "required": false,
+            "description": "Default state password for encrypted state."
+          }
+        ]
+      },
+      "VerifyConfig": {
+        "fields": [
+          {
+            "name": "url",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "expectStatus",
+            "type": "number",
+            "required": false
+          },
+          {
+            "name": "skipHttp",
+            "type": "boolean",
+            "required": false
+          }
+        ]
+      },
+      "LocalVerifyConfig": {
+        "fields": [
+          {
+            "name": "checks",
+            "type": "LocalVerifyCheckConfig[]",
+            "required": true
+          },
+          {
+            "name": "packs",
+            "type": "Record<string, LocalVerifyPackConfig>",
+            "required": false
+          }
+        ]
+      },
+      "LocalVerifyPackConfig": {
+        "fields": [
+          {
+            "name": "description",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "checks",
+            "type": "LocalVerifyCheckConfig[]",
+            "required": true
+          }
+        ]
+      },
+      "WorkerFixtureConfig": {
+        "fields": [
+          {
+            "name": "type",
+            "type": "\"worker\"",
+            "required": true
+          },
+          {
+            "name": "worker",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "endpoint",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "path",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "method",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "query",
+            "type": "Record<string, string>",
+            "required": false
+          },
+          {
+            "name": "headers",
+            "type": "Record<string, string>",
+            "required": false
+          },
+          {
+            "name": "body",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "required": false
+          }
+        ]
+      },
+      "QueueFixtureConfig": {
+        "fields": [
+          {
+            "name": "type",
+            "type": "\"queue\"",
+            "required": true
+          },
+          {
+            "name": "queue",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "payload",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "worker",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "required": false
+          }
+        ]
+      },
+      "D1FixtureConfig": {
+        "fields": [
+          {
+            "name": "type",
+            "type": "\"d1\"",
+            "required": true
+          },
+          {
+            "name": "database",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "sql",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "file",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "worker",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "required": false
+          }
+        ]
+      },
+      "ResourceConfig": {
+        "description": "Discriminated union of provisionable resource definitions.",
+        "variants": [
+          "KvResourceConfig",
+          "QueueResourceConfig",
+          "HyperdriveResourceConfig",
+          "D1ResourceConfig",
+          "R2ResourceConfig",
+          "VectorizeResourceConfig"
+        ]
+      },
+      "QueueBinding": {
+        "description": "Accepted binding shapes for queue resources.",
+        "variants": [
+          "string",
+          "QueueProducerBinding",
+          "QueueConsumerBinding",
+          "QueueDlqBinding"
+        ]
+      },
+      "FixtureConfig": {
+        "description": "Shared fixture union used by worker, queue, and D1 workflows.",
+        "variants": [
+          "WorkerFixtureConfig",
+          "QueueFixtureConfig",
+          "D1FixtureConfig"
+        ]
+      },
+      "LocalVerifyCheckConfig": {
+        "description": "Union of local verification check definitions.",
+        "variants": [
+          "LocalVerifyWorkerCheck",
+          "LocalVerifyCronCheck",
+          "LocalVerifyQueueCheck",
+          "LocalVerifyD1Check",
+          "LocalVerifyD1FileCheck"
+        ]
+      }
+    }
+  },
+  "outputs": {
+    "structured": [
+      "plan",
+      "apply",
+      "deploy",
+      "destroy",
+      "gc",
+      "status",
+      "verify",
+      "graph",
+      "impact",
+      "diff",
+      "doctor",
+      "snapshot",
+      "fixture",
+      "worker",
+      "d1",
+      "queue",
+      "ci",
+      "secrets"
+    ],
+    "dryRun": [
+      "apply",
+      "deploy",
+      "destroy",
+      "secrets set",
+      "secrets sync"
+    ]
+  },
+  "agentNotes": [
+    "Prefer --json for machine consumers and --dry-run before mutating commands.",
+    "Use --fields to trim JSON output and --ndjson for streaming list workflows.",
+    "Use schema output to discover commands and flags instead of scraping help text.",
+    "Use wd create vite for greenfield starters and wd init for existing Wrangler repos.",
+    "Project defaults can be stored in .wdrc or .wdrc.json at or above the repo root.",
+    "Queue send payload input uses --payload and --payload-file."
+  ]
+}
