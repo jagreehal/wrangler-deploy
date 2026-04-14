@@ -39,7 +39,7 @@ describe("deploy", () => {
     story.given("a worker with rendered config");
 
     story.when("deploy is called");
-    await deploy(
+    const result = await deploy(
       { stage: "staging" },
       {
         rootDir: "/repo",
@@ -60,6 +60,13 @@ describe("deploy", () => {
       ["deploy", "-c", "/repo/.wrangler-deploy/staging/apps/api/wrangler.rendered.jsonc"],
       "/repo/apps/api",
     );
+    expect(result.deployedWorkers).toEqual([
+      {
+        workerPath: "apps/api",
+        name: "api-staging",
+        renderedConfigPath: "/repo/.wrangler-deploy/staging/apps/api/wrangler.rendered.jsonc",
+      },
+    ]);
   });
 
   it("blocks deploys when declared secrets are missing", async ({ task }) => {

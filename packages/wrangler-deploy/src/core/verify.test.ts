@@ -72,8 +72,9 @@ const mockState: StageState = {
   resources: {
     "cache-kv": {
       type: "kv",
-      desired: { name: "cache-kv-staging" },
-      observed: { id: "abc123", status: "active", lastSeenAt: "2026-01-01T00:00:00Z" },
+      lifecycleStatus: "created",
+      props: { type: "kv", name: "cache-kv-staging", bindings: {} },
+      output: { id: "abc123", title: "cache-kv-staging" },
       source: "managed",
     },
   },
@@ -283,7 +284,7 @@ describe("verifyLocal", () => {
         ok: true,
         body: "ok",
       }),
-      resolvePlannedWorkerPortFn: vi.fn().mockReturnValue(8788),
+      resolvePlannedWorkerPortFn: vi.fn().mockResolvedValue(8788),
       executeLocalD1Fn: vi.fn().mockReturnValue({
         target: {
           database: "payments-db",

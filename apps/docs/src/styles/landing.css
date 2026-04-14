@@ -37,7 +37,7 @@
 :root {
   --sl-color-accent-low: #1c1000;
   --sl-color-accent: #f6821f;
-  --sl-color-accent-high: #ffdcb8;
+  --sl-color-accent-high: #f6821f;
   --sl-color-bg: var(--ws-dark);
   --sl-color-bg-nav: var(--ws-darker);
   --sl-color-bg-sidebar: var(--ws-darker);
@@ -74,7 +74,7 @@
 }
 
 /* Primary CTA — Cloudflare-orange fill */
-[data-page-type="splash"] .hero .action.primary a {
+[data-page-type="splash"] .hero sl-link-button.primary {
   background: var(--ws-orange);
   border-color: var(--ws-orange);
   color: #fff;
@@ -83,12 +83,12 @@
   transition: transform 0.15s ease, box-shadow 0.2s ease;
 }
 
-[data-page-type="splash"] .hero .action.primary a:hover {
+[data-page-type="splash"] .hero sl-link-button.primary:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 20px rgba(246, 130, 31, 0.3);
 }
 
-[data-page-type="splash"] .hero .action.primary a:active {
+[data-page-type="splash"] .hero sl-link-button.primary:active {
   transform: translateY(0) scale(0.98);
 }
 
@@ -201,6 +201,68 @@
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-block: 2.5rem;
+}
+
+/* ===== Dashboard Showcase ===== */
+.dashboard-showcase {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.25fr);
+  gap: 1.5rem;
+  align-items: start;
+  margin: 1.25rem 0 3rem;
+}
+
+.dashboard-copy {
+  display: grid;
+  gap: 1rem;
+}
+
+.dashboard-points {
+  margin: 0;
+  padding-left: 1.15rem;
+  display: grid;
+  gap: 0.6rem;
+  color: var(--ws-text-muted);
+}
+
+.dashboard-points li strong {
+  color: var(--ws-text);
+}
+
+.dashboard-figure {
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--ws-border);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.02), transparent),
+    var(--ws-darker);
+  box-shadow:
+    0 0 0 1px var(--ws-orange-faint),
+    0 24px 48px -18px rgba(0, 0, 0, 0.45),
+    0 0 60px -22px var(--ws-orange-glow);
+}
+
+.dashboard-figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--ws-border);
+  border-radius: 12px;
+  background: var(--ws-surface);
+}
+
+.dashboard-figure figcaption {
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--ws-text-muted);
+}
+
+@media (max-width: 900px) {
+  .dashboard-showcase {
+    grid-template-columns: 1fr;
+  }
 }
 
 a.resource-pill {

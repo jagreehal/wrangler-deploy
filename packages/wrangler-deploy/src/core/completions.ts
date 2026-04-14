@@ -1,5 +1,6 @@
 const COMMANDS = [
   "init",
+  "create",
   "introspect",
   "plan",
   "apply",

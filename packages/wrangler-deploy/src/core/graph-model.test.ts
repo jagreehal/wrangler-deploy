@@ -124,26 +124,28 @@ describe("buildRichGraph", () => {
       resources: {
         "payments-db": {
           type: "d1",
-          desired: { name: "dev-payments-db" },
-          observed: { id: "db-abc123", status: "active" },
+          lifecycleStatus: "created",
+          props: { type: "d1", name: "dev-payments-db", bindings: {} },
+          output: { id: "db-abc123", name: "dev-payments-db" },
           source: "managed",
         },
         "cache-kv": {
           type: "kv",
-          desired: { name: "dev-cache-kv" },
-          observed: { status: "missing" },
+          lifecycleStatus: "missing",
+          props: { type: "kv", name: "dev-cache-kv", bindings: {} },
           source: "managed",
         },
         "payment-outbox": {
           type: "queue",
-          desired: { name: "dev-payment-outbox" },
-          observed: { id: "q-xyz789", status: "active" },
+          lifecycleStatus: "created",
+          props: { type: "queue", name: "dev-payment-outbox", bindings: {} },
+          output: { id: "q-xyz789", name: "dev-payment-outbox" },
           source: "managed",
         },
         "payment-outbox-dlq": {
           type: "queue",
-          desired: { name: "dev-payment-outbox-dlq" },
-          observed: { status: "missing" },
+          lifecycleStatus: "missing",
+          props: { type: "queue", name: "dev-payment-outbox-dlq", bindings: {} },
           source: "managed",
         },
       },
@@ -160,7 +162,7 @@ describe("buildRichGraph", () => {
     story.then("resource nodes have resourceId and status from state");
     const dbNode = graph.nodes.find((n) => n.id === "payments-db");
     expect(dbNode?.resourceId).toBe("db-abc123");
-    expect(dbNode?.status).toBe("active");
+    expect(dbNode?.status).toBe("created");
 
     const kvNode = graph.nodes.find((n) => n.id === "cache-kv");
     expect(kvNode?.status).toBe("missing");

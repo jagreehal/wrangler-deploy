@@ -3,9 +3,13 @@ title: Local Dev
 description: Start all workers locally with a single command
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside } from "@astrojs/starlight/components";
 
-<Aside type="tip">`wd dev` is built on top of your existing `wrangler.jsonc` files. It does not invent a separate dev config or ask you to change how local development works.</Aside>
+<Aside type="tip">
+  `wd dev` is built on top of your existing `wrangler.jsonc` files. It does not invent a separate
+  dev config or ask you to change how local development works, and `--stage` can reuse the rendered
+  stage configs from `wd apply` so local bindings match deploy-time state.
+</Aside>
 
 If you have more than one worker, you've probably dealt with opening three terminals, picking ports that don't collide, and then watching two `wrangler dev` processes fight over inspector port 9229. `wd dev` handles all of that.
 
@@ -36,6 +40,19 @@ Starting local dev session:
 
 Set `dev.session.entryWorker` when the worker you want exposed on localhost is not the last worker in dependency order.
 
+## Stage-aware dev
+
+If you have already run `wd apply --stage staging`, you can point local dev at the rendered stage bindings directly:
+
+```bash
+$ wd dev --stage staging --session --persist-to .wrangler/state
+Starting local dev session:
+  workers/api -> http://localhost:8787
+  includes: workers/batch-workflow, workers/event-router
+```
+
+This keeps local bindings aligned with deployed resources and worker names. It is especially useful when you want `wd dev` to behave like the exact stage you already applied, rather than the raw placeholders in the checked-in configs.
+
 ## Port resolution
 
 Before spawning anything, wrangler-deploy probes for free ports. If 8787 or 9229 is already taken by another process, it picks the next one. You never have to think about inspector port collisions when running multiple workers.
@@ -63,6 +80,25 @@ Starting dev servers:
 batch-workflow is included because api has a `WORKFLOWS` service binding to it. event-router is skipped because api doesn't depend on it.
 
 If the filter doesn't match any configured worker, the command fails immediately with a list of valid worker paths.
+
+## Single-worker read mode
+
+For large monorepos, starting all workers locally can be slow. `--fallback-stage` runs a single worker while falling back to real Cloudflare resources from a deployed stage:
+
+```bash
+$ wd dev --filter workers/api --fallback-stage staging
+Starting dev servers:
+  workers/api → http://localhost:8787
+  → falls back to staging/cloud-api via service binding
+```
+
+The filtered worker runs locally on the port while its service bindings point to the real workers in the fallback stage. This is useful when:
+
+- You only need to modify one worker
+- Other workers are already deployed
+- Full local startup is too slow
+
+Service bindings from the target worker automatically connect to their deployed counterparts in the fallback stage, not to local workers that aren't running.
 
 ## Hot reload
 
@@ -136,7 +172,7 @@ $ wd verify local --pack smoke
 You could build many of these flows manually with raw Wrangler plus custom scripts. The DX gain from wrangler-deploy is that the commands resolve workers, ports, queue producers, and local routes from `wrangler-deploy.config.ts` instead of making every developer rediscover that wiring.
 
 - `wd dev doctor` catches local-only setup issues before startup
-- `wd dev ui` gives you a small live control plane for workers, queues, D1, verify packs, snapshots, and logs
+- `wd dev ui` gives you a small live control plane for workers, queues, D1, verify packs, snapshots, logs, project defaults, and command metadata
 - `wd fixture list` shows the shared local payloads and SQL used by the repo
 - `wd snapshot save` and `wd snapshot load` make local state reproducible instead of disposable
 - `wd logs` tails persisted worker logs from the active dev runtime
@@ -152,3 +188,5 @@ You could build many of these flows manually with raw Wrangler plus custom scrip
 - `wd verify local --pack` lets teams split quick CI smoke runs from deeper regression packs
 
 The practical win is consistency. The same fixture can drive `wd worker call`, `wd queue send`, `wd d1 exec`, `wd verify local`, and buttons inside `wd dev ui`. Snapshot save/load adds reproducible state on top of that, and the UI now keeps replayable local actions so you can rerun a known-good workflow without rebuilding the command by hand. None of that replaces `wrangler.jsonc`; it removes the repo-memory tax around it.
+
+The dashboard also surfaces the resolved `.wdrc` / `.wdrc.json` defaults and the same manifest that powers `wd schema` and `wd tools`, which makes it easier for agents and humans to confirm what the CLI will do before they run it.

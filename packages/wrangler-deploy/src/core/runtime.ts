@@ -187,17 +187,17 @@ function defaultQueueSendPath(logicalName: string): string {
   return `/__wd/queues/${encodeURIComponent(logicalName)}`;
 }
 
-export function resolvePlannedWorkerPort(
+export async function resolvePlannedWorkerPort(
   config: CfStageConfig,
   rootDir: string,
   workerPath: string,
-): number {
+): Promise<number> {
   const activeState = readActiveDevState(rootDir);
   if (activeState?.ports[workerPath] !== undefined) {
     return activeState.ports[workerPath]!;
   }
 
-  const plan = buildDevPlan(config, rootDir, { filter: workerPath });
+  const plan = await buildDevPlan(config, rootDir, { filter: workerPath });
   const plannedPort = plan.mode === "session"
     ? plan.session?.port
     : plan.workers.find((worker) => worker.workerPath === workerPath)?.port;
@@ -243,11 +243,11 @@ export function resolveQueueTailLogFiles(
   });
 }
 
-export function resolveQueueSendTarget(
+export async function resolveQueueSendTarget(
   config: CfStageConfig,
   rootDir: string,
   options: { queue: string; worker?: string; port?: number; path?: string },
-): QueueSendTarget {
+): Promise<QueueSendTarget> {
   const route = getQueueRoute(config, options.queue);
   if (!route) {
     throw new Error(`Unknown queue "${options.queue}"`);
@@ -270,7 +270,7 @@ export function resolveQueueSendTarget(
     throw new Error(`Worker "${workerPath}" is not a producer for queue "${options.queue}"`);
   }
 
-  const port = options.port ?? resolvePlannedWorkerPort(config, rootDir, workerPath);
+  const port = options.port ?? await resolvePlannedWorkerPort(config, rootDir, workerPath);
   const path = options.path ?? configuredRoute?.path ?? defaultQueueSendPath(options.queue);
   const url = new URL(path, `http://127.0.0.1:${port}`).toString();
 
@@ -283,11 +283,11 @@ export function resolveQueueSendTarget(
   };
 }
 
-export function resolveWorkerCallTarget(
+export async function resolveWorkerCallTarget(
   config: CfStageConfig,
   rootDir: string,
   options: { worker: string; endpoint?: string; port?: number; path?: string; query?: Record<string, string> },
-): WorkerCallTarget {
+): Promise<WorkerCallTarget> {
   const configuredEndpoint = options.endpoint ? config.dev?.endpoints?.[options.endpoint] : undefined;
   const worker = configuredEndpoint?.worker ?? options.worker;
   if (!config.workers.includes(worker)) {
@@ -300,7 +300,7 @@ export function resolveWorkerCallTarget(
     );
   }
 
-  const port = options.port ?? resolvePlannedWorkerPort(config, rootDir, worker);
+  const port = options.port ?? await resolvePlannedWorkerPort(config, rootDir, worker);
   const path = options.path ?? configuredEndpoint?.path ?? "/";
   const url = new URL(path, `http://127.0.0.1:${port}`);
 
@@ -343,7 +343,7 @@ export async function sendQueueMessage(
   rootDir: string,
   options: QueueSendOptions,
 ): Promise<QueueSendResult> {
-  const target = resolveQueueSendTarget(config, rootDir, options);
+  const target = await resolveQueueSendTarget(config, rootDir, options);
   const response = await fetch(target.url, {
     method: "POST",
     headers: {
@@ -366,7 +366,7 @@ export async function callWorker(
   rootDir: string,
   options: WorkerCallOptions,
 ): Promise<WorkerCallResult> {
-  const target = resolveWorkerCallTarget(config, rootDir, options);
+  const target = await resolveWorkerCallTarget(config, rootDir, options);
   const method = (
     options.method
     ?? (options.endpoint ? config.dev?.endpoints?.[options.endpoint]?.method : undefined)
@@ -389,10 +389,11 @@ export async function callWorker(
   };
 }
 
-export function listWorkerRoutes(config: CfStageConfig, rootDir: string): WorkerRouteSummary[] {
+export async function listWorkerRoutes(config: CfStageConfig, rootDir: string): Promise<WorkerRouteSummary[]> {
   const endpointEntries = Object.entries(config.dev?.endpoints ?? {});
-  return config.workers.map((workerPath) => {
-    const port = resolvePlannedWorkerPort(config, rootDir, workerPath);
+  const routes: WorkerRouteSummary[] = [];
+  for (const workerPath of config.workers) {
+    const port = await resolvePlannedWorkerPort(config, rootDir, workerPath);
     const url = `http://127.0.0.1:${port}`;
     const endpoints = endpointEntries
       .filter(([, endpoint]) => endpoint.worker === workerPath)
@@ -404,13 +405,14 @@ export function listWorkerRoutes(config: CfStageConfig, rootDir: string): Worker
         url: new URL(endpoint.path, url).toString(),
       }));
 
-    return {
+    routes.push({
       workerPath,
       port,
       url,
       endpoints,
-    };
-  });
+    });
+  }
+  return routes;
 }
 
 export function listD1Databases(config: CfStageConfig): D1DatabaseRoute[] {
@@ -492,7 +494,7 @@ export async function replayQueueMessages(
   rootDir: string,
   options: Omit<QueueSendOptions, "payload"> & { payloads: string[] },
 ): Promise<QueueReplayResult> {
-  const target = resolveQueueSendTarget(config, rootDir, options);
+  const target = await resolveQueueSendTarget(config, rootDir, options);
   const results: QueueSendResult[] = [];
 
   for (const payload of options.payloads) {
@@ -587,11 +589,11 @@ export function parseInterval(input: string): number {
   return value * 60_000;
 }
 
-export function runDevDoctor(
+export async function runDevDoctor(
   config: CfStageConfig,
   rootDir: string,
   deps: DevDoctorDeps,
-): Array<{ name: string; status: "pass" | "warn" | "fail"; message: string; details?: string }> {
+): Promise<Array<{ name: string; status: "pass" | "warn" | "fail"; message: string; details?: string }>> {
   const checks: Array<{ name: string; status: "pass" | "warn" | "fail"; message: string; details?: string }> = [];
 
   for (const workerPath of config.workers) {
@@ -702,7 +704,7 @@ export function runDevDoctor(
     }
   }
 
-  const portPlan = buildDevPlan(config, rootDir, {});
+  const portPlan = await buildDevPlan(config, rootDir, {});
   const portEntries = Object.entries(portPlan.ports);
   const duplicatePorts = new Map<number, string[]>();
   for (const [workerPath, port] of portEntries) {

@@ -18,4 +18,12 @@ describe("package manifest", () => {
         packageJson.peerDependencies?.["@cloudflare/workers-types"],
     ).toBeTruthy();
   });
+
+  it("ships the agent context artifact", () => {
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8")) as {
+      files?: string[];
+    };
+
+    expect(packageJson.files).toContain("agent-context.json");
+  });
 });

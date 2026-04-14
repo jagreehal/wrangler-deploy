@@ -13,6 +13,10 @@ This file sits alongside your existing Wrangler config. It does not replace `wra
 - `wrangler-deploy.config.ts`: project-level resource, stage, and binding model
 - `wrangler.rendered.jsonc`: generated deploy-time config with real IDs for a stage
 
+You can also add a project defaults file, `.wdrc` or `.wdrc.json`, at the repo root or any parent directory. `wd context` uses it for defaults like stage name, dev port, account ID, and state password. It is optional, but helpful when you want agents or teammates to reuse the same settings without repeating flags.
+
+The config also gives you inferred worker types through `workerEnv(...)` and `typeof api.Env`. That keeps the runtime config and the TypeScript `Env` shape in one place, with no generated files and no separate type generation step.
+
 ## Minimal example
 
 ```ts
@@ -96,6 +100,16 @@ export default defineConfig({
 ```
 
 Every worker listed in `workers` should point at a directory that already contains `wrangler.jsonc` or `wrangler.json`.
+
+If you need a quick way to inspect or update project defaults, use the CLI instead of hand-editing JSON:
+
+```bash
+wd context
+wd context get stage
+wd context set --stage staging --account-id 1234567890abcdef1234567890abcdef
+wd context unset --account-id
+wd context clear
+```
 
 ## Local Verify
 

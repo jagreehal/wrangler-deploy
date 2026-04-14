@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, rmSync
 import { join, dirname } from "node:path";
 import type { StageState, StateConfig } from "../types.js";
 import { getWranglerEnv, resolveAccountId } from "./auth.js";
+import { encryptState, decryptState } from "./crypto.js";
 
 const CF_API_BASE = "https://api.cloudflare.com/client/v4";
 
@@ -12,16 +13,26 @@ export interface StateProvider {
   list(): Promise<string[]>;
 }
 
-export function resolveStateProvider(rootDir: string, stateConfig?: StateConfig): StateProvider {
+export function resolveStateProvider(rootDir: string, stateConfig?: StateConfig, password?: string): StateProvider {
   if (!stateConfig || stateConfig.backend === "local") {
-    return new LocalStateProvider(rootDir);
+    return new LocalStateProvider(rootDir, password);
   }
 
   if (stateConfig.backend === "kv") {
-    return new KvStateProvider(rootDir, stateConfig.namespaceId!, stateConfig.keyPrefix);
+    return new KvStateProvider(rootDir, stateConfig.namespaceId!, stateConfig.keyPrefix, password);
   }
 
-  return new LocalStateProvider(rootDir);
+  return new LocalStateProvider(rootDir, password);
+}
+
+export async function loadState(
+  rootDir: string,
+  stage: string,
+  stateConfig?: StateConfig,
+  password?: string,
+): Promise<StageState | null> {
+  const provider = resolveStateProvider(rootDir, stateConfig, password);
+  return provider.read(stage);
 }
 
 export class KvStateProvider implements StateProvider {
@@ -29,9 +40,11 @@ export class KvStateProvider implements StateProvider {
   private apiToken: string;
   private namespaceId: string;
   private prefix: string;
+  private password?: string;
 
-  constructor(rootDir: string, namespaceId: string, keyPrefix: string = "wrangler-deploy/") {
+  constructor(rootDir: string, namespaceId: string, keyPrefix: string = "wrangler-deploy/", password?: string) {
     this.prefix = keyPrefix;
+    this.password = password;
     const env = getWranglerEnv(rootDir);
     this.apiToken = env.CLOUDFLARE_API_TOKEN || "";
     if (!this.apiToken) {
@@ -85,12 +98,14 @@ export class KvStateProvider implements StateProvider {
     const key = `${this.prefix}${stage}`;
     const value = await this.kvGet(key);
     if (!value) return null;
-    return value as StageState;
+    const state = value as StageState;
+    return this.password ? decryptState(state, this.password) : state;
   }
 
   async write(stage: string, state: StageState): Promise<void> {
     const key = `${this.prefix}${stage}`;
-    await this.kvPut(key, JSON.stringify(state));
+    const toStore = this.password ? await encryptState(state, this.password) : state;
+    await this.kvPut(key, JSON.stringify(toStore));
   }
 
   async delete(stage: string): Promise<void> {
@@ -112,19 +127,21 @@ export class KvStateProvider implements StateProvider {
 }
 
 export class LocalStateProvider implements StateProvider {
-  constructor(private rootDir: string) {}
+  constructor(private rootDir: string, private password?: string) {}
 
   async read(stage: string): Promise<StageState | null> {
     const path = statePath(this.rootDir, stage);
     if (!existsSync(path)) return null;
     const raw = readFileSync(path, "utf-8");
-    return JSON.parse(raw);
+    const state = JSON.parse(raw) as StageState;
+    return this.password ? decryptState(state, this.password) : state;
   }
 
   async write(stage: string, state: StageState): Promise<void> {
     const path = statePath(this.rootDir, stage);
     mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, JSON.stringify(state, null, 2) + "\n");
+    const toStore = this.password ? await encryptState(state, this.password) : state;
+    writeFileSync(path, JSON.stringify(toStore, null, 2) + "\n");
   }
 
   async delete(stage: string): Promise<void> {

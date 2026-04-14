@@ -2,6 +2,27 @@
 // Manifest types — what the user writes in wrangler-deploy.config.ts
 // ============================================================================
 
+export interface ProjectContext {
+  /** Default stage when commands omit --stage. */
+  stage?: string;
+  /** Default fallback stage for `wd dev --filter ...` read mode. */
+  fallbackStage?: string;
+  /** Default base port for `wd dev`. */
+  basePort?: number;
+  /** Default filter for `wd dev`. */
+  filter?: string;
+  /** Default session mode for `wd dev`. */
+  session?: boolean;
+  /** Default Miniflare persistence path for `wd dev --session`. */
+  persistTo?: string;
+  /** Default account ID for Cloudflare auth and KV-backed state. */
+  accountId?: string;
+  /** Default Hyperdrive database URL when not passed on the command line. */
+  databaseUrl?: string;
+  /** Default state password for encrypted state. */
+  statePassword?: string;
+}
+
 export type ResourceType = "kv" | "queue" | "hyperdrive" | "d1" | "r2" | "vectorize";
 
 export interface KvResourceConfig {
@@ -266,6 +287,8 @@ export interface DevConfig {
   session?: DevSessionConfig;
   /** Snapshot defaults for local reproducible environments. */
   snapshots?: DevSnapshotConfig;
+  /** Stage to read deployed worker names from when --filter is used with --fallback-stage. */
+  fallbackStage?: string;
 }
 
 export interface DevSnapshotConfig {
@@ -292,23 +315,71 @@ export interface CfStageConfig {
   verifyLocal?: LocalVerifyConfig;
   /** Local dev configuration */
   dev?: DevConfig;
+  /** Optional password for encrypting sensitive resource outputs and storedSecrets in state. Falls back to WD_STATE_PASSWORD env var. */
+  statePassword?: string;
+  /** Secret values to store encrypted in state (keyed by worker path → secret name → value). */
+  storedSecrets?: Record<string, Record<string, string>>;
 }
 
 // ============================================================================
 // State types — what wrangler-deploy writes to .wrangler-deploy/<stage>/state.json
 // ============================================================================
 
+// ============================================================================
+// Resource lifecycle types
+// ============================================================================
+
+export type LifecycleStatus =
+  | "creating" | "created"
+  | "updating" | "updated"
+  | "deleting" | "deleted"
+  | "missing" | "drifted" | "orphaned";
+
+export type ResourceProps = {
+  type: ResourceType;
+  name: string; // staged name, e.g. "cache-kv-staging"
+  bindings: Record<string, unknown>;
+  [key: string]: unknown; // type-specific extras (dimensions, metric, etc.)
+};
+
+// Per-resource output types — what Cloudflare returns after provisioning
+export interface D1Output        { id?: string; name: string; version?: "v1" | "v2" }
+export interface KvOutput        { id: string;  title: string }
+export interface QueueOutput     { id?: string; name: string }
+export interface R2Output        { name: string }
+export interface HyperdriveOutput{ id: string;  name: string; origin: string }
+export interface VectorizeOutput { id?: string; name: string; dimensions?: number; metric?: "euclidean" | "cosine" | "dot-product" }
+
+export type ResourceOutput =
+  | D1Output | KvOutput | QueueOutput
+  | R2Output | HyperdriveOutput | VectorizeOutput;
+
 export interface ResourceState {
   type: ResourceType;
-  desired: {
-    name: string;
-  };
-  observed: {
-    id?: string;
-    status: "active" | "missing" | "drifted" | "orphaned";
-    lastSeenAt?: string;
-  };
+  lifecycleStatus: LifecycleStatus;
+  props: ResourceProps;
+  oldProps?: ResourceProps;  // set when updating, cleared on completion
+  output?: ResourceOutput;
   source: "managed";
+}
+
+// ============================================================================
+// State accessor helpers — use these instead of accessing fields directly
+// ============================================================================
+
+/** Returns the Cloudflare resource ID from state output, if present. */
+export function resourceId(state: ResourceState): string | undefined {
+  return (state.output as { id?: string } | undefined)?.id;
+}
+
+/** Returns the staged resource name (e.g. "cache-kv-staging"). */
+export function resourceStagedName(state: ResourceState): string {
+  return state.props.name;
+}
+
+/** True when the resource has been successfully created or updated. */
+export function isActive(state: ResourceState): boolean {
+  return state.lifecycleStatus === "created" || state.lifecycleStatus === "updated";
 }
 
 export interface WorkerState {
@@ -328,6 +399,7 @@ export interface StageState {
   resources: Record<string, ResourceState>;
   workers: Record<string, WorkerState>;
   secrets: Record<string, SecretState>;
+  storedSecrets?: Record<string, Record<string, string>>;
 }
 
 // ============================================================================
@@ -360,8 +432,10 @@ export interface WranglerConfig {
   main?: string;
   compatibility_date?: string;
   compatibility_flags?: string[];
+  d1_databases?: Array<{ binding: string; database_id: string; database_name: string }>;
   hyperdrive?: Array<{ binding: string; id: string; localConnectionString?: string }>;
   kv_namespaces?: Array<{ binding: string; id: string }>;
+  r2_buckets?: Array<{ binding: string; bucket_name: string }>;
   queues?: {
     producers?: Array<{ queue: string; binding: string }>;
     consumers?: Array<{

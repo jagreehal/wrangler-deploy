@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { getWranglerEnv } from "../core/auth.js";
+import type { VectorizeOutput } from "../types.js";
 
 function wrangler(args: string[], cwd: string): string {
   try {
@@ -30,7 +31,7 @@ export function createVectorizeIndex(
   name: string,
   config: VectorizeConfig,
   cwd: string,
-): string | undefined {
+): VectorizeOutput {
   const args = ["vectorize", "create", name];
 
   if (config.preset) {
@@ -42,8 +43,8 @@ export function createVectorizeIndex(
   if (config.description) args.push("--description", config.description);
 
   const output = wrangler(args, cwd);
-  const match = output.match(/([a-f0-9-]{36})/);
-  return match?.[1];
+  const match = output.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+  return { id: match?.[1], name, dimensions: config.dimensions, metric: config.metric };
 }
 
 export function deleteVectorizeIndex(name: string, cwd: string): void {

@@ -71,7 +71,7 @@ describe("renderAscii", () => {
     const enrichedGraph: RichGraph = {
       nodes: [
         { id: "apps/api", type: "worker", label: "api", deployedName: "dev-api" },
-        { id: "payments-db", type: "d1", label: "payments-db", resourceId: "db-abc123", status: "active" },
+        { id: "payments-db", type: "d1", label: "payments-db", resourceId: "db-abc123", status: "created" },
       ],
       edges: [
         { from: "apps/api", to: "payments-db", type: "binding", label: "DB" },
@@ -81,6 +81,6 @@ describe("renderAscii", () => {
     story.then("output shows deployed name and resource id");
     expect(output).toContain("dev-api");
     expect(output).toContain("db-abc123");
-    expect(output).toContain("active");
+    expect(output).toContain("created");
   });
 });

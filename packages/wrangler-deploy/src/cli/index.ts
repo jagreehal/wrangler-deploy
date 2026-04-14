@@ -6,6 +6,14 @@ import { execFileSync } from "node:child_process";
 import { createInterface } from "node:readline";
 import { createWranglerRunner } from "../core/wrangler-runner.js";
 import { resolveStateProvider } from "../core/state.js";
+import {
+  clearProjectContext,
+  getProjectContextValue,
+  loadProjectContext,
+  loadProjectContextDetails,
+  unsetProjectContext,
+  writeProjectContext,
+} from "../core/project-context.js";
 import { clearActiveDevState, resolveDevLogDir, writeActiveDevState } from "../core/dev-runtime-state.js";
 import { apply, plan } from "../core/apply.js";
 import { deploy } from "../core/deploy.js";
@@ -19,9 +27,11 @@ import {
 } from "../core/secrets.js";
 import { gc } from "../core/gc.js";
 import { generateConfig } from "../core/init.js";
+import { createViteStarter } from "../core/create.js";
 import { introspect } from "../core/introspect.js";
 import { buildRichGraph } from "../core/graph-model.js";
-import { renderAscii, renderMermaid, renderDot, renderJson } from "../core/renderers/index.js";
+import { resolveDeployOrder } from "../core/graph.js";
+import { renderAscii, renderMermaid, renderDot } from "../core/renderers/index.js";
 import { analyzeImpact } from "../core/impact.js";
 import { buildDevPlan, startDev } from "../core/dev.js";
 import { generateGitHubWorkflow } from "../core/ci/workflow-gen.js";
@@ -60,9 +70,25 @@ import {
   getWorkerFixture,
   listFixtures,
 } from "../core/fixtures.js";
+import { cliManifest } from "../core/cli-manifest.js";
+import {
+  formatCliError,
+  isDryRun,
+  parseOutputFields,
+  parseOutputFormat,
+  printJson,
+  setJsonOutputOptions,
+} from "../core/cli-output.js";
+import type { ProjectContext } from "../types.js";
 
 const args = process.argv.slice(2);
 const command = args[0];
+const outputFormat = parseOutputFormat(args);
+setJsonOutputOptions({
+  fields: parseOutputFields(args),
+  ndjson: args.includes("--ndjson") || getFlag("format") === "ndjson",
+});
+const silentLogger = { log: () => {}, warn: () => {}, error: () => {} };
 
 function getFlag(name: string): string | undefined {
   const idx = args.indexOf(`--${name}`);
@@ -95,6 +121,18 @@ function parseKeyValueFlags(entries: string[], flagName: string): Record<string,
   }));
 }
 
+function resolveStatePassword(
+  config: { statePassword?: string },
+  projectContext: { statePassword?: string },
+  override: string | undefined = getFlag("state-password"),
+): string | undefined {
+  return override ?? config.statePassword ?? projectContext.statePassword ?? process.env.WD_STATE_PASSWORD;
+}
+
+function wantsJsonOutput(): boolean {
+  return outputFormat === "json";
+}
+
 async function loadConfig(rootDir: string) {
   const configPath = resolve(rootDir, "wrangler-deploy.config.ts");
   if (!existsSync(configPath)) {
@@ -118,12 +156,20 @@ async function loadConfig(rootDir: string) {
 
 async function main() {
   const rootDir = process.cwd();
+  const projectContext = loadProjectContext(rootDir);
+  const projectContextDetails = loadProjectContextDetails(rootDir);
 
   if (!command || command === "help" || command === "--help") {
+    if (outputFormat === "json") {
+      printJson(cliManifest);
+      return;
+    }
+
     console.log(`
   wrangler-deploy — Wrangler-native environment orchestration
 
   Commands:
+    create      Scaffold a new starter project
     init        Scan local wrangler configs and generate wrangler-deploy.config.ts
     introspect  Scan live Cloudflare account and generate config from existing resources
     plan        Show what would be created/changed
@@ -137,7 +183,9 @@ async function main() {
     graph       [--stage <name>] [--format ascii|mermaid|dot|json]  Show topology
     impact      <worker-path>                                       Show dependency impact
     diff        <stage-a> <stage-b> [--format json]                 Compare stages
-    dev         [--filter <worker>] [--port <base>] [--session]     Start local dev
+    schema      Emit the CLI manifest as JSON
+    tools       Emit tool metadata derived from the manifest
+    dev         [--stage <stage>] [--filter <worker>] [--fallback-stage <stage>] [--port <base>] [--session]  Start local dev
     dev doctor                                                      Validate local dev setup
     dev ui                                                          Start a local runtime dashboard
     snapshot list                                                   List saved local runtime snapshots
@@ -164,6 +212,11 @@ async function main() {
     ci check    --stage <name>                                      Post GitHub check runs
     doctor                                                          Run diagnostic checks
     completions --shell zsh|bash|fish                               Generate shell completions
+    context                                                         Show resolved project defaults
+    context get <key>                                               Show one default value
+    context set                                                     Update project defaults in .wdrc
+    context unset                                                   Remove project default keys
+    context clear                                                   Remove the project defaults file
 
   Secrets sub-commands:
     secrets --stage <name>                           Check secret status
@@ -173,11 +226,18 @@ async function main() {
   Options:
     --stage <name>       Stage name (required)
     --database-url <url> Postgres URL (required for Hyperdrive on first apply)
+    --account-id <id>    Cloudflare account ID override
     --force              Force destructive operations on protected stages
+    --dry-run            Preview mutating actions without changing state
     --verify             Run verification after deploy
     --session            Run wrangler dev as a single multi-config local session
+    --base-port <number> Base port for wd dev
+    --fallback-stage <name> Fallback stage for wd dev filter read mode
     --persist-to <path>  Persist Miniflare state for session mode
+    --filter <worker>    Filter wd dev to one worker
+    --stage <name>       Render and use stage bindings directly for wd dev
     --pack <name>        Run a named verify-local pack
+    --state-password <value>  Encrypt or decrypt project defaults and state
     --json-report        Print machine-readable JSON output
     --endpoint <name>     Named local endpoint for worker call
     --cron <expr>         Cron expression for local scheduled trigger
@@ -193,19 +253,35 @@ async function main() {
     --body <text>         Raw request body for worker call
     --body-file <path>    Read raw request body from a file for worker call
     --fixture <name>      Use a named local fixture from wrangler-deploy.config.ts
-    --json <payload>      Inline JSON payload for queue send
-    --file <path>         JSON payload file for queue send
+    --payload <json>      Inline JSON payload for queue send
+    --payload-file <path> JSON payload file for queue send
     --worker <worker>     Explicit producer worker for queue send
     --watch               Repeat queue send on an interval
     --count <number>      Stop queue send watch after N sends
     --follow              Keep following queue tail output (default)
     --once                Print the current queue tail snapshot and exit
+    --json                Emit machine-readable JSON for supported commands
+    --format json         Emit machine-readable JSON for supported commands
+    --fields <paths>      Filter JSON output to specific dot-paths
+    --ndjson              Emit newline-delimited JSON for array outputs
+    --key <name>          Key to read with wd context get
+
+  Project defaults:
+    .wdrc or .wdrc.json   Default stage, dev settings, database URL, and account ID
 
   Examples:
     wrangler-deploy init
+    wrangler-deploy create vite my-app
     wrangler-deploy plan --stage staging
     wrangler-deploy apply --stage staging --database-url "postgresql://..."
     wrangler-deploy deploy --stage staging
+    wrangler-deploy schema --json
+    wrangler-deploy tools --json
+    wrangler-deploy context --json
+    wrangler-deploy context get stage
+    wrangler-deploy context set --stage staging --account-id 1234...
+    wrangler-deploy context unset --stage --account-id
+    wrangler-deploy context clear
     wrangler-deploy secrets --stage staging
     wrangler-deploy secrets set --stage staging
     wrangler-deploy secrets sync --to staging --from-env-file .dev.vars
@@ -215,7 +291,7 @@ async function main() {
     return;
   }
 
-  const stage = getFlag("stage");
+  const stage = getFlag("stage") ?? projectContext.stage;
 
   switch (command) {
     case "init": {
@@ -236,9 +312,38 @@ async function main() {
       break;
     }
 
+    case "create": {
+      const template = args[1];
+      if (template !== "vite") {
+        throw new Error(`Unknown starter template "${template}". Available templates: vite.`);
+      }
+
+      const targetDir = getFlag("dir") ?? args[2] ?? "cloudflare-vite-app";
+      const result = createViteStarter({
+        targetDir,
+        projectName: getFlag("name"),
+        force: hasFlag("force"),
+      });
+
+      if (wantsJsonOutput()) {
+        printJson(result);
+        break;
+      }
+
+      console.log(`\n  Created ${result.template} starter in ${result.targetDir}\n`);
+      for (const file of result.files) {
+        console.log(`  ✓ ${file}`);
+      }
+      console.log(`\n  Next:\n`);
+      console.log(`    cd ${targetDir}`);
+      console.log(`    pnpm install`);
+      console.log(`    pnpm dev\n`);
+      break;
+    }
+
     case "introspect": {
       const wrangler = createWranglerRunner();
-      const filter = getFlag("filter");
+      const filter = getFlag("filter") ?? projectContext.filter;
       const dryRun = hasFlag("dry-run");
       const result = await introspect(
         { filter, dryRun },
@@ -269,8 +374,13 @@ async function main() {
     case "plan": {
       if (!stage) throw new Error("--stage is required");
       const config = await loadConfig(rootDir);
-      const stateProvider = resolveStateProvider(rootDir, config.state);
+      const stateProvider = resolveStateProvider(rootDir, config.state, resolveStatePassword(config, projectContext));
       const result = await plan({ stage }, { rootDir, config, state: stateProvider });
+
+      if (wantsJsonOutput()) {
+        printJson(result);
+        break;
+      }
 
       console.log(`\n  wrangler-deploy plan --stage ${stage}\n`);
       for (const item of result.items) {
@@ -302,11 +412,46 @@ async function main() {
       if (!stage) throw new Error("--stage is required");
       const config = await loadConfig(rootDir);
       const wrangler = createWranglerRunner();
-      const stateProvider = resolveStateProvider(rootDir, config.state);
-      await apply(
-        { stage, databaseUrl: getFlag("database-url") },
-        { rootDir, config, state: stateProvider, wrangler },
+      const stateProvider = resolveStateProvider(rootDir, config.state, resolveStatePassword(config, projectContext));
+
+      if (isDryRun(args)) {
+        const preview = await plan({ stage }, { rootDir, config, state: stateProvider });
+        const result = {
+          stage,
+          dryRun: true,
+          plan: preview,
+          workers: config.workers,
+        };
+        if (wantsJsonOutput()) {
+          printJson(result);
+        } else {
+          console.log(`\n  wrangler-deploy apply --stage ${stage} --dry-run\n`);
+          for (const item of preview.items) {
+            const symbol =
+              item.action === "create"
+                ? "+"
+                : item.action === "in-sync"
+                  ? "="
+                  : item.action === "drifted"
+                    ? "~"
+                    : item.action === "orphaned"
+                      ? "!"
+                      : "-";
+            console.log(`  ${symbol} ${item.name} (${item.type}) ${item.action}`);
+            if (item.details) console.log(`    ${item.details}`);
+          }
+          console.log(`\n  Preview only — no resources were changed.\n`);
+        }
+        break;
+      }
+
+      const result = await apply(
+        { stage, databaseUrl: getFlag("database-url") ?? projectContext.databaseUrl },
+        { rootDir, config, state: stateProvider, wrangler, logger: wantsJsonOutput() ? silentLogger : console },
       );
+      if (wantsJsonOutput()) {
+        printJson(result);
+      }
       break;
     }
 
@@ -321,11 +466,61 @@ async function main() {
         if (!envFile) throw new Error("--from-env-file is required for secrets sync");
         const config = await loadConfig(rootDir);
         const wrangler = createWranglerRunner();
-        const stateProvider = resolveStateProvider(rootDir, config.state);
+        const stateProvider = resolveStateProvider(rootDir, config.state, resolveStatePassword(config, projectContext));
+
+        if (isDryRun(args)) {
+          const state = await stateProvider.read(toStage);
+          if (!state) throw new Error(`No state for stage "${toStage}". Run apply first.`);
+          const content = readFileSync(resolve(rootDir, envFile), "utf-8");
+          const envVars = new Map<string, string>();
+          for (const line of content.split("\n")) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith("#")) continue;
+            const eqIndex = trimmed.indexOf("=");
+            if (eqIndex === -1) continue;
+            envVars.set(trimmed.slice(0, eqIndex).trim(), trimmed.slice(eqIndex + 1).trim());
+          }
+
+          const set: string[] = [];
+          const skipped: string[] = [];
+          if (config.secrets) {
+            for (const [workerPath, secretNames] of Object.entries(config.secrets as Record<string, string[]>)) {
+              const workerState = state.workers[workerPath];
+              if (!workerState) {
+                skipped.push(...secretNames.map((n) => `${workerPath}/${n} (worker not in state)`));
+                continue;
+              }
+              for (const secretName of secretNames) {
+                if (envVars.get(secretName)) {
+                  set.push(`${workerPath}/${secretName}`);
+                } else {
+                  skipped.push(`${workerPath}/${secretName} (not in env file)`);
+                }
+              }
+            }
+          }
+
+          const result = { stage: toStage, dryRun: true, set, skipped };
+          if (wantsJsonOutput()) {
+            printJson(result);
+          } else {
+            console.log(`\n  wrangler-deploy secrets sync --to ${toStage} --dry-run\n`);
+            for (const s of set) console.log(`  + ${s}`);
+            for (const s of skipped) console.log(`  - ${s} (skipped)`);
+            console.log(`\n  Preview only — no secrets were changed.\n`);
+          }
+          break;
+        }
+
         const result = await syncSecretsFromEnvFile(
           { stage: toStage, envFilePath: resolve(rootDir, envFile) },
           { rootDir, config, state: stateProvider, wrangler },
         );
+
+        if (wantsJsonOutput()) {
+          printJson({ stage: toStage, ...result });
+          break;
+        }
 
         console.log(`\n  wrangler-deploy secrets sync --to ${toStage}\n`);
         for (const s of result.set) console.log(`  + ${s}`);
@@ -339,7 +534,7 @@ async function main() {
         if (!stage) throw new Error("--stage is required");
         const config = await loadConfig(rootDir);
         const wrangler = createWranglerRunner();
-        const stateProvider = resolveStateProvider(rootDir, config.state);
+        const stateProvider = resolveStateProvider(rootDir, config.state, resolveStatePassword(config, projectContext));
 
         const statuses = await checkSecrets(
           { stage },
@@ -352,12 +547,39 @@ async function main() {
           break;
         }
 
+        const stageState = await stateProvider.read(stage);
+        if (wantsJsonOutput()) {
+          printJson({
+            stage,
+            dryRun: false,
+            set: missing.filter((s) => !!stageState?.workers[s.worker]?.name).map((s) => `${s.worker}/${s.name}`),
+            skipped: missing.filter((s) => !stageState?.workers[s.worker]?.name).map((s) => `${s.worker}/${s.name} (worker not deployed)`),
+          });
+          break;
+        }
+        if (isDryRun(args)) {
+          const preview = missing.map((s) => ({
+            worker: s.worker,
+            name: s.name,
+            status: "missing" as const,
+          }));
+          if (wantsJsonOutput()) {
+            printJson({ stage, dryRun: true, missing: preview });
+          } else {
+            console.log(`\n  wrangler-deploy secrets set --stage ${stage} --dry-run\n`);
+            for (const s of preview) {
+              console.log(`  ? ${s.worker}/${s.name}`);
+            }
+            console.log(`\n  Preview only — no secrets were changed.\n`);
+          }
+          break;
+        }
+
         console.log(`\n  Setting ${missing.length} missing secret(s) for stage "${stage}":\n`);
 
         const rl = createInterface({ input: process.stdin, output: process.stdout });
         const question = (q: string): Promise<string> => new Promise((res) => rl.question(q, res));
 
-        const stageState = await stateProvider.read(stage);
         for (const s of missing) {
           const wName = stageState?.workers[s.worker]?.name;
           if (!wName) {
@@ -378,11 +600,16 @@ async function main() {
       if (!stage) throw new Error("--stage is required");
       const config = await loadConfig(rootDir);
       const wrangler = createWranglerRunner();
-      const stateProvider = resolveStateProvider(rootDir, config.state);
+      const stateProvider = resolveStateProvider(rootDir, config.state, resolveStatePassword(config, projectContext));
       const statuses = await checkSecrets(
         { stage },
         { rootDir, config, state: stateProvider, wrangler },
       );
+
+      if (wantsJsonOutput()) {
+        printJson({ stage, statuses });
+        break;
+      }
 
       console.log(`\n  wrangler-deploy secrets --stage ${stage}\n`);
 
@@ -411,18 +638,60 @@ async function main() {
       if (!stage) throw new Error("--stage is required");
       const config = await loadConfig(rootDir);
       const wrangler = createWranglerRunner();
-      const stateProvider = resolveStateProvider(rootDir, config.state);
-      await deploy(
+      const stateProvider = resolveStateProvider(rootDir, config.state, resolveStatePassword(config, projectContext));
+      const logger = wantsJsonOutput() ? silentLogger : console;
+
+      if (isDryRun(args)) {
+        const state = await stateProvider.read(stage);
+        if (!state) {
+          throw new Error(`No state found for stage "${stage}". Run apply first.`);
+        }
+
+        const missingSecrets = config.secrets
+          ? await validateSecrets({ stage }, { rootDir, config, state: stateProvider })
+          : [];
+        const result = {
+          stage,
+          dryRun: true,
+          deployOrder: resolveDeployOrder(config),
+          missingSecrets,
+          workers: resolveDeployOrder(config).map((workerPath) => ({
+            workerPath,
+            deployedName: state.workers[workerPath]?.name ?? null,
+          })),
+        };
+        if (wantsJsonOutput()) {
+          printJson(result);
+        } else {
+          console.log(`\n  wrangler-deploy deploy --stage ${stage} --dry-run\n`);
+          for (const workerPath of result.deployOrder) {
+            const workerState = state.workers[workerPath];
+            console.log(`  would deploy ${workerState?.name ?? workerPath}`);
+          }
+          if (missingSecrets.length > 0) {
+            console.log(`\n  Missing secrets:`);
+            for (const secret of missingSecrets) console.log(`    x ${secret}`);
+          }
+          console.log(`\n  Preview only — no workers were deployed.\n`);
+        }
+        break;
+      }
+
+      const result = await deploy(
         { stage, verify: hasFlag("verify") },
         {
           rootDir,
           config,
           state: stateProvider,
           wrangler,
+          logger,
           validateSecretsFn: validateSecrets,
           verifyFn: verify,
         },
       );
+      if (wantsJsonOutput()) {
+        printJson(result);
+      }
       break;
     }
 
@@ -430,11 +699,68 @@ async function main() {
       if (!stage) throw new Error("--stage is required");
       const config = await loadConfig(rootDir);
       const wrangler = createWranglerRunner();
-      const stateProvider = resolveStateProvider(rootDir, config.state);
-      await destroy(
+      const stateProvider = resolveStateProvider(rootDir, config.state, resolveStatePassword(config, projectContext));
+      const logger = wantsJsonOutput() ? silentLogger : console;
+
+      if (isDryRun(args)) {
+        const state = await stateProvider.read(stage);
+        if (!state) {
+          const result = { stage, dryRun: true, resources: [], workers: [], detachedConsumers: [] };
+          if (wantsJsonOutput()) {
+            printJson(result);
+          } else {
+            console.log(`  No state found for stage "${stage}". Nothing to destroy.`);
+          }
+          break;
+        }
+
+        const workers = [...resolveDeployOrder(config)].reverse().filter((workerPath) => state.workers[workerPath]);
+        const resources = Object.values(state.resources as Record<string, { source?: string; props: { name: string }; type: string }>).filter((resource) => resource.source === "managed");
+        const detachedConsumers: Array<{ queue: string; worker: string }> = [];
+        for (const [logicalName, resource] of Object.entries(config.resources as Record<string, { type: string; bindings: Record<string, unknown> }>)) {
+          if (resource.type !== "queue") continue;
+          const stateResource = state.resources[logicalName];
+          const queueName = stateResource?.props.name;
+          if (!queueName) continue;
+          for (const [workerPath, binding] of Object.entries(resource.bindings)) {
+            if (binding && typeof binding === "object" && "consumer" in binding && state.workers[workerPath]) {
+              detachedConsumers.push({ queue: queueName, worker: state.workers[workerPath]!.name });
+            }
+          }
+        }
+
+        const result = {
+          stage,
+          dryRun: true,
+          workers,
+          resources: resources.map((resource) => ({
+            name: resource.props.name,
+            type: resource.type,
+          })),
+          detachedConsumers,
+        };
+        if (wantsJsonOutput()) {
+          printJson(result);
+        } else {
+          console.log(`\n  wrangler-deploy destroy --stage ${stage} --dry-run\n`);
+          for (const workerPath of workers) {
+            console.log(`  would delete worker ${state.workers[workerPath]?.name ?? workerPath}`);
+          }
+          for (const resource of result.resources) {
+            console.log(`  would delete ${resource.name} (${resource.type})`);
+          }
+          console.log(`\n  Preview only — no resources were changed.\n`);
+        }
+        break;
+      }
+
+      const result = await destroy(
         { stage, force: hasFlag("force") },
-        { rootDir, config, state: stateProvider, wrangler },
+        { rootDir, config, state: stateProvider, wrangler, logger },
       );
+      if (wantsJsonOutput()) {
+        printJson(result);
+      }
       break;
     }
 
@@ -445,8 +771,8 @@ async function main() {
         const pack = getFlag("pack");
         const result = await verifyLocal({ rootDir, config, pack });
 
-        if (hasFlag("json-report")) {
-          console.log(JSON.stringify(result, null, 2));
+        if (hasFlag("json-report") || wantsJsonOutput()) {
+          printJson(result);
           if (!result.passed) process.exit(1);
           break;
         }
@@ -470,8 +796,14 @@ async function main() {
 
       if (!stage) throw new Error("--stage is required");
       const config = await loadConfig(rootDir);
-      const stateProvider = resolveStateProvider(rootDir, config.state);
+      const stateProvider = resolveStateProvider(rootDir, config.state, resolveStatePassword(config, projectContext));
       const result = await verify({ stage }, { rootDir, config, state: stateProvider });
+
+      if (wantsJsonOutput()) {
+        printJson(result);
+        if (!result.passed) process.exit(1);
+        break;
+      }
 
       console.log(`\n  wrangler-deploy verify --stage ${stage}\n`);
       for (const check of result.checks) {
@@ -494,6 +826,10 @@ async function main() {
 
       if (subCmd === "list") {
         const snapshots = listSnapshots(rootDir);
+        if (wantsJsonOutput()) {
+          printJson({ snapshots });
+          break;
+        }
         if (snapshots.length === 0) {
           console.log("\n  No snapshots saved.\n");
           break;
@@ -514,6 +850,10 @@ async function main() {
           process.exit(1);
         }
         const snapshot = saveSnapshot(config, rootDir, name);
+        if (wantsJsonOutput()) {
+          printJson(snapshot);
+          break;
+        }
         console.log(`\n  snapshot saved: ${snapshot.name}`);
         console.log(`  sources: ${snapshot.sources.join(", ")}\n`);
         break;
@@ -525,6 +865,10 @@ async function main() {
           process.exit(1);
         }
         const snapshot = loadSnapshot(rootDir, name);
+        if (wantsJsonOutput()) {
+          printJson(snapshot);
+          break;
+        }
         console.log(`\n  snapshot loaded: ${snapshot.name}`);
         console.log(`  sources: ${snapshot.sources.join(", ")}\n`);
         break;
@@ -537,8 +881,13 @@ async function main() {
     case "gc": {
       const config = await loadConfig(rootDir);
       const wrangler = createWranglerRunner();
-      const stateProvider = resolveStateProvider(rootDir, config.state);
-      const result = await gc({}, { rootDir, config, state: stateProvider, wrangler });
+      const stateProvider = resolveStateProvider(rootDir, config.state, resolveStatePassword(config, projectContext));
+      const result = await gc({}, { rootDir, config, state: stateProvider, wrangler, logger: wantsJsonOutput() ? silentLogger : console });
+
+      if (wantsJsonOutput()) {
+        printJson(result);
+        break;
+      }
 
       console.log(`\n  wrangler-deploy gc\n`);
       for (const s of result.destroyed) console.log(`  - ${s} (destroyed — TTL expired)`);
@@ -552,9 +901,13 @@ async function main() {
 
     case "status": {
       const config = await loadConfig(rootDir);
-      const stateProvider = resolveStateProvider(rootDir, config.state);
+      const stateProvider = resolveStateProvider(rootDir, config.state, resolveStatePassword(config, projectContext));
       if (stage) {
         const stageState = await stateProvider.read(stage);
+        if (wantsJsonOutput()) {
+          printJson({ stage, state: stageState });
+          return;
+        }
         if (!stageState) {
           console.log(`  No state found for stage "${stage}".`);
           return;
@@ -565,7 +918,7 @@ async function main() {
         console.log(`\n  Resources:`);
         for (const [_name, r] of Object.entries(stageState.resources)) {
           console.log(
-            `    ${r.observed.status === "active" ? "+" : "-"} ${r.desired.name} (${r.type}) — ${r.observed.status}`,
+            `    ${r.lifecycleStatus === "created" || r.lifecycleStatus === "updated" ? "+" : "-"} ${r.props.name} (${r.type}) — ${r.lifecycleStatus}`,
           );
         }
         console.log(`\n  Workers:`);
@@ -575,6 +928,15 @@ async function main() {
         console.log("");
       } else {
         const stages = await stateProvider.list();
+        if (wantsJsonOutput()) {
+          const details: Array<{ stage: string; state: NonNullable<Awaited<ReturnType<typeof stateProvider.read>>> }> = [];
+          for (const name of stages) {
+            const state = await stateProvider.read(name);
+            if (state) details.push({ stage: name, state });
+          }
+          printJson({ stages: details });
+          return;
+        }
         if (stages.length === 0) {
           console.log("  No stages found.");
           return;
@@ -593,69 +955,79 @@ async function main() {
     }
 
     case "graph": {
-  const format = getFlag("format") ?? "ascii";
-  const config = await loadConfig(rootDir);
-  let state;
-  if (stage) {
-    const stateProvider = resolveStateProvider(rootDir, config.state);
-    state = await stateProvider.read(stage) ?? undefined;
-    if (!state) {
-      console.log(`  ⚠ No state found for stage "${stage}" — showing config-only topology`);
-    }
-  }
+      const format = getFlag("format") ?? "ascii";
+      const config = await loadConfig(rootDir);
+      let state;
+      if (stage) {
+        const stateProvider = resolveStateProvider(rootDir, config.state, resolveStatePassword(config, projectContext));
+        state = (await stateProvider.read(stage)) ?? undefined;
+        if (!state && !wantsJsonOutput()) {
+          console.log(`  ⚠ No state found for stage "${stage}" — showing config-only topology`);
+        }
+      }
 
-  const graph = buildRichGraph(config, state);
-  const renderers: Record<string, (g: typeof graph) => string> = { ascii: renderAscii, mermaid: renderMermaid, dot: renderDot, json: renderJson };
-  const renderer = renderers[format];
-  if (!renderer) {
-    console.error(`  ✗ Unknown format "${format}". Use: ascii, mermaid, dot, json`);
-    process.exit(1);
-  }
-  console.log(renderer(graph));
-  break;
-}
+      const graph = buildRichGraph(config, state);
+      if (format === "json" || wantsJsonOutput()) {
+        printJson(graph);
+        break;
+      }
+
+      const renderers: Record<string, (g: typeof graph) => string> = { ascii: renderAscii, mermaid: renderMermaid, dot: renderDot };
+      const renderer = renderers[format];
+      if (!renderer) {
+        console.error(`  ✗ Unknown format "${format}". Use: ascii, mermaid, dot, json`);
+        process.exit(1);
+      }
+      console.log(renderer(graph));
+      break;
+    }
 
     case "impact": {
-  const target = args[1];
-  if (!target) {
-    console.error("  ✗ Usage: wd impact <worker-path>");
-    process.exit(1);
-  }
-  const config = await loadConfig(rootDir);
+      const target = args[1];
+      if (!target) {
+        console.error("  ✗ Usage: wd impact <worker-path>");
+        process.exit(1);
+      }
+      const config = await loadConfig(rootDir);
 
-  const graph = buildRichGraph(config);
-  const result = analyzeImpact(graph, target);
+      const graph = buildRichGraph(config);
+      const result = analyzeImpact(graph, target);
 
-  console.log(`\n  Impact analysis for ${target}\n`);
-  if (result.upstream.length > 0) {
-    console.log("  Upstream (depends on):");
-    for (const dep of result.upstream) {
-      const shared = dep.sharedWith.length > 0 ? ` → shared with ${dep.sharedWith.join(", ")}` : " → exclusive";
-      console.log(`    ${dep.id}${shared}`);
+      if (wantsJsonOutput()) {
+        printJson(result);
+        break;
+      }
+
+      console.log(`\n  Impact analysis for ${target}\n`);
+      if (result.upstream.length > 0) {
+        console.log("  Upstream (depends on):");
+        for (const dep of result.upstream) {
+          const shared = dep.sharedWith.length > 0 ? ` → shared with ${dep.sharedWith.join(", ")}` : " → exclusive";
+          console.log(`    ${dep.id}${shared}`);
+        }
+      }
+      if (result.downstream.length > 0) {
+        console.log("\n  Downstream (depended on by):");
+        for (const dep of result.downstream) {
+          const label = dep.label ? ` → ${dep.label} ${dep.relationship}` : ` → ${dep.relationship}`;
+          console.log(`    ${dep.id}${label}`);
+        }
+      }
+      if (result.consequences.length > 0) {
+        console.log(`\n  If ${target} is unavailable:`);
+        for (const c of result.consequences) {
+          console.log(`    ${c}`);
+        }
+      }
+      console.log("");
+      break;
     }
-  }
-  if (result.downstream.length > 0) {
-    console.log("\n  Downstream (depended on by):");
-    for (const dep of result.downstream) {
-      const label = dep.label ? ` → ${dep.label} ${dep.relationship}` : ` → ${dep.relationship}`;
-      console.log(`    ${dep.id}${label}`);
-    }
-  }
-  if (result.consequences.length > 0) {
-    console.log(`\n  If ${target} is unavailable:`);
-    for (const c of result.consequences) {
-      console.log(`    ${c}`);
-    }
-  }
-  console.log("");
-  break;
-}
 
     case "dev": {
       const subCmd = args[1];
       if (subCmd === "doctor") {
         const config = await loadConfig(rootDir);
-        const checks = runDevDoctor(config, rootDir, {
+        const checks = await runDevDoctor(config, rootDir, {
           workerExists: (workerPath) =>
             existsSync(resolve(rootDir, workerPath, "wrangler.jsonc")) ||
             existsSync(resolve(rootDir, workerPath, "wrangler.json")),
@@ -675,7 +1047,7 @@ async function main() {
 
       if (subCmd === "ui") {
         const config = await loadConfig(rootDir);
-        const port = getFlag("port") ? Number.parseInt(getFlag("port")!, 10) : 8899;
+      const port = getFlag("port") ? Number.parseInt(getFlag("port")!, 10) : projectContext.basePort ?? 8899;
         const ui = await startDevUi(config, rootDir, port);
         console.log(`\n  dev ui -> http://127.0.0.1:${ui.port}\n`);
         const shutdown = async () => {
@@ -689,18 +1061,27 @@ async function main() {
       }
 
       const filter = getFlag("filter");
-      const basePort = getFlag("port") ? parseInt(getFlag("port")!, 10) : undefined;
-      const session = hasFlag("session");
-      const persistTo = getFlag("persist-to");
       const config = await loadConfig(rootDir);
-      const plan = buildDevPlan(config, rootDir, {
+      const fallbackStage = getFlag("fallback-stage") ?? projectContext.fallbackStage ?? config.dev?.fallbackStage;
+      const basePort = getFlag("port") ? parseInt(getFlag("port")!, 10) : projectContext.basePort;
+      const session = hasFlag("session") ? true : projectContext.session;
+      const persistTo = getFlag("persist-to") ?? projectContext.persistTo;
+
+      const stateProvider = (stage || fallbackStage)
+        ? resolveStateProvider(rootDir, config.state, resolveStatePassword(config, projectContext))
+        : undefined;
+
+      const plan = await buildDevPlan(config, rootDir, {
         basePort,
         filter: filter ?? undefined,
+        stage: stage ?? undefined,
+        fallbackStage: fallbackStage ?? undefined,
+        stateProvider,
         session,
         persistTo,
       });
       const logDir = resolveDevLogDir(rootDir);
-      const handle = await startDev(plan, { logDir });
+      const handle = await startDev(plan, { logDir, rootDir });
       const sessionLogFile = plan.session ? logFilePathForTarget(logDir, "wrangler") : undefined;
       writeActiveDevState(rootDir, {
         mode: plan.mode,
@@ -747,7 +1128,7 @@ async function main() {
 
       const port = getFlag("port")
         ? Number.parseInt(getFlag("port")!, 10)
-        : resolvePlannedWorkerPort(config, rootDir, workerPath);
+        : await resolvePlannedWorkerPort(config, rootDir, workerPath);
       const cron = getFlag("cron");
       const time = getFlag("time");
       const path = getFlag("path");
@@ -836,6 +1217,10 @@ async function main() {
 
       const config = await loadConfig(rootDir);
       const fixtures = listFixtures(config);
+      if (wantsJsonOutput()) {
+        printJson({ fixtures });
+        break;
+      }
       if (fixtures.length === 0) {
         console.log("\n  No fixtures declared.\n");
         break;
@@ -870,11 +1255,16 @@ async function main() {
 
       if (subCmd === "routes") {
         const config = await loadConfig(rootDir);
-        const routes = listWorkerRoutes(config, rootDir)
+        const routes = (await listWorkerRoutes(config, rootDir))
           .filter((route) => !workerPath || route.workerPath === workerPath);
         if (routes.length === 0) {
           console.error(`  ✗ Unknown worker "${workerPath}"`);
           process.exit(1);
+        }
+
+        if (wantsJsonOutput()) {
+          printJson({ routes });
+          break;
         }
 
         console.log("\n  Worker routes\n");
@@ -953,6 +1343,12 @@ async function main() {
           headers: Object.keys(headers).length > 0 ? headers : undefined,
           body,
         });
+
+        if (wantsJsonOutput()) {
+          printJson(result);
+          return;
+        }
+
         console.log(`\n  worker ${result.target.workerPath}`);
         console.log(`  ${result.method} ${result.target.url}`);
         console.log(`  ${result.status}`);
@@ -1001,6 +1397,10 @@ async function main() {
 
       if (subCmd === "list") {
         const databases = listD1Databases(config);
+        if (wantsJsonOutput()) {
+          printJson({ databases });
+          break;
+        }
         if (databases.length === 0) {
           console.log("\n  No D1 databases declared.\n");
           break;
@@ -1024,6 +1424,12 @@ async function main() {
           console.error(`  ✗ Unknown D1 database "${logicalName}"`);
           process.exit(1);
         }
+
+        if (wantsJsonOutput()) {
+          printJson({ database });
+          break;
+        }
+
         console.log(`\n  D1: ${database.logicalName}\n`);
         console.log(`  bindings: ${database.bindings.map((binding) => `${binding.workerPath}:${binding.binding}`).join(", ")}`);
         const workflow = config.dev?.d1?.[logicalName];
@@ -1065,6 +1471,10 @@ async function main() {
           sql,
           file,
         });
+        if (wantsJsonOutput()) {
+          printJson(result);
+          break;
+        }
         console.log(`\n  d1 ${resolvedDatabase} -> ${result.target.workerPath}`);
         console.log(`  ${result.output}\n`);
         break;
@@ -1084,6 +1494,10 @@ async function main() {
           worker,
           file,
         });
+        if (wantsJsonOutput()) {
+          printJson(result);
+          break;
+        }
         console.log(`\n  d1 ${subCmd} ${resolvedDatabase} -> ${result.target.workerPath}`);
         console.log(`  ${result.output}\n`);
         break;
@@ -1100,6 +1514,10 @@ async function main() {
 
       if (subCmd === "list") {
         const routes = listQueueRoutes(config);
+        if (wantsJsonOutput()) {
+          printJson({ routes });
+          break;
+        }
         if (routes.length === 0) {
           console.log("\n  No queues declared.\n");
           break;
@@ -1131,6 +1549,11 @@ async function main() {
           process.exit(1);
         }
 
+        if (wantsJsonOutput()) {
+          printJson({ route });
+          break;
+        }
+
         console.log(`\n  Queue: ${route.logicalName}\n`);
         console.log(`  producers: ${route.producers.map((producer) => `${producer.workerPath}:${producer.binding}`).join(", ") || "none"}`);
         console.log(`  consumers: ${route.consumers.map((consumer) => consumer.workerPath).join(", ") || "none"}`);
@@ -1152,15 +1575,15 @@ async function main() {
           process.exit(1);
         }
 
-        const inlinePayload = getFlag("json");
-        const filePayload = getFlag("file");
+        const inlinePayload = getFlag("payload");
+        const filePayload = getFlag("payload-file");
         const fixturePayload = fixture?.payload;
         if (!inlinePayload && !filePayload && !fixturePayload) {
-          console.error("  ✗ queue send requires --json, --file, or a queue fixture");
+          console.error("  ✗ queue send requires --payload, --payload-file, or a queue fixture");
           process.exit(1);
         }
         if (inlinePayload && filePayload) {
-          console.error("  ✗ Use only one of --json or --file");
+          console.error("  ✗ Use only one of --payload or --payload-file");
           process.exit(1);
         }
 
@@ -1177,6 +1600,12 @@ async function main() {
             port,
             path,
           });
+
+          if (wantsJsonOutput()) {
+            printJson(result);
+            return;
+          }
+
           console.log(`\n  queue ${resolvedQueue} -> ${result.target.workerPath}`);
           console.log(`  ${result.status} ${result.target.url}`);
           if (result.body.trim()) console.log(`  ${result.body.trim()}`);
@@ -1237,6 +1666,11 @@ async function main() {
         });
 
         const failures = result.results.filter((entry) => !entry.ok);
+        if (wantsJsonOutput()) {
+          printJson(result);
+          if (failures.length > 0) process.exit(1);
+          break;
+        }
         console.log(`\n  replay ${logicalName} -> ${result.target.workerPath}`);
         console.log(`  sent ${result.sent} message(s) to ${result.target.url}`);
         if (failures.length > 0) {
@@ -1319,7 +1753,7 @@ async function main() {
     if (!ci) { console.error("  ✗ Not in supported CI"); process.exit(1); }
     if (!ci.prNumber) { console.log("  ⚠ Not a PR — skipping"); break; }
     const config = await loadConfig(rootDir);
-    const stateProvider = resolveStateProvider(rootDir, config.state);
+    const stateProvider = resolveStateProvider(rootDir, config.state, resolveStatePassword(config, projectContext));
     const state = await stateProvider.read(stage);
     if (!state) { console.error(`  ✗ No state for "${stage}"`); process.exit(1); }
     const comment = buildPrComment(config, state);
@@ -1332,7 +1766,7 @@ async function main() {
     const ci = detectCiEnvironment(process.env as Record<string, string>);
     if (!ci) { console.error("  ✗ Not in supported CI"); process.exit(1); }
     const config = await loadConfig(rootDir);
-    const stateProvider = resolveStateProvider(rootDir, config.state);
+    const stateProvider = resolveStateProvider(rootDir, config.state, resolveStatePassword(config, projectContext));
     const state = await stateProvider.read(stage);
     const ghProvider = createGitHubProvider(ci);
     const result = await postCheckRun(ghProvider, stage, state);
@@ -1349,51 +1783,51 @@ async function main() {
 }
 
     case "diff": {
-  const stageA = args[1];
-  const stageB = args[2];
-  if (!stageA || !stageB) {
-    console.error("  ✗ Usage: wd diff <stage-a> <stage-b>");
-    process.exit(1);
-  }
-  const config = await loadConfig(rootDir);
-  const stateProvider = resolveStateProvider(rootDir, config.state);
-  const a = await stateProvider.read(stageA);
-  const b = await stateProvider.read(stageB);
-  if (!a) { console.error(`  ✗ No state found for stage "${stageA}"`); process.exit(1); }
-  if (!b) { console.error(`  ✗ No state found for stage "${stageB}"`); process.exit(1); }
+      const stageA = args[1];
+      const stageB = args[2];
+      if (!stageA || !stageB) {
+        console.error("  ✗ Usage: wd diff <stage-a> <stage-b>");
+        process.exit(1);
+      }
+      const config = await loadConfig(rootDir);
+      const stateProvider = resolveStateProvider(rootDir, config.state, resolveStatePassword(config, projectContext));
+      const a = await stateProvider.read(stageA);
+      const b = await stateProvider.read(stageB);
+      if (!a) { console.error(`  ✗ No state found for stage "${stageA}"`); process.exit(1); }
+      if (!b) { console.error(`  ✗ No state found for stage "${stageB}"`); process.exit(1); }
 
-  const result = diffStages(a, b);
-  const format = getFlag("format");
+      const result = diffStages(a, b);
+      const format = getFlag("format");
 
-  if (format === "json") {
-    console.log(JSON.stringify(result, null, 2));
-    break;
-  }
+      if (format === "json" || wantsJsonOutput()) {
+        printJson(result);
+        break;
+      }
 
-  console.log(`\n  Diff: ${stageA} vs ${stageB}\n`);
-  if (result.resources.length > 0) {
-    console.log("  Resources:");
-    for (const r of result.resources) {
-      const icon = r.status === "same" ? "=" : r.status === "only-in-a" ? "+" : r.status === "only-in-b" ? "-" : "~";
-      console.log(`    ${icon} ${r.name} (${r.type}) — ${r.status}`);
+      console.log(`\n  Diff: ${stageA} vs ${stageB}\n`);
+      if (result.resources.length > 0) {
+        console.log("  Resources:");
+        for (const r of result.resources) {
+          const icon = r.status === "same" ? "=" : r.status === "only-in-a" ? "+" : r.status === "only-in-b" ? "-" : "~";
+          console.log(`    ${icon} ${r.name} (${r.type}) — ${r.status}`);
+        }
+      }
+      if (result.workers.length > 0) {
+        console.log("\n  Workers:");
+        for (const w of result.workers) {
+          const icon = w.status === "same" ? "=" : w.status === "only-in-a" ? "+" : "-";
+          console.log(`    ${icon} ${w.path} — ${w.status}`);
+        }
+      }
+      if (result.secrets.length > 0) {
+        console.log("\n  Secrets:");
+        for (const s of result.secrets) {
+          console.log(`    ~ ${s.worker}/${s.name}: ${stageA}=${s.inA}, ${stageB}=${s.inB}`);
+        }
+      }
+      console.log("");
+      break;
     }
-  }
-  if (result.workers.length > 0) {
-    console.log("\n  Workers:");
-    for (const w of result.workers) {
-      const icon = w.status === "same" ? "=" : w.status === "only-in-a" ? "+" : "-";
-      console.log(`    ${icon} ${w.path} — ${w.status}`);
-    }
-  }
-  if (result.secrets.length > 0) {
-    console.log("\n  Secrets:");
-    for (const s of result.secrets) {
-      console.log(`    ~ ${s.worker}/${s.name}: ${stageA}=${s.inA}, ${stageB}=${s.inB}`);
-    }
-  }
-  console.log("");
-  break;
-}
 
     case "doctor": {
       const config = await loadConfig(rootDir);
@@ -1405,6 +1839,10 @@ async function main() {
       };
 
       const checks = runDoctor(config, deps);
+      if (wantsJsonOutput()) {
+        printJson({ checks });
+        break;
+      }
       console.log("\n  wrangler-deploy doctor\n");
       for (const check of checks) {
         const icon = check.status === "pass" ? "✓" : check.status === "warn" ? "⚠" : "✗";
@@ -1425,6 +1863,187 @@ async function main() {
       break;
     }
 
+    case "schema": {
+      printJson(cliManifest);
+      break;
+    }
+
+    case "context": {
+      const subCommand = args[1];
+
+      if (subCommand === "get") {
+        const validKeys: Array<keyof ProjectContext> = [
+          "stage",
+          "fallbackStage",
+          "basePort",
+          "filter",
+          "session",
+          "persistTo",
+          "accountId",
+          "databaseUrl",
+          "statePassword",
+        ];
+        const keyName = getFlag("key") ?? args[2];
+        if (!keyName || !validKeys.includes(keyName as keyof ProjectContext)) {
+          throw new Error(`context get requires one of: ${validKeys.join(", ")}`);
+        }
+
+        const value = getProjectContextValue(rootDir, keyName as keyof ProjectContext);
+        const result = { key: keyName, value };
+        if (wantsJsonOutput()) {
+          printJson(result);
+          break;
+        }
+
+        console.log("\n  wrangler-deploy context get\n");
+        console.log(`  ${keyName}: ${JSON.stringify(value)}`);
+        console.log("");
+        break;
+      }
+
+      if (subCommand === "set") {
+        const updates: Record<string, unknown> = {};
+        const basePort = getFlag("base-port");
+        if (getFlag("stage") !== undefined) updates.stage = getFlag("stage");
+        if (getFlag("fallback-stage") !== undefined) updates.fallbackStage = getFlag("fallback-stage");
+        if (basePort !== undefined) updates.basePort = Number.parseInt(basePort, 10);
+        if (getFlag("filter") !== undefined) updates.filter = getFlag("filter");
+        if (hasFlag("session")) updates.session = true;
+        if (getFlag("persist-to") !== undefined) updates.persistTo = getFlag("persist-to");
+        if (getFlag("account-id") !== undefined) updates.accountId = getFlag("account-id");
+        if (getFlag("database-url") !== undefined) updates.databaseUrl = getFlag("database-url");
+        if (getFlag("state-password") !== undefined) updates.statePassword = getFlag("state-password");
+
+        if (Object.keys(updates).length === 0) {
+          throw new Error(
+            "context set requires at least one flag: --stage, --fallback-stage, --base-port, --filter, --session, --persist-to, --account-id, --database-url, or --state-password",
+          );
+        }
+
+        const result = writeProjectContext(rootDir, updates as Partial<{
+          stage: string;
+          fallbackStage: string;
+          basePort: number;
+          filter: string;
+          session: boolean;
+          persistTo: string;
+          accountId: string;
+          databaseUrl: string;
+          statePassword: string;
+        }>);
+
+        if (wantsJsonOutput()) {
+          printJson(result);
+          break;
+        }
+
+        console.log("\n  wrangler-deploy context set\n");
+        console.log(`  file: ${result.path}`);
+        for (const [key, value] of Object.entries(result.context)) {
+          console.log(`  ${key}: ${JSON.stringify(value)}`);
+        }
+        console.log("");
+        break;
+      }
+
+      if (subCommand === "unset") {
+        const keys: Array<keyof ProjectContext> = [];
+        if (hasFlag("stage")) keys.push("stage");
+        if (hasFlag("fallback-stage")) keys.push("fallbackStage");
+        if (hasFlag("base-port")) keys.push("basePort");
+        if (hasFlag("filter")) keys.push("filter");
+        if (hasFlag("session")) keys.push("session");
+        if (hasFlag("persist-to")) keys.push("persistTo");
+        if (hasFlag("account-id")) keys.push("accountId");
+        if (hasFlag("database-url")) keys.push("databaseUrl");
+        if (hasFlag("state-password")) keys.push("statePassword");
+
+        if (keys.length === 0) {
+          throw new Error(
+            "context unset requires at least one flag: --stage, --fallback-stage, --base-port, --filter, --session, --persist-to, --account-id, --database-url, or --state-password",
+          );
+        }
+
+        const result = unsetProjectContext(rootDir, keys);
+        if (wantsJsonOutput()) {
+          printJson(result);
+          break;
+        }
+
+        console.log("\n  wrangler-deploy context unset\n");
+        console.log(`  file: ${result.path}`);
+        if (Object.keys(result.context).length === 0) {
+          console.log("  (defaults cleared)");
+        } else {
+          for (const [key, value] of Object.entries(result.context)) {
+            console.log(`  ${key}: ${JSON.stringify(value)}`);
+          }
+        }
+        console.log("");
+        break;
+      }
+
+      if (subCommand === "clear") {
+        const result = clearProjectContext(rootDir);
+        if (wantsJsonOutput()) {
+          printJson(result);
+          break;
+        }
+
+        console.log("\n  wrangler-deploy context clear\n");
+        console.log(`  file: ${result.path}`);
+        console.log("  defaults cleared\n");
+        break;
+      }
+
+      const details = {
+        path: projectContextDetails.path ?? null,
+        context: projectContext,
+      };
+
+      if (wantsJsonOutput()) {
+        printJson(details);
+        break;
+      }
+
+      console.log("\n  wrangler-deploy context\n");
+      console.log(`  file: ${details.path ?? "none"}`);
+      for (const [key, value] of Object.entries(details.context)) {
+        console.log(`  ${key}: ${JSON.stringify(value)}`);
+      }
+      if (Object.keys(details.context).length === 0) {
+        console.log("  (no defaults found)");
+      }
+      console.log("");
+      break;
+    }
+
+    case "tools": {
+      const tools = cliManifest.commands.map((entry) => ({
+        name: entry.subcommands?.length ? `wd ${entry.name} ${entry.subcommands[0]}` : `wd ${entry.name}`,
+        description: entry.description,
+        mutating: entry.mutating ?? false,
+        output: entry.output ?? "text",
+        flags: entry.flags ?? [],
+        subcommands: entry.subcommands ?? [],
+      }));
+
+      if (wantsJsonOutput()) {
+        printJson({ package: cliManifest.package, version: cliManifest.version, tools });
+        break;
+      }
+
+      console.log("\n  wrangler-deploy tools\n");
+      for (const tool of tools) {
+        console.log(`  ${tool.name}`);
+        console.log(`    ${tool.description}`);
+        if (tool.flags.length > 0) console.log(`    flags: ${tool.flags.join(", ")}`);
+        if (tool.subcommands.length > 0) console.log(`    subcommands: ${tool.subcommands.join(", ")}`);
+      }
+      console.log("");
+      break;
+    }
+
     default:
       console.error(`Unknown command: ${command}. Run "wrangler-deploy help" for usage.`);
       process.exit(1);
@@ -1432,6 +2051,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error(`\n  Error: ${(err as Error).message}\n`);
+  console.error(`\n  Error: ${formatCliError(err)}\n`);
   process.exit(1);
 });

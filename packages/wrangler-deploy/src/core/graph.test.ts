@@ -65,6 +65,30 @@ describe("buildGraph", () => {
     const apiNode = graph.find((n) => n.id === "apps/api");
     expect(apiNode?.dependsOn).toContain("cache");
   });
+
+  it("ignores unbound managed resources when building worker edges", ({ task }) => {
+    story.init(task);
+
+    const config: CfStageConfig = {
+      version: 1,
+      workers: ["apps/api"],
+      resources: {
+        embeddings: {
+          type: "vectorize",
+          bindings: {},
+          dimensions: 1536,
+          metric: "cosine",
+        },
+      },
+    };
+
+    story.given("a config with an unbound vectorize resource");
+    const graph = buildGraph(config);
+
+    story.then("worker graph still builds without depending on the vector index");
+    const apiNode = graph.find((n) => n.id === "apps/api");
+    expect(apiNode?.dependsOn).toEqual([]);
+  });
 });
 
 describe("validateGraph", () => {

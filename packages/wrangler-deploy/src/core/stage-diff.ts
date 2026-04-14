@@ -1,4 +1,5 @@
 import type { StageState } from "../types.js";
+import { resourceId } from "../types.js";
 
 export interface ResourceDiff {
   name: string;
@@ -47,14 +48,14 @@ export function diffStages(a: StageState, b: StageState): StageDiffResult {
         name,
         type: ra.type,
         status: "only-in-a",
-        idA: ra.observed.id,
+        idA: resourceId(ra),
       });
     } else if (!ra && rb) {
       resources.push({
         name,
         type: rb.type,
         status: "only-in-b",
-        idB: rb.observed.id,
+        idB: resourceId(rb),
       });
     } else if (ra && rb) {
       const status = ra.type !== rb.type ? "different" : "same";
@@ -62,8 +63,8 @@ export function diffStages(a: StageState, b: StageState): StageDiffResult {
         name,
         type: ra.type,
         status,
-        ...(ra.observed.id !== undefined ? { idA: ra.observed.id } : {}),
-        ...(rb.observed.id !== undefined ? { idB: rb.observed.id } : {}),
+        ...(resourceId(ra) !== undefined ? { idA: resourceId(ra) } : {}),
+        ...(resourceId(rb) !== undefined ? { idB: resourceId(rb) } : {}),
       });
     }
   }

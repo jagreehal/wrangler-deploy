@@ -13,6 +13,7 @@ describe("generateCompletions", () => {
     expect(result).toContain("compdef");
 
     story.then("output contains expected command names");
+    expect(result).toContain("create");
     expect(result).toContain("graph");
     expect(result).toContain("dev");
     expect(result).toContain("doctor");
@@ -30,6 +31,7 @@ describe("generateCompletions", () => {
     expect(result).toContain("complete -F");
 
     story.then("output contains expected command names");
+    expect(result).toContain("create");
     expect(result).toContain("graph");
     expect(result).toContain("dev");
     expect(result).toContain("doctor");
@@ -46,6 +48,7 @@ describe("generateCompletions", () => {
     expect(result).toContain("complete -c wd");
 
     story.then("output contains expected command names");
+    expect(result).toContain("create");
     expect(result).toContain("graph");
     expect(result).toContain("dev");
     expect(result).toContain("doctor");

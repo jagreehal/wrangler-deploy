@@ -3,7 +3,57 @@ title: CLI Commands
 description: Full CLI reference with example output
 ---
 
-Both `wrangler-deploy` and the short alias `wd` are available after install. The CLI is built for existing Wrangler projects, so the default assumption is that you already have `wrangler.jsonc` files and want to keep them.
+Both `wrangler-deploy` and the short alias `wd` are available after install. The CLI works for both new greenfield starters and existing Wrangler projects, so you can scaffold a fresh app or keep the `wrangler.jsonc` files you already have.
+
+## `wd create vite [directory]`
+
+Scaffold a new Vite-style starter project that already includes a worker API, a local Vite frontend, and a `wrangler-deploy.config.ts` file. Use this when you are starting greenfield instead of adopting an existing repo.
+
+```bash
+$ wd create vite my-app
+  Created vite starter in /repo/my-app
+  ✓ package.json
+  ✓ tsconfig.json
+  ✓ vite.config.ts
+  ✓ index.html
+  ✓ src/main.ts
+  ✓ src/style.css
+  ✓ workers/api/src/index.ts
+  ✓ workers/api/wrangler.jsonc
+  ✓ wrangler-deploy.config.ts
+  ✓ README.md
+  ✓ .gitignore
+```
+
+- `wd create vite` creates a starter in a new directory, defaulting to `cloudflare-vite-app` when you omit the directory
+- `--name` sets the package name and displayed project title
+- `--force` allows overwriting existing files in the target directory
+- `--json` returns the scaffold summary as machine-readable output
+
+## `wd context [get|set|unset|clear]`
+
+Manage project-level defaults in a `.wdrc` or `.wdrc.json` file at or above the repo root. This is useful when you want to stop repeating the same stage, account, or dev settings on every command.
+
+```bash
+$ wd context get stage
+  staging
+
+$ wd context set --stage staging --account-id 1234567890abcdef1234567890abcdef
+  file: /repo/.wdrc
+
+$ wd context unset --account-id
+  file: /repo/.wdrc
+
+$ wd context clear
+  file: /repo/.wdrc
+  defaults cleared
+```
+
+- `wd context get <key>` reads a single resolved default value
+- `wd context set` merges new defaults into the nearest existing context file or creates `.wdrc` at the repo root
+- `wd context unset` removes one or more keys from the file without touching the rest
+- `wd context clear` removes the file entirely
+- `--json` works for all four subcommands when you want machine-readable output
 
 ## `wd init`
 
@@ -307,9 +357,11 @@ $ wd diff staging production
 
 `--format json` for machine-readable output you can pipe into other tools.
 
-## `wd dev [--filter <worker>] [--port <base>] [--session] [--persist-to <path>]`
+## `wd dev [--stage <stage>] [--filter <worker>] [--port <base>] [--session] [--persist-to <path>]`
 
-Start all workers in local dev mode. Reads your existing `wrangler.jsonc` files as-is. Automatically resolves available dev and inspector ports so multi-worker setups work without conflicts.
+Start all workers in local dev mode. Reads your existing `wrangler.jsonc` files as-is, or uses the rendered stage configs when you pass `--stage`. Automatically resolves available dev and inspector ports so multi-worker setups work without conflicts.
+
+`--stage` is the normal way to make local dev line up with a stage you already applied. `wrangler.jsonc` remains the thing you author and keep in the repo. `--remote` is not the primary wrangler-deploy path.
 
 Wrangler can start these workers too. The benefit of `wd dev` is that it derives the worker set, dependency order, port map, companion processes, and session settings from one project config instead of leaving that orchestration to shell scripts or tribal knowledge.
 
@@ -332,10 +384,12 @@ Starting dev servers:
 
 (batch-workflow is included because api has a service binding to it.)
 
+If you already ran `wd apply --stage staging`, then `wd dev --stage staging` uses the rendered stage configs directly. That keeps local bindings aligned with deploy-time bindings, including D1, KV, R2, queue, and service bindings.
+
 Use `--session` for Cloudflare Queue local development sessions where producer and consumer workers need to share one Miniflare environment:
 
 ```bash
-$ wd dev --session --persist-to .wrangler/state
+$ wd dev --stage staging --session --persist-to .wrangler/state
 Starting local dev session:
   workers/api -> http://localhost:8787
   includes: workers/batch-workflow, workers/event-router
@@ -369,7 +423,7 @@ $ wd dev ui --port 8899
   dev ui -> http://127.0.0.1:8899
 ```
 
-The UI shows worker URLs, named endpoints, queue topology, D1 databases, verify packs, snapshots, recent history, and logs. It also lets you:
+The UI shows worker URLs, named endpoints, queue topology, D1 databases, verify packs, snapshots, recent history, logs, resolved project defaults, and agent metadata. It also lets you:
 
 - call named local endpoints
 - run fixture-backed worker, queue, and D1 actions
@@ -377,6 +431,8 @@ The UI shows worker URLs, named endpoints, queue topology, D1 databases, verify 
 - run local verify packs with pass/fail summaries
 - save and load local snapshots
 - replay recent local actions from the UI history
+
+The top of the dashboard includes the same `.wdrc` / `.wdrc.json` defaults and command manifest information exposed by `wd context`, `wd schema`, and `wd tools`.
 
 Use this when you want the repo-aware runtime workflow without memorizing commands during local debugging.
 

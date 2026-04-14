@@ -1,4 +1,5 @@
 import type { StageState, ResourceState } from "../types.js";
+import { resourceId, resourceStagedName } from "../types.js";
 import type { WranglerRunner } from "./wrangler-runner.js";
 
 export type DriftStatus = "in-sync" | "drifted" | "orphaned" | "missing";
@@ -41,12 +42,13 @@ function parseJsonArray(output: string): unknown[] {
  * Check if a KV namespace still exists and has the expected title.
  */
 function checkKv(resource: ResourceState, runner: WranglerRunner, cwd: string): DriftStatus {
-  if (!resource.observed.id) return "missing";
+  const rid = resourceId(resource);
+  if (!rid) return "missing";
   const output = wranglerList(runner, ["kv", "namespace", "list"], cwd);
   const namespaces = parseJsonArray(output) as Array<{ id: string; title: string }>;
-  const match = namespaces.find((ns) => ns.id === resource.observed.id);
+  const match = namespaces.find((ns) => ns.id === rid);
   if (!match) return "orphaned";
-  if (match.title === resource.desired.name) return "in-sync";
+  if (match.title === resourceStagedName(resource)) return "in-sync";
   return "drifted";
 }
 
@@ -56,7 +58,7 @@ function checkKv(resource: ResourceState, runner: WranglerRunner, cwd: string): 
 function checkQueue(resource: ResourceState, runner: WranglerRunner, cwd: string): DriftStatus {
   const output = wranglerList(runner, ["queues", "list"], cwd);
   const queues = parseJsonArray(output) as Array<{ queue_name: string }>;
-  if (queues.some((q) => q.queue_name === resource.desired.name)) return "in-sync";
+  if (queues.some((q) => q.queue_name === resourceStagedName(resource))) return "in-sync";
   return "orphaned";
 }
 
@@ -64,10 +66,11 @@ function checkQueue(resource: ResourceState, runner: WranglerRunner, cwd: string
  * Check if a Hyperdrive config still exists.
  */
 function checkHyperdrive(resource: ResourceState, runner: WranglerRunner, cwd: string): DriftStatus {
-  if (!resource.observed.id) return "missing";
+  const rid = resourceId(resource);
+  if (!rid) return "missing";
   const output = wranglerList(runner, ["hyperdrive", "list"], cwd);
   const configs = parseJsonArray(output) as Array<{ id: string }>;
-  if (configs.some((c) => c.id === resource.observed.id)) return "in-sync";
+  if (configs.some((c) => c.id === rid)) return "in-sync";
   return "orphaned";
 }
 
@@ -77,7 +80,7 @@ function checkHyperdrive(resource: ResourceState, runner: WranglerRunner, cwd: s
 function checkD1(resource: ResourceState, runner: WranglerRunner, cwd: string): DriftStatus {
   const output = wranglerList(runner, ["d1", "list", "--json"], cwd);
   const databases = parseJsonArray(output) as Array<{ name: string }>;
-  if (databases.some((db) => db.name === resource.desired.name)) return "in-sync";
+  if (databases.some((db) => db.name === resourceStagedName(resource))) return "in-sync";
   return "orphaned";
 }
 
@@ -87,7 +90,7 @@ function checkD1(resource: ResourceState, runner: WranglerRunner, cwd: string): 
 function checkR2(resource: ResourceState, runner: WranglerRunner, cwd: string): DriftStatus {
   const output = wranglerList(runner, ["r2", "bucket", "list"], cwd);
   const buckets = parseJsonArray(output) as Array<{ name: string }>;
-  if (buckets.some((b) => b.name === resource.desired.name)) return "in-sync";
+  if (buckets.some((b) => b.name === resourceStagedName(resource))) return "in-sync";
   return "orphaned";
 }
 
@@ -97,7 +100,7 @@ function checkR2(resource: ResourceState, runner: WranglerRunner, cwd: string): 
 function checkVectorize(resource: ResourceState, runner: WranglerRunner, cwd: string): DriftStatus {
   const output = wranglerList(runner, ["vectorize", "list"], cwd);
   const indexes = parseJsonArray(output) as Array<{ name: string }>;
-  if (indexes.some((v) => v.name === resource.desired.name)) return "in-sync";
+  if (indexes.some((v) => v.name === resourceStagedName(resource))) return "in-sync";
   return "orphaned";
 }
 
@@ -139,7 +142,7 @@ export function detectDrift(args: DetectDriftArgs, deps: DetectDriftDeps): Drift
       resource: name,
       type: resource.type,
       status,
-      details: status !== "in-sync" ? `Expected: ${resource.desired.name}` : undefined,
+      details: status !== "in-sync" ? `Expected: ${resourceStagedName(resource)}` : undefined,
     });
   }
 

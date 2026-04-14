@@ -70,7 +70,7 @@ describe("wd dev smoke test", () => {
   });
 
   it("starts a worker and responds to HTTP requests", async () => {
-    const plan = buildDevPlan(config, rootDir, { basePort: 8687, filter: "workers/hello" });
+    const plan = await buildDevPlan(config, rootDir, { basePort: 8687, filter: "workers/hello" });
     handle = await startDev(plan);
 
     const port = handle.ports["workers/hello"]!;
@@ -81,7 +81,7 @@ describe("wd dev smoke test", () => {
   }, 20_000);
 
   it("hot-reloads when the worker source changes", async () => {
-    const plan = buildDevPlan(config, rootDir, { basePort: 8689, filter: "workers/hello" });
+    const plan = await buildDevPlan(config, rootDir, { basePort: 8689, filter: "workers/hello" });
     handle = await startDev(plan);
 
     const port = handle.ports["workers/hello"]!;
@@ -96,7 +96,7 @@ describe("wd dev smoke test", () => {
   }, 30_000);
 
   it("starts both workers when no filter is specified", async () => {
-    const plan = buildDevPlan(config, rootDir, { basePort: 8691 });
+    const plan = await buildDevPlan(config, rootDir, { basePort: 8691 });
     expect(plan.workers).toHaveLength(2);
 
     handle = await startDev(plan);
@@ -115,7 +115,7 @@ describe("wd dev smoke test", () => {
   }, 20_000);
 
   it("--filter starts only the filtered worker", async () => {
-    const plan = buildDevPlan(config, rootDir, { basePort: 8693, filter: "workers/echo" });
+    const plan = await buildDevPlan(config, rootDir, { basePort: 8693, filter: "workers/echo" });
     expect(plan.workers).toHaveLength(1);
     expect(plan.workers[0]!.workerPath).toBe("workers/echo");
 
@@ -132,9 +132,9 @@ describe("wd dev smoke test", () => {
     expect(helloUp).toBe(false);
   }, 20_000);
 
-  it("--filter throws for unknown worker", () => {
-    expect(() =>
+  it("--filter throws for unknown worker", async () => {
+    await expect(
       buildDevPlan(config, rootDir, { basePort: 8695, filter: "workers/nope" }),
-    ).toThrow(/unknown worker/i);
+    ).rejects.toThrow(/unknown worker/i);
   });
 });

@@ -37,6 +37,13 @@ flowchart TD
 5. Runs from the worker directory so relative paths resolve correctly
 6. Optional `--verify` runs post-deploy coherence checks
 
+### `wd dev`
+
+1. Uses the checked-in `wrangler.jsonc` files by default
+2. When you pass `--stage <name>`, renders stage-specific configs from the applied stage state
+3. Uses those rendered configs to start local workers or a shared session, so local bindings match deploy-time state
+4. Keeps the original `wrangler.jsonc` files untouched
+
 ### `wd destroy`
 
 1. Checks stage protection rules (refuses without `--force` for protected stages)
@@ -67,3 +74,7 @@ wrangler-deploy uses wrangler for all Cloudflare operations:
 - **CI/CD**: `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`
 
 No separate authentication needed. If wrangler works, wrangler-deploy works.
+
+## Trust boundary
+
+`wrangler.jsonc` remains the primary authoring format. wrangler-deploy adds orchestration around it instead of replacing it. Rendered configs under `.wrangler-deploy` are generated artifacts for deploy and stage-aware local dev, not files you are meant to edit by hand.

@@ -36,6 +36,7 @@ export type GcDeps = {
   config: CfStageConfig;
   state: StateProvider;
   wrangler: WranglerRunner;
+  logger?: Pick<Console, "log" | "warn" | "error">;
   destroyFn?: typeof destroy;
 };
 
@@ -44,7 +45,7 @@ export type GcDeps = {
  * Only destroys stages matching an unprotected pattern with an expired TTL.
  */
 export async function gc(_args: GcArgs, deps: GcDeps): Promise<GcResult> {
-  const { rootDir, config, state: provider, wrangler } = deps;
+  const { rootDir, config, state: provider, wrangler, logger = console } = deps;
   const destroyFn = deps.destroyFn ?? destroy;
   const stages = await provider.list();
   const result: GcResult = { destroyed: [], kept: [], protected: [] };
@@ -78,7 +79,7 @@ export async function gc(_args: GcArgs, deps: GcDeps): Promise<GcResult> {
           result.destroyed.push(stageName);
           await destroyFn(
             { stage: stageName, force: false },
-            { rootDir, config, state: provider, wrangler },
+            { rootDir, config, state: provider, wrangler, logger },
           );
         } else {
           result.kept.push(stageName);
