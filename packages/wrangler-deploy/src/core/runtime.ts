@@ -196,6 +196,15 @@ export async function resolvePlannedWorkerPort(
   if (activeState?.ports[workerPath] !== undefined) {
     return activeState.ports[workerPath]!;
   }
+  if (
+    activeState?.mode === "session"
+    && activeState.entryWorker
+    && activeState.workers.includes(workerPath)
+    && activeState.ports[activeState.entryWorker] !== undefined
+  ) {
+    // In session mode, all workers are served by one wrangler process/port.
+    return activeState.ports[activeState.entryWorker]!;
+  }
 
   const plan = await buildDevPlan(config, rootDir, { filter: workerPath });
   const plannedPort = plan.mode === "session"

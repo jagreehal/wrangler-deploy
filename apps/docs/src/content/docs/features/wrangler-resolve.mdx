@@ -1,0 +1,123 @@
+---
+title: wrangler-resolve
+description: Wraps wrangler dev and deploy with node-env-resolver — FIFO secret injection, vars/secrets split, hot reload
+---
+
+`wrangler-resolve` is a thin CLI and programmatic wrapper around `wrangler` that integrates [node-env-resolver](https://github.com/jagreehal/node-env-resolver) into your Cloudflare Workers workflow.
+
+It handles three things:
+- **dev** — serves resolved env via FIFO (secrets never touch disk on Unix) with hot reload on file changes
+- **deploy** — splits config into public vars (`--var`) and secrets (`--secrets-file`) automatically
+- **types** — generates a TypeScript `Env` interface from your schema
+
+## Install
+
+```bash
+npm install node-env-resolver-cloudflare node-env-resolver
+```
+
+## CLI
+
+```bash
+npx wrangler-resolve dev
+npx wrangler-resolve deploy
+npx wrangler-resolve versions upload
+npx wrangler-resolve types
+```
+
+All unrecognized commands are passed through to `wrangler` unchanged.
+
+### Notes
+
+- `dev` refuses to start if `.dev.vars` exists — `wrangler-resolve` manages env injection itself. Remove `.dev.vars` and use `.env` files instead.
+- `deploy` manages `--secrets-file` automatically. Do not pass `--secrets-file` manually.
+- Set `NER_CF_DEBUG=1` to enable debug logging.
+
+### Custom config file
+
+By default the CLI uses `processEnv()` as the resolver source. To use custom resolvers, point `NER_CF_CONFIG` at a module that exports `WranglerFacade` options:
+
+```ts
+// wrangler-resolve.config.ts
+import { dotenv } from 'node-env-resolver/resolvers';
+
+export default {
+  resolvers: [[dotenv('.env.local'), {}]],
+  watchPaths: ['.env.local', '.env.local.secrets'],
+};
+```
+
+```bash
+NER_CF_CONFIG=./wrangler-resolve.config.ts npx wrangler-resolve dev
+```
+
+## Programmatic usage
+
+```ts
+import { WranglerFacade } from 'node-env-resolver-cloudflare';
+import { dotenv } from 'node-env-resolver/resolvers';
+
+const facade = new WranglerFacade({
+  resolvers: [[dotenv('.env'), { DATABASE_URL: postgres() }]],
+});
+
+await facade.dev();    // start dev server with hot reload
+await facade.deploy(); // deploy with vars/secrets split
+await facade.types();  // generate Env interface
+```
+
+### `WranglerFacadeOptions`
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `resolvers` | `[Resolver, SimpleEnvSchema][]` | required | Resolver + schema pairs |
+| `resolveOptions` | `Partial<ResolveOptions>` | — | Options forwarded to `resolveAsync` |
+| `watchPaths` | `string[]` | auto-detected | Files to watch during `dev` |
+| `watchStrategy` | `'auto'`, `'metadata'`, or `'fallback'` | `'auto'` | Auto-detect strategy for watch paths |
+| `watchDebounce` | `number` | `300` | Debounce ms between restarts |
+| `sensitivePrefixes` | `string[]` | common patterns | Key prefixes that mark a value as secret |
+| `wranglerBin` | `string` | `'wrangler'` | Custom wrangler binary name |
+| `debug` | `boolean` | `false` | Extra logging |
+
+### Watch strategy
+
+| Strategy | Behaviour |
+|---|---|
+| `auto` (default) | Uses resolver metadata paths; falls back to `.env`, `.env.local`, `.env.development`, `.env.development.local` |
+| `metadata` | Uses resolver-derived paths only, no fallback |
+| `fallback` | Ignores resolver metadata, always uses the four common `.env` files |
+
+## How secrets are kept off disk
+
+On Unix, `createServingTempFile` creates a named pipe (FIFO). Wrangler reads from it exactly once; the content is never written to a real file. On Windows a temp file is used instead.
+
+## `cf://` reference handler
+
+Resolve values from Cloudflare Workers env bindings at runtime:
+
+```ts
+import { createCloudflareHandler } from 'node-env-resolver-cloudflare/handlers';
+
+const handler = createCloudflareHandler({ env });
+// resolves cf://MY_SECRET from the worker's env bindings
+```
+
+## Secret chunking
+
+Cloudflare enforces a 5 KB limit per secret. When the serialized env blob exceeds that, `wrangler-resolve` automatically chunks it across multiple `__NER_ENV_0`, `__NER_ENV_1`, … secrets and reassembles them at runtime via `reassembleEnvFromRecord`.
+
+```ts
+import { reassembleEnvFromRecord } from 'node-env-resolver-cloudflare/chunking';
+
+const env = reassembleEnvFromRecord(workerEnv);
+```
+
+## Exports
+
+| Import path | Exports |
+|---|---|
+| `node-env-resolver-cloudflare` | `WranglerFacade`, `createServingTempFile`, chunking helpers, format helpers, `createCloudflareHandler` |
+| `node-env-resolver-cloudflare/handlers` | `createCloudflareHandler`, `cfHandler` |
+| `node-env-resolver-cloudflare/wrangler` | `WranglerFacade` |
+| `node-env-resolver-cloudflare/chunking` | `chunkString`, `addSerializedEnvToRecord`, `reassembleEnvFromRecord`, `CF_SECRET_MAX_BYTES` |
+| `node-env-resolver-cloudflare/fifo` | `createServingTempFile` |

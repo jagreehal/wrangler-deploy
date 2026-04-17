@@ -90,6 +90,9 @@ export default defineConfig({
   verifyLocal: {
     /* ... */
   }, // config-driven local runtime checks
+  guard: {
+    /* ... */
+  }, // workers usage guard integration
   state: {
     /* ... */
   }, // remote state backend (KV)
@@ -191,6 +194,39 @@ verifyLocal: {
 ```
 
 Use packs when the repo needs a fast smoke run and a stricter regression run without copying the same fixtures into multiple scripts.
+
+## Guard integration
+
+`guard` connects wrangler-deploy to a deployed `workers-usage-guard` Worker.
+
+```ts
+guard: {
+  endpoint: "https://workers-usage-guard.example.workers.dev", // set by `wd guard init`
+  databaseId: "bd0274ea-ea3b-4fd7-966d-ee55d6ce9947",         // set by `wd guard init`
+  accounts: [
+    {
+      accountId: "1234567890abcdef1234567890abcdef",
+      billingCycleDay: 1,
+      workers: [
+        {
+          scriptName: "payment-api",
+          thresholds: { requests: 500_000, cpuMs: 5_000_000 },
+          forecast: true,
+          forecastLookaheadSeconds: 600,
+        },
+      ],
+      globalProtected: [],
+    },
+  ],
+}
+```
+
+- `guard.endpoint` and `guard.databaseId` are printed by `wd guard init` — copy them from the output.
+- `guard.accounts` powers `wd guard status` (GraphQL usage fetch path).
+- `guard.endpoint` enables signed API commands: `breaches`, `report`, `disarm`, `arm`, `approvals`, `approve`, `reject`.
+- `guard.databaseId` is used by `wd guard deploy` and `wd guard migrate` to target the correct D1.
+- Signed commands require `WRANGLER_DEPLOY_GUARD_SIGNING_KEY` at runtime.
+- Status requires `CLOUDFLARE_API_TOKEN`.
 
 ## Shared fixtures
 

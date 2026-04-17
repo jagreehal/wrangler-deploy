@@ -2,9 +2,9 @@
 
 | Key | Value |
 | --- | --- |
-| Date | 2026-04-14T15:04:11.087Z |
-| Version | 1.2.0 |
-| Git SHA | 6cfff03 |
+| Date | 2026-04-19T19:51:11.734Z |
+| Version | 1.3.0 |
+| Git SHA | 2872744 |
 
 ## src/github.test.ts
 
@@ -27,6 +27,82 @@
 - **Given** the example workflow source
 - **When** the workflow has a schedule-conditional cleanup job
 - **Then** the workflow must declare a schedule trigger
+
+## src/providers/cloudflare-api.test.ts
+
+### cloudflare-api
+
+### ✅ uses CLOUDFLARE_ACCOUNT_ID without fetching
+
+- **Given** CLOUDFLARE_ACCOUNT_ID is set in the environment
+- **When** resolveAccountId is called
+- **Then** it returns the env var value without making any API calls
+
+### ✅ caches resolved account ids between calls
+
+- **Given** no CLOUDFLARE_ACCOUNT_ID in the environment
+- **And** the API returns an account ID
+- **When** resolveAccountId is called twice
+- **Then** only one API call is made
+
+### ✅ formats API errors from cfApiResult
+
+- **Given** an API response with multiple error codes
+- **When** cfApiResult parses the response
+- **Then** it throws with all error codes and messages formatted
+
+## src/providers/local-cli.test.ts
+
+### local CLI-backed providers
+
+### ✅ returns a typed D1Output with the extracted database id
+
+- **Given** wrangler output containing a D1 database UUID
+- **When** createD1Database is called with a name and cwd
+- **Then** the returned struct contains the extracted id, name, and version
+
+### ✅ returns a typed R2Output with the bucket name
+
+- **Given** wrangler output for an R2 bucket creation
+- **When** createR2Bucket is called with a name and cwd
+- **Then** the returned struct contains the bucket name
+
+### ✅ returns a typed VectorizeOutput with the index metadata
+
+- **Given** wrangler output containing a Vectorize index UUID
+- **When** createVectorizeIndex is called with a name, config, and cwd
+- **Then** the returned struct contains the name, dimensions, and metric
+
+## src/providers/resources.test.ts
+
+### providers
+
+### ✅ adopts an existing KV namespace when create reports conflict
+
+- **Given** the Cloudflare API rejects KV creation with a conflict error
+- **And** a subsequent list call returns the existing namespace
+- **When** createKvNamespace is called
+- **Then** the existing namespace is adopted
+
+### ✅ adopts an existing queue when create returns conflict
+
+- **Given** the Cloudflare API rejects queue creation with a 409 conflict
+- **And** a subsequent list call returns the existing queue
+- **When** createQueue is called
+- **Then** the existing queue is adopted
+
+### ✅ adopts an existing Hyperdrive config when create returns conflict
+
+- **Given** the Cloudflare API rejects Hyperdrive creation with a 409 conflict
+- **And** a subsequent list call returns the existing config
+- **When** createHyperdrive is called
+- **Then** the existing Hyperdrive config is adopted
+
+### ✅ treats worker deletion as idempotent on 404
+
+- **Given** the Cloudflare API returns 404 for a worker deletion
+- **When** deleteWorker is called
+- **Then** it resolves without error
 
 ## src/core/apply.test.ts
 
@@ -989,6 +1065,11 @@
 - **Given** a named local endpoint configured for workers/api
 - **Then** the worker route summary includes the resolved local URL and endpoint
 
+### ✅ resolves non-entry worker ports to the active session entry port
+
+- **Given** an active session-mode runtime where only the entry worker port is recorded
+- **Then** the non-entry worker resolves to the shared session port
+
 ### ✅ lists D1 databases and resolves a repo-aware command target
 
 - **Given** a D1 database bound in multiple workers with a configured default worker
@@ -1252,82 +1333,6 @@
 
 - **Given** a config without verifyLocal
 - **Then** the command fails fast with a configuration check
-
-## src/providers/cloudflare-api.test.ts
-
-### cloudflare-api
-
-### ✅ uses CLOUDFLARE_ACCOUNT_ID without fetching
-
-- **Given** CLOUDFLARE_ACCOUNT_ID is set in the environment
-- **When** resolveAccountId is called
-- **Then** it returns the env var value without making any API calls
-
-### ✅ caches resolved account ids between calls
-
-- **Given** no CLOUDFLARE_ACCOUNT_ID in the environment
-- **And** the API returns an account ID
-- **When** resolveAccountId is called twice
-- **Then** only one API call is made
-
-### ✅ formats API errors from cfApiResult
-
-- **Given** an API response with multiple error codes
-- **When** cfApiResult parses the response
-- **Then** it throws with all error codes and messages formatted
-
-## src/providers/local-cli.test.ts
-
-### local CLI-backed providers
-
-### ✅ returns a typed D1Output with the extracted database id
-
-- **Given** wrangler output containing a D1 database UUID
-- **When** createD1Database is called with a name and cwd
-- **Then** the returned struct contains the extracted id, name, and version
-
-### ✅ returns a typed R2Output with the bucket name
-
-- **Given** wrangler output for an R2 bucket creation
-- **When** createR2Bucket is called with a name and cwd
-- **Then** the returned struct contains the bucket name
-
-### ✅ returns a typed VectorizeOutput with the index metadata
-
-- **Given** wrangler output containing a Vectorize index UUID
-- **When** createVectorizeIndex is called with a name, config, and cwd
-- **Then** the returned struct contains the name, dimensions, and metric
-
-## src/providers/resources.test.ts
-
-### providers
-
-### ✅ adopts an existing KV namespace when create reports conflict
-
-- **Given** the Cloudflare API rejects KV creation with a conflict error
-- **And** a subsequent list call returns the existing namespace
-- **When** createKvNamespace is called
-- **Then** the existing namespace is adopted
-
-### ✅ adopts an existing queue when create returns conflict
-
-- **Given** the Cloudflare API rejects queue creation with a 409 conflict
-- **And** a subsequent list call returns the existing queue
-- **When** createQueue is called
-- **Then** the existing queue is adopted
-
-### ✅ adopts an existing Hyperdrive config when create returns conflict
-
-- **Given** the Cloudflare API rejects Hyperdrive creation with a 409 conflict
-- **And** a subsequent list call returns the existing config
-- **When** createHyperdrive is called
-- **Then** the existing Hyperdrive config is adopted
-
-### ✅ treats worker deletion as idempotent on 404
-
-- **Given** the Cloudflare API returns 404 for a worker deletion
-- **When** deleteWorker is called
-- **Then** it resolves without error
 
 ## src/core/ci/check.test.ts
 

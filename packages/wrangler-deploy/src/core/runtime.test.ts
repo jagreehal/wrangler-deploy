@@ -17,6 +17,7 @@ import {
   readQueueTailSnapshot,
   replayQueueMessages,
   resolveD1CommandTarget,
+  resolvePlannedWorkerPort,
   resolveWorkerCallTarget,
   resolveQueueSendTarget,
   runDevDoctor,
@@ -138,6 +139,28 @@ describe("runtime helpers", () => {
         },
       ],
     });
+  });
+
+  it("resolves non-entry worker ports to the active session entry port", async ({ task }) => {
+    story.init(task);
+    story.given("an active session-mode runtime where only the entry worker port is recorded");
+
+    const rootDir = mkdtempSync(join(tmpdir(), "wd-runtime-"));
+    writeActiveDevState(rootDir, {
+      mode: "session",
+      ports: { "workers/api": 8788 },
+      workers: ["workers/api", "workers/batch-workflow", "workers/event-router"],
+      entryWorker: "workers/api",
+      entryUrl: "http://127.0.0.1:8788",
+      logFiles: {},
+      updatedAt: new Date().toISOString(),
+      pid: process.pid,
+    });
+
+    const port = await resolvePlannedWorkerPort(config, rootDir, "workers/batch-workflow");
+
+    story.then("the non-entry worker resolves to the shared session port");
+    expect(port).toBe(8788);
   });
 
   it("lists D1 databases and resolves a repo-aware command target", ({ task }) => {

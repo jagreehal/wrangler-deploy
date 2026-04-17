@@ -1,0 +1,36 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "workers-usage-guard",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-17",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "triggers": { "crons": ["*/5 * * * *", "0 8 * * *"] },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "workers-usage-guard",
+      "database_id": "REPLACE_WITH_D1_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "workflows": [
+    {
+      "name": "overage-workflow",
+      "binding": "OVERAGE_WORKFLOW",
+      "class_name": "OverageWorkflow"
+    }
+  ],
+
+  "vars": {
+    "REQUEST_THRESHOLD": "500000",
+    "CPU_TIME_THRESHOLD_MS": "5000000",
+    "OVERAGE_COOLDOWN_SECONDS": "3600",
+    "OVERAGE_GRACE_SECONDS": "14400",
+    "GUARD_SCRIPT_NAME": "workers-usage-guard",
+    "ACCOUNTS_JSON": "[]",
+    "NOTIFICATIONS_JSON": "{\"channels\":[]}"
+  }
+}
