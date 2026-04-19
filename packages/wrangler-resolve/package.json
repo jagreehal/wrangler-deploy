@@ -1,0 +1,124 @@
+{
+  "name": "wrangler-resolve",
+  "version": "1.0.0",
+  "description": "Cloudflare Workers integration for node-env-resolver (wrangler dev/deploy, FIFO secrets, hot reload)",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.js"
+    },
+    "./handlers": {
+      "types": "./dist/handlers.d.ts",
+      "import": "./dist/handlers.js",
+      "require": "./dist/handlers.cjs",
+      "default": "./dist/handlers.js"
+    },
+    "./wrangler": {
+      "types": "./dist/wrangler.d.ts",
+      "import": "./dist/wrangler.js",
+      "require": "./dist/wrangler.cjs",
+      "default": "./dist/wrangler.js"
+    },
+    "./chunking": {
+      "types": "./dist/chunking.d.ts",
+      "import": "./dist/chunking.js",
+      "require": "./dist/chunking.cjs",
+      "default": "./dist/chunking.js"
+    },
+    "./fifo": {
+      "types": "./dist/fifo.d.ts",
+      "import": "./dist/fifo.js",
+      "require": "./dist/fifo.cjs",
+      "default": "./dist/fifo.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "*": [
+        "./dist/index.d.ts"
+      ],
+      "handlers": [
+        "./dist/handlers.d.ts"
+      ],
+      "wrangler": [
+        "./dist/wrangler.d.ts"
+      ],
+      "chunking": [
+        "./dist/chunking.d.ts"
+      ],
+      "fifo": [
+        "./dist/fifo.d.ts"
+      ]
+    }
+  },
+  "bin": {
+    "wrangler-resolve": "./bin/wrangler-resolve.js",
+    "cloudflare-resolve": "./bin/wrangler-resolve.js"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "NODE_ENV=production tsup",
+    "build:dev": "tsup",
+    "build:dts": "tsc --emitDeclarationOnly",
+    "type-check": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src/",
+    "test": "vitest run",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "prepublishOnly": "pnpm build && pnpm type-check"
+  },
+  "keywords": [
+    "cloudflare",
+    "workers",
+    "wrangler",
+    "secrets",
+    "fifo",
+    "environment",
+    "env",
+    "config",
+    "node-env-resolver"
+  ],
+  "author": {
+    "name": "Jagvinder Singh Reehal",
+    "email": "jag@jagreehal.com",
+    "url": "https://jagreehal.com"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jagreehal/wrangler-deploy",
+    "directory": "packages/wrangler-resolve"
+  },
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "node-env-resolver": "^6.4.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.6.0",
+    "@typescript-eslint/eslint-plugin": "^8.58.1",
+    "@typescript-eslint/parser": "^8.58.1",
+    "eslint": "^10.2.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.5.0",
+    "node-env-resolver": "^6.4.0",
+    "prettier": "^3.8.2",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.4"
+  }
+}

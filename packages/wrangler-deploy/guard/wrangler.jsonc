@@ -1,0 +1,32 @@
+{
+  "name": "workers-usage-guard",
+  "main": "index.js",
+  "no_bundle": true,
+  "compatibility_date": "2026-04-17",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "triggers": { "crons": ["*/5 * * * *", "0 8 * * *"] },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "workers-usage-guard",
+      "database_id": "REPLACE_WITH_D1_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "workflows": [
+    {
+      "name": "overage-workflow",
+      "binding": "OVERAGE_WORKFLOW",
+      "class_name": "OverageWorkflow"
+    }
+  ],
+
+  "vars": {
+    "GUARD_SCRIPT_NAME": "workers-usage-guard",
+    "ACCOUNTS_JSON": "[]",
+    "NOTIFICATIONS_JSON": "{\"channels\":[]}"
+  }
+}

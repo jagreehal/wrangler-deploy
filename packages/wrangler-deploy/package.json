@@ -29,7 +29,8 @@
     "wrangler": ">=4.80.0"
   },
   "dependencies": {
-    "@cloudflare/workers-types": "^4.20260412.1"
+    "@cloudflare/workers-types": "^4.20260412.1",
+    "usage-guard-shared": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^25.5.2",
@@ -39,6 +40,7 @@
   },
   "files": [
     "dist",
+    "guard",
     "README.md",
     "github",
     "agent-context.json"

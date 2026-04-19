@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { resolve, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { createInterface } from "node:readline";
@@ -33,6 +34,17 @@ import { buildRichGraph } from "../core/graph-model.js";
 import { resolveDeployOrder } from "../core/graph.js";
 import { renderAscii, renderMermaid, renderDot } from "../core/renderers/index.js";
 import { analyzeImpact } from "../core/impact.js";
+import { runStatus } from "../core/guard/status.js";
+import { renderStatusTable, renderStatusJson } from "../core/guard/render-table.js";
+import { createGuardClient } from "../core/guard/client.js";
+import { runBreaches, renderBreachesTable, renderBreachesJson } from "../core/guard/breaches.js";
+import { runReport, renderReportText, renderReportJson } from "../core/guard/report.js";
+import { runDisarm, runArm } from "../core/guard/disarm.js";
+import { generateSigningKey, createD1Database } from "../core/guard/init.js";
+import { runListApprovals, runApprove, runReject } from "../core/guard/approvals.js";
+import { deployGuard } from "../core/guard/deploy.js";
+import { runMigrations } from "../core/guard/migrate.js";
+import { fetchWorkerUsage, type NotificationChannelConfig } from "usage-guard-shared";
 import { buildDevPlan, startDev } from "../core/dev.js";
 import { generateGitHubWorkflow } from "../core/ci/workflow-gen.js";
 import { detectCiEnvironment } from "../core/ci/detect.js";
@@ -210,6 +222,17 @@ async function main() {
     ci init     [--provider github] [--branch main]                 Generate CI workflow
     ci comment  --stage <name>                                      Post/update PR comment
     ci check    --stage <name>                                      Post GitHub check runs
+    guard init  --account <id> [--workers <names>] [--billing-cycle-day <1-31>] [--request-threshold <n>] [--database-id <id>] [--skip-d1] [--yes]  Provision and deploy usage guard Worker
+    guard deploy [--database-id <id>]                                   Redeploy guard Worker after npm update
+    guard migrate                                                        Apply pending D1 migrations
+    guard status [--json] [--account <id>]                          Show live Workers usage
+    guard breaches [--json] [--account <id>] [--limit <n>]          Show recent breaches
+    guard report [--json] [--account <id>] [--date <YYYY-MM-DD>]    Show latest daily report
+    guard disarm <script> --account <id> [--reason <text>]          Add script to runtime-protected
+    guard arm <script> --account <id>                               Remove script from runtime-protected
+    guard approvals [--json] [--account <id>]                       List pending approvals
+    guard approve <approval-id> --account <id>                      Approve a pending kill-switch
+    guard reject <approval-id> --account <id>                       Reject a pending kill-switch
     doctor                                                          Run diagnostic checks
     completions --shell zsh|bash|fish                               Generate shell completions
     context                                                         Show resolved project defaults
@@ -980,6 +1003,347 @@ async function main() {
       }
       console.log(renderer(graph));
       break;
+    }
+
+    case "guard": {
+      const sub = args[1];
+      if (sub !== "status" && sub !== "breaches" && sub !== "report" && sub !== "disarm" && sub !== "arm" && sub !== "init" && sub !== "deploy" && sub !== "migrate" && sub !== "approvals" && sub !== "approve" && sub !== "reject") {
+        console.error("Usage: wd guard <status|breaches|report|disarm|arm|init|deploy|migrate|approvals|approve|reject> [--json] [--account <id>] [--limit <n>] [--date <YYYY-MM-DD>] [--reason <text>] [--dir <path>] [--billing-cycle-day <1-31>] [--dry-run] [--skip-d1] [--force]");
+        process.exit(2);
+      }
+
+      const cliDir = fileURLToPath(new URL(".", import.meta.url));
+      const guardDir = resolve(cliDir, "..", "..", "guard");
+
+      const cfg = await loadConfig(rootDir);
+      const token = process.env.CLOUDFLARE_API_TOKEN;
+      const json = hasFlag("json");
+
+      if (sub === "init") {
+        const accountId = getFlag("account");
+        const billingCycleDay = Number(getFlag("billing-cycle-day") ?? "1");
+        const workersFlag = getFlag("workers");
+        const yes = hasFlag("yes");
+
+        if (!accountId) {
+          console.error("--account <id> is required for `wd guard init`.");
+          process.exit(2);
+        }
+        if (!Number.isInteger(billingCycleDay) || billingCycleDay < 1 || billingCycleDay > 31) {
+          console.error("--billing-cycle-day must be an integer between 1 and 31.");
+          process.exit(2);
+        }
+
+        // Parse --workers flag or prompt
+        let workerNames: string[] = workersFlag
+          ? workersFlag.split(",").map((s) => s.trim()).filter(Boolean)
+          : [];
+
+        const notifications: NotificationChannelConfig[] = [];
+
+        if (!yes && process.stdin.isTTY && process.stdout.isTTY) {
+          const rl = createInterface({ input: process.stdin, output: process.stdout });
+          const question = (q: string): Promise<string> => new Promise((res) => rl.question(q, res));
+
+          if (workerNames.length === 0) {
+            const raw = await question("  Worker script names to monitor (comma-separated, or empty to skip): ");
+            workerNames = raw.split(",").map((s) => s.trim()).filter(Boolean);
+          }
+
+          console.log(`\n  Configure notification channels (leave empty to skip):\n`);
+          let index = 1;
+          while (true) {
+            const type = await question(`  Channel ${index} type (discord/slack/webhook, or empty to finish): `);
+            if (!type || !["discord", "slack", "webhook"].includes(type)) break;
+            const name = await question(`  Channel ${index} name (unique): `);
+            if (!name) { console.log("  Name is required."); continue; }
+            const secretName = await question(`  Channel ${index} secret name (e.g. DISCORD_WEBHOOK): `);
+            if (!secretName) { console.log("  Secret name is required."); continue; }
+            const channelType = type as "discord" | "slack" | "webhook";
+            if (channelType === "webhook") {
+              notifications.push({ type: "webhook", name, urlSecret: secretName });
+            } else {
+              notifications.push({ type: channelType, name, webhookUrlSecret: secretName });
+            }
+            index += 1;
+          }
+          rl.close();
+        }
+
+        const workers = workerNames.map((scriptName) => ({ scriptName }));
+        const accountsJson = JSON.stringify([{
+          accountId,
+          billingCycleDay,
+          workers,
+          globalProtected: [],
+        }]);
+        const notificationsJson = JSON.stringify({ channels: notifications });
+        const signingKey = generateSigningKey();
+
+        // Step 1: Create D1 database (or use existing)
+        const existingDatabaseId = getFlag("database-id") ?? cfg?.guard?.databaseId;
+        let databaseId: string;
+        if (existingDatabaseId) {
+          databaseId = existingDatabaseId;
+          console.log(`\n  Using existing D1 database: ${databaseId}`);
+        } else {
+          console.log(`\n  Creating D1 database "workers-usage-guard"...`);
+          try {
+            ({ databaseId } = createD1Database(
+              { name: "workers-usage-guard", targetDir: guardDir },
+              { execFileSync }
+            ));
+            console.log(`  ✔ D1 database created: ${databaseId}`);
+          } catch (e) {
+            console.error(`  D1 creation failed: ${(e as Error).message}`);
+            console.error(`  If the database already exists, pass --database-id <id> to skip creation.`);
+            process.exit(1);
+          }
+        }
+
+        // Step 2: Apply migrations
+        console.log(`  Applying D1 migrations...`);
+        try {
+          const { output } = runMigrations({ guardDir, databaseId }, { execFileSync });
+          if (output.trim()) console.log(output.trim());
+          console.log(`  ✔ Migrations applied`);
+        } catch (e) {
+          console.error(`  Migrations failed: ${(e as Error).message}`);
+          process.exit(1);
+        }
+
+        // Step 3: Set secrets
+        console.log(`  Setting secrets on workers-usage-guard...`);
+        const cfToken = process.env.CLOUDFLARE_API_TOKEN;
+        if (!cfToken) {
+          console.warn("  ⚠ CLOUDFLARE_API_TOKEN is not set — set it manually after deploy:\n    wrangler secret put CLOUDFLARE_API_TOKEN --name workers-usage-guard");
+        }
+        const secretsToSet: Array<{ name: string; value: string }> = [
+          ...(cfToken ? [{ name: "CLOUDFLARE_API_TOKEN", value: cfToken }] : []),
+          { name: "GUARD_API_SIGNING_KEY", value: signingKey },
+          { name: "ACCOUNTS_JSON", value: accountsJson },
+          { name: "NOTIFICATIONS_JSON", value: notificationsJson },
+        ];
+        const notificationSecrets = notifications.map((n) =>
+          n.type === "webhook" ? n.urlSecret : n.webhookUrlSecret
+        );
+        for (const secret of secretsToSet) {
+          try {
+            execFileSync("wrangler", ["secret", "put", secret.name, "--name", "workers-usage-guard"], {
+              input: secret.value,
+              encoding: "utf-8",
+              stdio: ["pipe", "pipe", "pipe"],
+            });
+            console.log(`  ✔ Secret set: ${secret.name}`);
+          } catch (e) {
+            console.error(`  Failed to set ${secret.name}: ${(e as Error).message}`);
+            process.exit(1);
+          }
+        }
+
+        // Step 4: Deploy
+        console.log(`  Deploying workers-usage-guard...`);
+        let workerUrl: string | undefined;
+        try {
+          ({ workerUrl } = deployGuard({ guardDir, databaseId }, { execFileSync }));
+          console.log(`  ✔ Deployed${workerUrl ? ` → ${workerUrl}` : ""}`);
+        } catch (e) {
+          console.error(`  Deploy failed: ${(e as Error).message}`);
+          process.exit(1);
+        }
+
+        // Step 5: Print config snippet
+        console.log(`\n  Add this to your wrangler-deploy.config.ts:\n`);
+        console.log(`    guard: {`);
+        if (workerUrl) console.log(`      endpoint: "${workerUrl}",`);
+        console.log(`      databaseId: "${databaseId}",`);
+        console.log(`    },`);
+        if (notificationSecrets.length > 0) {
+          console.log(`\n  Set these notification secrets when ready:`);
+          for (const s of notificationSecrets) console.log(`    wrangler secret put ${s} --name workers-usage-guard`);
+        }
+        console.log("");
+        return;
+      }
+
+      if (sub === "deploy") {
+        const databaseId = cfg?.guard?.databaseId ?? getFlag("database-id");
+        if (!databaseId) {
+          console.error("guard.databaseId is required in wrangler-deploy.config.ts or pass --database-id <id>.");
+          process.exit(2);
+        }
+        console.log("  Deploying workers-usage-guard...");
+        try {
+          const { workerUrl } = deployGuard({ guardDir, databaseId }, { execFileSync });
+          console.log(`  ✔ Deployed${workerUrl ? ` → ${workerUrl}` : ""}`);
+        } catch (e) {
+          console.error(`  Deploy failed: ${(e as Error).message}`);
+          process.exit(1);
+        }
+        return;
+      }
+
+      if (sub === "migrate") {
+        const databaseId = cfg?.guard?.databaseId ?? getFlag("database-id");
+        if (!databaseId) {
+          console.error("guard.databaseId is required in wrangler-deploy.config.ts or pass --database-id <id>.");
+          process.exit(2);
+        }
+        console.log("  Applying D1 migrations...");
+        try {
+          const { output } = runMigrations({ guardDir, databaseId }, { execFileSync });
+          console.log(output.trim());
+          console.log("  ✔ Migrations applied");
+        } catch (e) {
+          console.error(`  Migration failed: ${(e as Error).message}`);
+          process.exit(1);
+        }
+        return;
+      }
+
+      const endpoint = cfg?.guard?.endpoint;
+      const signingKey = process.env.WRANGLER_DEPLOY_GUARD_SIGNING_KEY;
+      const client = endpoint && signingKey ? createGuardClient({ endpoint, signingKey }) : undefined;
+
+      if (sub === "status") {
+        const accounts = cfg?.guard?.accounts ?? [];
+        if (accounts.length === 0) {
+          console.error(
+            "No accounts configured. Set `guard.accounts` in wrangler-deploy.config.ts — see docs."
+          );
+          process.exit(2);
+        }
+        if (!token) {
+          console.error("CLOUDFLARE_API_TOKEN env var is required for `wd guard status`.");
+          process.exit(2);
+        }
+        const statusDeps: Parameters<typeof runStatus>[1] = {
+          now: () => new Date(),
+          fetchUsage: (a) => fetchWorkerUsage(a, { fetch, token }),
+        };
+        if (client) statusDeps.breachClient = client;
+        const rows = await runStatus({ accounts }, statusDeps);
+        console.log(json ? renderStatusJson(rows) : renderStatusTable(rows));
+        return;
+      }
+
+      // `breaches`, `report`, `disarm`, and `arm` all require a configured endpoint + signing key.
+      const accountId = getFlag("account");
+
+      if (sub === "disarm" || sub === "arm") {
+        const scriptName = args[2];
+        if (!scriptName) {
+          console.error(`--account <id> and <script> are required. Usage: wd guard ${sub} <script> --account <id>${sub === "disarm" ? " [--reason <text>]" : ""}`);
+          process.exit(2);
+        }
+        if (!client) {
+          console.error(
+            "`wd guard " + sub + "` requires guard.endpoint in wrangler-deploy.config.ts AND " +
+              "WRANGLER_DEPLOY_GUARD_SIGNING_KEY env var."
+          );
+          process.exit(2);
+        }
+        if (!accountId) {
+          console.error("--account <id> is required.");
+          process.exit(2);
+        }
+        if (sub === "disarm") {
+          const reason = getFlag("reason");
+          const addedBy = `cli:${process.env.USER ?? "unknown"}`;
+          await runDisarm(
+            reason
+              ? { accountId, scriptName, addedBy, reason }
+              : { accountId, scriptName, addedBy },
+            { client }
+          );
+          console.log(`Disarmed ${scriptName} on account ${accountId}`);
+        } else {
+          await runArm({ accountId, scriptName }, { client });
+          console.log(`Re-armed ${scriptName} on account ${accountId}`);
+        }
+        return;
+      }
+
+      if (!client) {
+        console.error(
+          "`wd guard " + sub + "` requires guard.endpoint in wrangler-deploy.config.ts AND " +
+            "WRANGLER_DEPLOY_GUARD_SIGNING_KEY env var."
+        );
+        process.exit(2);
+      }
+      if (!accountId) {
+        console.error("--account <id> is required.");
+        process.exit(2);
+      }
+
+      if (sub === "breaches") {
+        const limit = Number(getFlag("limit") ?? "20");
+        if (!Number.isFinite(limit) || limit <= 0) {
+          console.error("--limit must be a positive number.");
+          process.exit(2);
+        }
+        const rows = await runBreaches({ accountId, limit }, { client });
+        console.log(json ? renderBreachesJson(rows) : renderBreachesTable(rows));
+        return;
+      }
+
+      if (sub === "report") {
+        const date = getFlag("date");
+        const report = await runReport(
+          date ? { accountId, date } : { accountId },
+          { client }
+        );
+        console.log(json ? renderReportJson(report) : renderReportText(report));
+        return;
+      }
+
+      if (sub === "approvals") {
+        const rows = await runListApprovals({ accountId }, { client });
+        if (json) {
+          printJson(rows);
+        } else {
+          console.log(`\n  Pending approvals for account ${accountId}\n`);
+          if (rows.length === 0) {
+            console.log("  (none)\n");
+          } else {
+            for (const r of rows) {
+              console.log(`  ${r.id}`);
+              console.log(`    script: ${r.scriptName}`);
+              console.log(`    rule: ${r.ruleId} (${r.breachType})`);
+              console.log(`    actual: ${r.actualValue} / limit: ${r.limitValue}`);
+              console.log(`    created: ${r.createdAt}`);
+              console.log(`    expires: ${r.expiresAt}`);
+              console.log("");
+            }
+          }
+        }
+        return;
+      }
+
+      if (sub === "approve" || sub === "reject") {
+        const approvalId = args[2];
+        if (!approvalId) {
+          console.error(`<approval-id> is required. Usage: wd guard ${sub} <approval-id> --account <id>`);
+          process.exit(2);
+        }
+        const decidedBy = `cli:${process.env.USER ?? "unknown"}`;
+        try {
+          if (sub === "approve") {
+            await runApprove({ id: approvalId, accountId, decidedBy }, { client });
+            console.log(`Approved ${approvalId}`);
+          } else {
+            await runReject({ id: approvalId, accountId, decidedBy }, { client });
+            console.log(`Rejected ${approvalId}`);
+          }
+        } catch (e) {
+          console.error(`Failed: ${(e as Error).message}`);
+          process.exit(1);
+        }
+        return;
+      }
+
+      console.error(`Unknown guard command "${sub}"`);
+      process.exit(2);
     }
 
     case "impact": {

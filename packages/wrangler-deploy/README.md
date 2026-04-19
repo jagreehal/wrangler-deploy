@@ -125,6 +125,55 @@ wd queue tail payment-outbox
 wd verify local --pack smoke
 ```
 
+## Guard commands
+
+`wd guard status` works against Cloudflare GraphQL directly — no deployed guard required.
+
+```bash
+CLOUDFLARE_API_TOKEN=... wd guard status
+CLOUDFLARE_API_TOKEN=... wd guard status --json
+```
+
+`guard.accounts` has the same shape as the `workers-usage-guard` package's `ACCOUNTS_JSON` — see its README for the schema. Per-worker `forecast: true` opts into early-trigger projection; see the workers-usage-guard README.
+
+### With a deployed guard
+
+If you've deployed `workers-usage-guard` and added `guard.endpoint` + a signing-key env var (`WRANGLER_DEPLOY_GUARD_SIGNING_KEY`), you also get:
+
+```bash
+# Scaffold a guard worker package in your repo
+wd guard init --account <account-id> [--dir packages/workers-usage-guard] [--billing-cycle-day 1] [--skip-d1] [--dry-run] [--force]
+
+# Recent breaches for one account
+wd guard breaches --account <account-id>
+wd guard breaches --account <account-id> --limit 5 --json
+
+# Latest usage report — or the one from a given day
+wd guard report --account <account-id>
+wd guard report --account <account-id> --date 2026-04-15
+wd guard report --account <account-id> --json
+```
+
+`wd guard status` also overlays the 5 most recent breaches per account when a guard client is configured — visible in `--json` output.
+
+```bash
+# Runtime protection — toggle kill-switch immunity for a worker without redeploying the guard
+wd guard disarm <script> --account <account-id>
+wd guard disarm <script> --account <account-id> --reason "on-call escalation"
+wd guard arm <script> --account <account-id>
+
+# Human approval queue
+wd guard approvals --account <account-id>
+wd guard approve <approval-id> --account <account-id>
+wd guard reject <approval-id> --account <account-id>
+```
+
+`disarm` inserts a runtime override into the guard's D1. `arm` removes it. Both go through the signed write endpoint; same signing key as the other commands.
+
+### Dev UI panel
+
+The dev UI (started with `wd dev`) now exposes a Workers Usage Guard panel at `/guard`. It always shows live usage from Cloudflare GraphQL, and overlays breaches + latest daily report + runtime-protected scripts when `guard.endpoint` and `WRANGLER_DEPLOY_GUARD_SIGNING_KEY` are set.
+
 ## Monorepos and single workers
 
 Works at the root of a monorepo or inside a single worker directory:

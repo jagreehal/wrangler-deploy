@@ -304,6 +304,12 @@
             "type": "Record<string, Record<string, string>>",
             "required": false,
             "description": "Secret values to store encrypted in state (keyed by worker path → secret name → value)."
+          },
+          {
+            "name": "guard",
+            "type": "GuardConfig",
+            "required": false,
+            "description": "Optional usage-guard integration config."
           }
         ]
       },

@@ -319,6 +319,8 @@ export interface CfStageConfig {
   statePassword?: string;
   /** Secret values to store encrypted in state (keyed by worker path → secret name → value). */
   storedSecrets?: Record<string, Record<string, string>>;
+  /** Optional usage-guard integration config. */
+  guard?: GuardConfig;
 }
 
 // ============================================================================
@@ -455,3 +457,28 @@ export interface WranglerConfig {
   dev?: { port: number };
   [key: string]: unknown;
 }
+
+// ---- Guard (optional usage-monitor integration) ----
+
+import type { AccountConfig as GuardAccountConfig } from "usage-guard-shared";
+
+export type GuardConfig = {
+  /**
+   * Optional HTTPS endpoint of a deployed `workers-usage-guard` Worker.
+   * When set, `wd guard` commands can overlay historical data from its D1.
+   */
+  endpoint?: string;
+
+  /**
+   * D1 database ID for the deployed guard Worker.
+   * Used by `wd guard migrate` and `wd guard deploy` to target the correct database.
+   */
+  databaseId?: string;
+
+  /**
+   * Accounts and workers to pull usage for when running `wd guard status`
+   * against Cloudflare GraphQL directly (no deployed guard required).
+   * Same shape as the guard's own ACCOUNTS_JSON.
+   */
+  accounts?: GuardAccountConfig[];
+};

@@ -65,4 +65,11 @@ app.get("/events", async (c) => {
   return c.json({ events: results });
 });
 
-export default app;
+async function scheduled(controller: ScheduledController): Promise<void> {
+  console.log(`[api] cron processed ${controller.cron}`);
+}
+
+export default {
+  fetch: app.fetch,
+  scheduled,
+};

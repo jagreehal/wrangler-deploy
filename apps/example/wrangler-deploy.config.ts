@@ -252,8 +252,8 @@ export default defineConfig({
           },
           {
             type: "cron",
-            name: "batch workflow cron route",
-            worker: "workers/batch-workflow",
+            name: "api cron route",
+            worker: "workers/api",
             expectStatus: 200,
             expectBodyIncludes: ["ok"],
           },

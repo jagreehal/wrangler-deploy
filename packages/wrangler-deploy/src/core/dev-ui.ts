@@ -22,6 +22,13 @@ import { verifyLocal } from "./verify.js";
 import { createWranglerRunner } from "./wrangler-runner.js";
 import { readWranglerConfig } from "./wrangler.js";
 import type { ProjectContext } from "../types.js";
+import { renderGuardPage } from "./dev-ui-guard.js";
+import { runStatus } from "./guard/status.js";
+import { runBreaches } from "./guard/breaches.js";
+import { runReport } from "./guard/report.js";
+import { runListRuntimeProtected } from "./guard/runtime-protected-client.js";
+import { createGuardClient } from "./guard/client.js";
+import { fetchWorkerUsage } from "usage-guard-shared";
 
 export interface DevUiHandle {
   port: number;
@@ -718,6 +725,7 @@ export async function renderDevUi(
       <div class="page-header">
         <h1>wrangler-deploy</h1>
         <span class="badge badge-secondary">dev ui</span>
+        <a href="/guard">Guard</a>
       </div>
       <p class="page-meta">
         <span>mode: ${escapeHtml(activeState?.mode ?? "unknown")}</span>
@@ -964,6 +972,80 @@ async function runAction(config: CfStageConfig, rootDir: string, rawBody: string
   }
 }
 
+async function loadGuardPageData(config: CfStageConfig): Promise<{
+  html: string;
+}> {
+  const accounts = config.guard?.accounts ?? [];
+  const token = process.env.CLOUDFLARE_API_TOKEN;
+  const endpoint = config.guard?.endpoint;
+  const signingKey = process.env.WRANGLER_DEPLOY_GUARD_SIGNING_KEY;
+  const warnings: string[] = [];
+
+  if (accounts.length === 0) {
+    return {
+      html: renderGuardPage({
+        status: [],
+        warnings: ["No accounts configured under guard.accounts in wrangler-deploy.config.ts."],
+      }),
+    };
+  }
+  if (!token) {
+    return {
+      html: renderGuardPage({
+        status: [],
+        warnings: ["CLOUDFLARE_API_TOKEN env var is required to render live usage."],
+      }),
+    };
+  }
+
+  let status: Awaited<ReturnType<typeof runStatus>> = [];
+  try {
+    status = await runStatus(
+      { accounts },
+      { now: () => new Date(), fetchUsage: (a) => fetchWorkerUsage(a, { fetch, token }) }
+    );
+  } catch (e) {
+    warnings.push(`Usage query failed: ${(e as Error).message}`);
+  }
+
+  let breaches: Awaited<ReturnType<typeof runBreaches>> | undefined;
+  let report: Awaited<ReturnType<typeof runReport>> | undefined;
+  let runtimeProtected: Awaited<ReturnType<typeof runListRuntimeProtected>> | undefined;
+
+  const client = endpoint && signingKey ? createGuardClient({ endpoint, signingKey }) : undefined;
+  if (client) {
+    const first = accounts[0];
+    if (first) {
+      try {
+        breaches = await runBreaches({ accountId: first.accountId, limit: 10 }, { client });
+      } catch (e) {
+        warnings.push(`Breaches query failed: ${(e as Error).message}`);
+      }
+      try {
+        report = await runReport({ accountId: first.accountId }, { client });
+      } catch (e) {
+        warnings.push(`Report query failed: ${(e as Error).message}`);
+      }
+      try {
+        runtimeProtected = await runListRuntimeProtected({ accountId: first.accountId }, { client });
+      } catch (e) {
+        warnings.push(`Runtime-protected query failed: ${(e as Error).message}`);
+      }
+    }
+  }
+
+  return {
+    html: renderGuardPage({
+      status,
+      ...(breaches !== undefined ? { breaches } : {}),
+      ...(report !== undefined ? { report } : {}),
+      ...(runtimeProtected !== undefined ? { runtimeProtected } : {}),
+      endpointConfigured: Boolean(client),
+      ...(warnings.length > 0 ? { warnings } : {}),
+    }),
+  };
+}
+
 export async function startDevUi(
   config: CfStageConfig,
   rootDir: string,
@@ -973,6 +1055,13 @@ export async function startDevUi(
     try {
       if (req.method === "GET" && (req.url === "/" || req.url === "/index.html")) {
         const html = await renderDevUi(config, rootDir, { autoRefresh: true });
+        res.setHeader("content-type", "text/html; charset=utf-8");
+        res.end(html);
+        return;
+      }
+
+      if (req.method === "GET" && req.url === "/guard") {
+        const { html } = await loadGuardPageData(config);
         res.setHeader("content-type", "text/html; charset=utf-8");
         res.end(html);
         return;

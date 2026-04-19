@@ -51,6 +51,7 @@ export default defineConfig({
             { label: "Route Templating", slug: "features/route-templating" },
             { label: "Stage Protection", slug: "features/stage-protection" },
             { label: "Doctor", slug: "features/doctor" },
+            { label: "wrangler-resolve", slug: "features/wrangler-resolve" },
           ],
         },
         {

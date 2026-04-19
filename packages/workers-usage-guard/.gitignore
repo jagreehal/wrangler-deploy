@@ -1,0 +1,6 @@
+dist
+dist-bundle
+node_modules
+.wrangler
+.dev.vars
+*.log

@@ -1,0 +1,29 @@
+{
+  "name": "workers-usage-guard",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Cloudflare Worker that monitors Workers usage and detaches public entry points on threshold breach",
+  "type": "module",
+  "main": "src/index.ts",
+  "dependencies": {
+    "usage-guard-shared": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "bundle": "wrangler deploy --dry-run --outdir dist-bundle",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config vitest.config.ts",
+    "test:int": "vitest run --config vitest.int.config.ts",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260412.1",
+    "@faker-js/faker": "^9.0.0",
+    "@types/node": "^25.5.2",
+    "miniflare": "^4.0.0",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.2",
+    "vitest-mock-extended": "^3.0.0",
+    "wrangler": "^4.80.0"
+  }
+}

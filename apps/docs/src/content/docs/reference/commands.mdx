@@ -178,6 +178,93 @@ $ wd status --stage staging
     payment-batch-workflow-staging — deployed
 ```
 
+## `wd guard ...`
+
+Workers usage guard commands. These are split into:
+
+- `status`: direct Cloudflare GraphQL usage view (requires `CLOUDFLARE_API_TOKEN`)
+- `init|deploy|migrate`: provision and deploy the bundled `workers-usage-guard` Worker
+- `breaches|report|disarm|arm|approvals|approve|reject`: require a deployed guard endpoint and `WRANGLER_DEPLOY_GUARD_SIGNING_KEY`
+
+### `wd guard status [--json]`
+
+Show current usage for accounts defined in `guard.accounts` in `wrangler-deploy.config.ts`.
+
+```bash
+$ CLOUDFLARE_API_TOKEN=... wd guard status
+```
+
+### `wd guard init --account <id> [--billing-cycle-day <1-31>] [--workers <names>] [--database-id <id>] [--yes]`
+
+One-command setup: creates the D1 database, applies migrations, sets secrets, and deploys the bundled `workers-usage-guard` Worker. Prints the config snippet to add to `wrangler-deploy.config.ts`.
+
+```bash
+$ wd guard init --account 1234abcd --workers api,event-router --yes
+```
+
+Prompts for notification channels interactively (skip with `--yes`).
+
+- `--workers` — comma-separated worker script names to monitor
+- `--database-id` — skip D1 creation and use an existing database (re-init safe)
+- `--billing-cycle-day` — day of month the billing cycle starts (default: 1)
+- `--yes` — non-interactive; skip all prompts
+
+### `wd guard deploy [--database-id <id>]`
+
+Re-deploy the bundled `workers-usage-guard` Worker using `guard.databaseId` from config (or `--database-id`).
+
+```bash
+$ wd guard deploy
+$ wd guard deploy --database-id bd0274ea-ea3b-4fd7-966d-ee55d6ce9947
+```
+
+### `wd guard migrate [--database-id <id>]`
+
+Apply D1 migrations to the guard database. Uses `guard.databaseId` from config (or `--database-id`).
+
+```bash
+$ wd guard migrate
+```
+
+### `wd guard breaches --account <id> [--limit <n>] [--json]`
+
+Read recent breach forensics from the guard API.
+
+```bash
+$ wd guard breaches --account 1234abcd --limit 10
+```
+
+### `wd guard report --account <id> [--date <YYYY-MM-DD>] [--json]`
+
+Read daily usage report data from the guard API.
+
+```bash
+$ wd guard report --account 1234abcd
+$ wd guard report --account 1234abcd --date 2026-04-19
+```
+
+### `wd guard disarm <script> --account <id> [--reason <text>]`
+### `wd guard arm <script> --account <id>`
+
+Toggle runtime protection for a worker script (human override on kill-switch behavior).
+
+```bash
+$ wd guard disarm payment-api --account 1234abcd --reason "incident mitigation"
+$ wd guard arm payment-api --account 1234abcd
+```
+
+### `wd guard approvals --account <id> [--json]`
+### `wd guard approve <approval-id> --account <id>`
+### `wd guard reject <approval-id> --account <id>`
+
+List and decide pending human approvals created by the kill-switch workflow.
+
+```bash
+$ wd guard approvals --account 1234abcd
+$ wd guard approve appr-123 --account 1234abcd
+$ wd guard reject appr-456 --account 1234abcd
+```
+
 ## `wd verify --stage <name>`
 
 Read-only coherence check. Validates state against live resources, rendered configs, workers, secrets, and service bindings. Use this in CI after deploy, or manually to check if everything is still consistent.
