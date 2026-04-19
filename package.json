@@ -24,7 +24,7 @@
     "release": "pnpm build && changeset publish"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.30.0",
+    "@changesets/cli": "^2.31.0",
     "@eslint/js": "^10.0.1",
     "eslint": "^10.2.1",
     "eslint-config-prettier": "^10.1.8",
