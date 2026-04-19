@@ -91,42 +91,6 @@ importers:
         specifier: workspace:*
         version: link:../../packages/wrangler-deploy
 
-  packages/node-env-resolver-cloudflare:
-    devDependencies:
-      '@eslint/js':
-        specifier: ^10.0.1
-        version: 10.0.1(eslint@10.2.0)
-      '@types/node':
-        specifier: ^25.6.0
-        version: 25.6.0
-      '@typescript-eslint/eslint-plugin':
-        specifier: ^8.58.1
-        version: 8.58.2(@typescript-eslint/parser@8.58.2(eslint@10.2.0)(typescript@6.0.2))(eslint@10.2.0)(typescript@6.0.2)
-      '@typescript-eslint/parser':
-        specifier: ^8.58.1
-        version: 8.58.2(eslint@10.2.0)(typescript@6.0.2)
-      eslint:
-        specifier: ^10.2.0
-        version: 10.2.0
-      eslint-config-prettier:
-        specifier: ^10.1.8
-        version: 10.1.8(eslint@10.2.0)
-      node-env-resolver:
-        specifier: ^6.4.0
-        version: 6.5.0
-      prettier:
-        specifier: ^3.8.2
-        version: 3.8.2
-      tsup:
-        specifier: ^8.5.1
-        version: 8.5.1(postcss@8.5.8)(tsx@4.21.0)(typescript@6.0.2)
-      typescript:
-        specifier: ^6.0.2
-        version: 6.0.2
-      vitest:
-        specifier: ^4.1.4
-        version: 4.1.4(@types/node@25.6.0)(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@25.6.0)(esbuild@0.27.3)(tsx@4.21.0))
-
   packages/usage-guard-shared:
     devDependencies:
       '@types/node':
@@ -186,8 +150,8 @@ importers:
         specifier: ^25.5.2
         version: 25.5.2
       executable-stories-vitest:
-        specifier: ^8.1.4
-        version: 8.1.4(vitest@4.1.2(@types/node@25.5.2)(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@25.5.2)(esbuild@0.27.3)(tsx@4.21.0)))
+        specifier: ^8.1.9
+        version: 8.1.9(vitest@4.1.2(@types/node@25.5.2)(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@25.5.2)(esbuild@0.27.3)(tsx@4.21.0)))
       typescript:
         specifier: ^6.0.2
         version: 6.0.2
@@ -226,7 +190,7 @@ importers:
         version: 3.8.2
       tsup:
         specifier: ^8.5.1
-        version: 8.5.1(postcss@8.5.8)(tsx@4.21.0)(typescript@6.0.2)
+        version: 8.5.1(postcss@8.5.10)(tsx@4.21.0)(typescript@6.0.2)
       typescript:
         specifier: ^6.0.2
         version: 6.0.2
@@ -428,13 +392,13 @@ packages:
     resolution: {integrity: sha512-kzyuwOAQnXJNLS9PSyrk0CWk35nWJW/zl/6KvnTBMFK65gm7U1/Z5BqjxeapjZCIhQcM/DsrEmcbRwDyXyXK4A==}
     engines: {node: '>=14'}
 
-  '@cucumber/html-formatter@23.0.0':
-    resolution: {integrity: sha512-WwcRzdM8Ixy4e53j+Frm3fKM5rNuIyWUfy4HajEN+Xk/YcjA6yW0ACGTFDReB++VDZz/iUtwYdTlPRY36NbqJg==}
+  '@cucumber/html-formatter@23.1.0':
+    resolution: {integrity: sha512-DcCSFoGs6jbwzXPgX1CwgJKEE+ZMcIEzq/0Memg0o24maNn9NJizBFHmoFWG4iv/OxHza+mvc+56cTHetfHndw==}
     peerDependencies:
       '@cucumber/messages': '>=18'
 
-  '@cucumber/messages@32.2.0':
-    resolution: {integrity: sha512-oYp1dgL2TByYWL51Z+rNm+/mFtJhiPU9WS03goes9EALb8d9GFcXRbG1JluFLFaChF1YDqIzLac0kkC3tv1DjQ==}
+  '@cucumber/messages@32.3.1':
+    resolution: {integrity: sha512-yNQq1KoXRYaEKrWMFmpUQX7TdeQuU9jeGgJAZ3dArTsC/T4NpJ6DnqaJIIgwPnz/wtQIQTNX7/h0rOuF5xY4qQ==}
 
   '@emnapi/core@1.9.2':
     resolution: {integrity: sha512-UC+ZhH3XtczQYfOlu3lNEkdW/p4dsJ1r/bP7H8+rhao3TTTMO1ATq/4DdIi23XuGoFY+Cz0JmCbdVl0hz9jZcA==}
@@ -852,8 +816,8 @@ packages:
   '@mermaid-js/parser@1.1.0':
     resolution: {integrity: sha512-gxK9ZX2+Fex5zu8LhRQoMeMPEHbc73UKZ0FQ54YrQtUxE1VVhMwzeNtKRPAu5aXks4FasbMe4xB4bWrmq6Jlxw==}
 
-  '@napi-rs/wasm-runtime@1.1.2':
-    resolution: {integrity: sha512-sNXv5oLJ7ob93xkZ1XnxisYhGYXfaG9f65/ZgYuAu3qt7b3NadcOEhLvx28hv31PgX8SZJRYrAIPQilQmFpLVw==}
+  '@napi-rs/wasm-runtime@1.1.4':
+    resolution: {integrity: sha512-3NQNNgA1YSlJb/kMH1ildASP9HW7/7kYnRI2szWJaofaS1hWmbGI4H+d3+22aGzXXN9IJ+n+GiFVcGipJP18ow==}
     peerDependencies:
       '@emnapi/core': ^1.7.1
       '@emnapi/runtime': ^1.7.1
@@ -2162,13 +2126,13 @@ packages:
   eventemitter3@5.0.4:
     resolution: {integrity: sha512-mlsTRyGaPBjPedk6Bvw+aqbsXDtoAyAzm5MO7JgU+yVRyMQ5O8bD4Kcci7BS85f93veegeCPkL8R4GLClnjLFw==}
 
-  executable-stories-formatters@0.7.3:
-    resolution: {integrity: sha512-S5YYNpLjS/Gc+rtsHcyqYv2K7b0ySldHZgwQimM1yPiBGyutbg+yMIraUhzYJ54jg6BDHxPPe+Be7yE+Uqs3kw==}
+  executable-stories-formatters@0.7.8:
+    resolution: {integrity: sha512-3uNxdtcFj6V/KgBwAuVmOlHpSlzcv3CKy2O3Rp2LL+clbi5q9Lm+5ympk7sa7GKnHINmlvYGHyuXM6ZTZqp+VQ==}
     engines: {node: '>=22'}
     hasBin: true
 
-  executable-stories-vitest@8.1.4:
-    resolution: {integrity: sha512-8vayIWG9NnrEq1RyHG98XAK3taMC145NVJljE7YVe2aFhIq0xinwx6tkEcP06O8guSOqo9x6AfDZJkmo2h4d7Q==}
+  executable-stories-vitest@8.1.9:
+    resolution: {integrity: sha512-rkgAS2JW5zSLJj3umQ2iQ4yH58cb8L4H0Z7aURRFsxQbJj8GDpboDAQAYTOC3huNYKk2mkycV0yQHh+UdBOv1g==}
     hasBin: true
     peerDependencies:
       vitest: '>=4.1.0'
@@ -3073,6 +3037,10 @@ packages:
     resolution: {integrity: sha512-Q8qQfPiZ+THO/3ZrOrO0cJJKfpYCagtMUkXbnEfmgUjwXg6z/WBeOyS9APBBPCTSiDV+s4SwQGu8yFsiMRIudg==}
     engines: {node: '>=4'}
 
+  postcss@8.5.10:
+    resolution: {integrity: sha512-pMMHxBOZKFU6HgAZ4eyGnwXF/EvPGGqUr0MnZ5+99485wwW41kW91A4LOGxSHhgugZmSChL5AlElNdwlNgcnLQ==}
+    engines: {node: ^10 || ^12 || >=14}
+
   postcss@8.5.8:
     resolution: {integrity: sha512-OW/rX8O/jXnm82Ey1k44pObPtdblfiuWnrd8X7GJ7emImCOstunGbXUpp7HdBrFQX6rJzn3sPT397Wp5aCwCHg==}
     engines: {node: ^10 || ^12 || >=14}
@@ -3408,6 +3376,10 @@ packages:
 
   tinyglobby@0.2.15:
     resolution: {integrity: sha512-j2Zq4NyQYG5XMST4cbs02Ak8iJUdxRM0XI5QyxXuZOzKOINmWurp3smXu3y5wDcJrptwpSjgXHzIQxR0omXljQ==}
+    engines: {node: '>=12.0.0'}
+
+  tinyglobby@0.2.16:
+    resolution: {integrity: sha512-pn99VhoACYR8nFHhxqix+uvsbXineAasWm5ojXoN8xEwK5Kd3/TrhNn1wByuD52UxWRLy8pu+kRMniEi6Eq9Zg==}
     engines: {node: '>=12.0.0'}
 
   tinyrainbow@3.1.0:
@@ -4279,11 +4251,11 @@ snapshots:
 
   '@ctrl/tinycolor@4.2.0': {}
 
-  '@cucumber/html-formatter@23.0.0(@cucumber/messages@32.2.0)':
+  '@cucumber/html-formatter@23.1.0(@cucumber/messages@32.3.1)':
     dependencies:
-      '@cucumber/messages': 32.2.0
+      '@cucumber/messages': 32.3.1
 
-  '@cucumber/messages@32.2.0':
+  '@cucumber/messages@32.3.1':
     dependencies:
       class-transformer: 0.5.1
       reflect-metadata: 0.2.2
@@ -4634,7 +4606,7 @@ snapshots:
     dependencies:
       langium: 4.2.1
 
-  '@napi-rs/wasm-runtime@1.1.2(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)':
+  '@napi-rs/wasm-runtime@1.1.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)':
     dependencies:
       '@emnapi/core': 1.9.2
       '@emnapi/runtime': 1.9.2
@@ -4727,7 +4699,7 @@ snapshots:
 
   '@rolldown/binding-wasm32-wasi@1.0.0-rc.12(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)':
     dependencies:
-      '@napi-rs/wasm-runtime': 1.1.2(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
+      '@napi-rs/wasm-runtime': 1.1.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
     transitivePeerDependencies:
       - '@emnapi/core'
       - '@emnapi/runtime'
@@ -6044,15 +6016,15 @@ snapshots:
 
   eventemitter3@5.0.4: {}
 
-  executable-stories-formatters@0.7.3:
+  executable-stories-formatters@0.7.8:
     dependencies:
-      '@cucumber/html-formatter': 23.0.0(@cucumber/messages@32.2.0)
-      '@cucumber/messages': 32.2.0
+      '@cucumber/html-formatter': 23.1.0(@cucumber/messages@32.3.1)
+      '@cucumber/messages': 32.3.1
       ajv: 8.18.0
 
-  executable-stories-vitest@8.1.4(vitest@4.1.2(@types/node@25.5.2)(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@25.5.2)(esbuild@0.27.3)(tsx@4.21.0))):
+  executable-stories-vitest@8.1.9(vitest@4.1.2(@types/node@25.5.2)(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@25.5.2)(esbuild@0.27.3)(tsx@4.21.0))):
     dependencies:
-      executable-stories-formatters: 0.7.3
+      executable-stories-formatters: 0.7.8
       fast-glob: 3.3.3
       picomatch: 4.0.4
       vitest: 4.1.2(@types/node@25.5.2)(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@25.5.2)(esbuild@0.27.3)(tsx@4.21.0))
@@ -7310,11 +7282,11 @@ snapshots:
       path-data-parser: 0.1.0
       points-on-curve: 0.2.0
 
-  postcss-load-config@6.0.1(postcss@8.5.8)(tsx@4.21.0):
+  postcss-load-config@6.0.1(postcss@8.5.10)(tsx@4.21.0):
     dependencies:
       lilconfig: 3.1.3
     optionalDependencies:
-      postcss: 8.5.8
+      postcss: 8.5.10
       tsx: 4.21.0
 
   postcss-nested@6.2.0(postcss@8.5.8):
@@ -7326,6 +7298,12 @@ snapshots:
     dependencies:
       cssesc: 3.0.0
       util-deprecate: 1.0.2
+
+  postcss@8.5.10:
+    dependencies:
+      nanoid: 3.3.11
+      picocolors: 1.1.1
+      source-map-js: 1.2.1
 
   postcss@8.5.8:
     dependencies:
@@ -7796,6 +7774,11 @@ snapshots:
       fdir: 6.5.0(picomatch@4.0.4)
       picomatch: 4.0.4
 
+  tinyglobby@0.2.16:
+    dependencies:
+      fdir: 6.5.0(picomatch@4.0.4)
+      picomatch: 4.0.4
+
   tinyrainbow@3.1.0: {}
 
   to-regex-range@5.0.1:
@@ -7826,7 +7809,7 @@ snapshots:
 
   tslib@2.8.1: {}
 
-  tsup@8.5.1(postcss@8.5.8)(tsx@4.21.0)(typescript@6.0.2):
+  tsup@8.5.1(postcss@8.5.10)(tsx@4.21.0)(typescript@6.0.2):
     dependencies:
       bundle-require: 5.1.0(esbuild@0.27.3)
       cac: 6.7.14
@@ -7837,7 +7820,7 @@ snapshots:
       fix-dts-default-cjs-exports: 1.0.1
       joycon: 3.1.1
       picocolors: 1.1.1
-      postcss-load-config: 6.0.1(postcss@8.5.8)(tsx@4.21.0)
+      postcss-load-config: 6.0.1(postcss@8.5.10)(tsx@4.21.0)
       resolve-from: 5.0.0
       rollup: 4.60.1
       source-map: 0.7.6
@@ -7846,7 +7829,7 @@ snapshots:
       tinyglobby: 0.2.15
       tree-kill: 1.2.2
     optionalDependencies:
-      postcss: 8.5.8
+      postcss: 8.5.10
       typescript: 6.0.2
     transitivePeerDependencies:
       - jiti
@@ -8024,9 +8007,9 @@ snapshots:
     dependencies:
       lightningcss: 1.32.0
       picomatch: 4.0.4
-      postcss: 8.5.8
+      postcss: 8.5.10
       rolldown: 1.0.0-rc.12(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
-      tinyglobby: 0.2.15
+      tinyglobby: 0.2.16
     optionalDependencies:
       '@types/node': 25.5.2
       esbuild: 0.27.3
@@ -8040,9 +8023,9 @@ snapshots:
     dependencies:
       lightningcss: 1.32.0
       picomatch: 4.0.4
-      postcss: 8.5.8
+      postcss: 8.5.10
       rolldown: 1.0.0-rc.12(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
-      tinyglobby: 0.2.15
+      tinyglobby: 0.2.16
     optionalDependencies:
       '@types/node': 25.6.0
       esbuild: 0.27.3
