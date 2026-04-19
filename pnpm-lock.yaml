@@ -55,8 +55,8 @@ importers:
         version: 4.12.12
     devDependencies:
       '@cloudflare/workers-types':
-        specifier: ^4.20260412.1
-        version: 4.20260414.1
+        specifier: ^4.20260418.1
+        version: 4.20260418.1
       '@types/node':
         specifier: ^25.5.2
         version: 25.5.2
@@ -68,7 +68,7 @@ importers:
         version: 4.21.0
       wrangler:
         specifier: ^4.80.0
-        version: 4.80.0(@cloudflare/workers-types@4.20260414.1)
+        version: 4.80.0(@cloudflare/workers-types@4.20260418.1)
       wrangler-deploy:
         specifier: workspace:*
         version: link:../../packages/wrangler-deploy
@@ -86,46 +86,10 @@ importers:
         version: 4.1.2(@types/node@25.5.2)(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@25.5.2)(esbuild@0.27.3)(tsx@4.21.0))
       wrangler:
         specifier: ^4.80.0
-        version: 4.80.0(@cloudflare/workers-types@4.20260414.1)
+        version: 4.80.0(@cloudflare/workers-types@4.20260418.1)
       wrangler-deploy:
         specifier: workspace:*
         version: link:../../packages/wrangler-deploy
-
-  packages/node-env-resolver-cloudflare:
-    devDependencies:
-      '@eslint/js':
-        specifier: ^10.0.1
-        version: 10.0.1(eslint@10.2.0)
-      '@types/node':
-        specifier: ^25.6.0
-        version: 25.6.0
-      '@typescript-eslint/eslint-plugin':
-        specifier: ^8.58.1
-        version: 8.58.2(@typescript-eslint/parser@8.58.2(eslint@10.2.0)(typescript@6.0.2))(eslint@10.2.0)(typescript@6.0.2)
-      '@typescript-eslint/parser':
-        specifier: ^8.58.1
-        version: 8.58.2(eslint@10.2.0)(typescript@6.0.2)
-      eslint:
-        specifier: ^10.2.0
-        version: 10.2.0
-      eslint-config-prettier:
-        specifier: ^10.1.8
-        version: 10.1.8(eslint@10.2.0)
-      node-env-resolver:
-        specifier: ^6.4.0
-        version: 6.5.0
-      prettier:
-        specifier: ^3.8.2
-        version: 3.8.2
-      tsup:
-        specifier: ^8.5.1
-        version: 8.5.1(postcss@8.5.8)(tsx@4.21.0)(typescript@6.0.2)
-      typescript:
-        specifier: ^6.0.2
-        version: 6.0.2
-      vitest:
-        specifier: ^4.1.4
-        version: 4.1.4(@types/node@25.6.0)(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@25.6.0)(esbuild@0.27.3)(tsx@4.21.0))
 
   packages/usage-guard-shared:
     devDependencies:
@@ -146,8 +110,8 @@ importers:
         version: link:../usage-guard-shared
     devDependencies:
       '@cloudflare/workers-types':
-        specifier: ^4.20260412.1
-        version: 4.20260414.1
+        specifier: ^4.20260418.1
+        version: 4.20260418.1
       '@faker-js/faker':
         specifier: ^9.0.0
         version: 9.9.0
@@ -168,19 +132,19 @@ importers:
         version: 3.1.1(typescript@6.0.2)(vitest@4.1.2(@types/node@25.5.2)(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)(@types/node@25.5.2)(esbuild@0.27.3)(tsx@4.21.0)))
       wrangler:
         specifier: ^4.80.0
-        version: 4.80.0(@cloudflare/workers-types@4.20260414.1)
+        version: 4.80.0(@cloudflare/workers-types@4.20260418.1)
 
   packages/wrangler-deploy:
     dependencies:
       '@cloudflare/workers-types':
-        specifier: ^4.20260412.1
-        version: 4.20260414.1
+        specifier: ^4.20260418.1
+        version: 4.20260418.1
       usage-guard-shared:
         specifier: workspace:*
         version: link:../usage-guard-shared
       wrangler:
         specifier: '>=4.80.0'
-        version: 4.80.0(@cloudflare/workers-types@4.20260414.1)
+        version: 4.80.0(@cloudflare/workers-types@4.20260418.1)
     devDependencies:
       '@types/node':
         specifier: ^25.5.2
@@ -226,7 +190,7 @@ importers:
         version: 3.8.2
       tsup:
         specifier: ^8.5.1
-        version: 8.5.1(postcss@8.5.8)(tsx@4.21.0)(typescript@6.0.2)
+        version: 8.5.1(postcss@8.5.10)(tsx@4.21.0)(typescript@6.0.2)
       typescript:
         specifier: ^6.0.2
         version: 6.0.2
@@ -417,8 +381,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@cloudflare/workers-types@4.20260414.1':
-    resolution: {integrity: sha512-E2wgYT1ywoM1M68nmVpxKdKzXsZm5vOu2plsqUixlK7YIydqsw31dZ+EjwXnAsdEjLaYC6XfsJayil8AEhyaBQ==}
+  '@cloudflare/workers-types@4.20260418.1':
+    resolution: {integrity: sha512-bywXb2XmeSqrLCQYipcupLneqx015YhhNWz2v9b9iatpe8Cg551vP7ZuD5S2a6GfBka0dDnO70kIBiBvFglcrg==}
 
   '@cspotcode/source-map-support@0.8.1':
     resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
@@ -852,8 +816,8 @@ packages:
   '@mermaid-js/parser@1.1.0':
     resolution: {integrity: sha512-gxK9ZX2+Fex5zu8LhRQoMeMPEHbc73UKZ0FQ54YrQtUxE1VVhMwzeNtKRPAu5aXks4FasbMe4xB4bWrmq6Jlxw==}
 
-  '@napi-rs/wasm-runtime@1.1.2':
-    resolution: {integrity: sha512-sNXv5oLJ7ob93xkZ1XnxisYhGYXfaG9f65/ZgYuAu3qt7b3NadcOEhLvx28hv31PgX8SZJRYrAIPQilQmFpLVw==}
+  '@napi-rs/wasm-runtime@1.1.4':
+    resolution: {integrity: sha512-3NQNNgA1YSlJb/kMH1ildASP9HW7/7kYnRI2szWJaofaS1hWmbGI4H+d3+22aGzXXN9IJ+n+GiFVcGipJP18ow==}
     peerDependencies:
       '@emnapi/core': ^1.7.1
       '@emnapi/runtime': ^1.7.1
@@ -3073,6 +3037,10 @@ packages:
     resolution: {integrity: sha512-Q8qQfPiZ+THO/3ZrOrO0cJJKfpYCagtMUkXbnEfmgUjwXg6z/WBeOyS9APBBPCTSiDV+s4SwQGu8yFsiMRIudg==}
     engines: {node: '>=4'}
 
+  postcss@8.5.10:
+    resolution: {integrity: sha512-pMMHxBOZKFU6HgAZ4eyGnwXF/EvPGGqUr0MnZ5+99485wwW41kW91A4LOGxSHhgugZmSChL5AlElNdwlNgcnLQ==}
+    engines: {node: ^10 || ^12 || >=14}
+
   postcss@8.5.8:
     resolution: {integrity: sha512-OW/rX8O/jXnm82Ey1k44pObPtdblfiuWnrd8X7GJ7emImCOstunGbXUpp7HdBrFQX6rJzn3sPT397Wp5aCwCHg==}
     engines: {node: ^10 || ^12 || >=14}
@@ -3408,6 +3376,10 @@ packages:
 
   tinyglobby@0.2.15:
     resolution: {integrity: sha512-j2Zq4NyQYG5XMST4cbs02Ak8iJUdxRM0XI5QyxXuZOzKOINmWurp3smXu3y5wDcJrptwpSjgXHzIQxR0omXljQ==}
+    engines: {node: '>=12.0.0'}
+
+  tinyglobby@0.2.16:
+    resolution: {integrity: sha512-pn99VhoACYR8nFHhxqix+uvsbXineAasWm5ojXoN8xEwK5Kd3/TrhNn1wByuD52UxWRLy8pu+kRMniEi6Eq9Zg==}
     engines: {node: '>=12.0.0'}
 
   tinyrainbow@3.1.0:
@@ -4271,7 +4243,7 @@ snapshots:
   '@cloudflare/workerd-windows-64@1.20260401.1':
     optional: true
 
-  '@cloudflare/workers-types@4.20260414.1': {}
+  '@cloudflare/workers-types@4.20260418.1': {}
 
   '@cspotcode/source-map-support@0.8.1':
     dependencies:
@@ -4634,7 +4606,7 @@ snapshots:
     dependencies:
       langium: 4.2.1
 
-  '@napi-rs/wasm-runtime@1.1.2(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)':
+  '@napi-rs/wasm-runtime@1.1.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)':
     dependencies:
       '@emnapi/core': 1.9.2
       '@emnapi/runtime': 1.9.2
@@ -4727,7 +4699,7 @@ snapshots:
 
   '@rolldown/binding-wasm32-wasi@1.0.0-rc.12(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)':
     dependencies:
-      '@napi-rs/wasm-runtime': 1.1.2(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
+      '@napi-rs/wasm-runtime': 1.1.4(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
     transitivePeerDependencies:
       - '@emnapi/core'
       - '@emnapi/runtime'
@@ -7310,11 +7282,11 @@ snapshots:
       path-data-parser: 0.1.0
       points-on-curve: 0.2.0
 
-  postcss-load-config@6.0.1(postcss@8.5.8)(tsx@4.21.0):
+  postcss-load-config@6.0.1(postcss@8.5.10)(tsx@4.21.0):
     dependencies:
       lilconfig: 3.1.3
     optionalDependencies:
-      postcss: 8.5.8
+      postcss: 8.5.10
       tsx: 4.21.0
 
   postcss-nested@6.2.0(postcss@8.5.8):
@@ -7326,6 +7298,12 @@ snapshots:
     dependencies:
       cssesc: 3.0.0
       util-deprecate: 1.0.2
+
+  postcss@8.5.10:
+    dependencies:
+      nanoid: 3.3.11
+      picocolors: 1.1.1
+      source-map-js: 1.2.1
 
   postcss@8.5.8:
     dependencies:
@@ -7796,6 +7774,11 @@ snapshots:
       fdir: 6.5.0(picomatch@4.0.4)
       picomatch: 4.0.4
 
+  tinyglobby@0.2.16:
+    dependencies:
+      fdir: 6.5.0(picomatch@4.0.4)
+      picomatch: 4.0.4
+
   tinyrainbow@3.1.0: {}
 
   to-regex-range@5.0.1:
@@ -7826,7 +7809,7 @@ snapshots:
 
   tslib@2.8.1: {}
 
-  tsup@8.5.1(postcss@8.5.8)(tsx@4.21.0)(typescript@6.0.2):
+  tsup@8.5.1(postcss@8.5.10)(tsx@4.21.0)(typescript@6.0.2):
     dependencies:
       bundle-require: 5.1.0(esbuild@0.27.3)
       cac: 6.7.14
@@ -7837,7 +7820,7 @@ snapshots:
       fix-dts-default-cjs-exports: 1.0.1
       joycon: 3.1.1
       picocolors: 1.1.1
-      postcss-load-config: 6.0.1(postcss@8.5.8)(tsx@4.21.0)
+      postcss-load-config: 6.0.1(postcss@8.5.10)(tsx@4.21.0)
       resolve-from: 5.0.0
       rollup: 4.60.1
       source-map: 0.7.6
@@ -7846,7 +7829,7 @@ snapshots:
       tinyglobby: 0.2.15
       tree-kill: 1.2.2
     optionalDependencies:
-      postcss: 8.5.8
+      postcss: 8.5.10
       typescript: 6.0.2
     transitivePeerDependencies:
       - jiti
@@ -8024,9 +8007,9 @@ snapshots:
     dependencies:
       lightningcss: 1.32.0
       picomatch: 4.0.4
-      postcss: 8.5.8
+      postcss: 8.5.10
       rolldown: 1.0.0-rc.12(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
-      tinyglobby: 0.2.15
+      tinyglobby: 0.2.16
     optionalDependencies:
       '@types/node': 25.5.2
       esbuild: 0.27.3
@@ -8040,9 +8023,9 @@ snapshots:
     dependencies:
       lightningcss: 1.32.0
       picomatch: 4.0.4
-      postcss: 8.5.8
+      postcss: 8.5.10
       rolldown: 1.0.0-rc.12(@emnapi/core@1.9.2)(@emnapi/runtime@1.9.2)
-      tinyglobby: 0.2.15
+      tinyglobby: 0.2.16
     optionalDependencies:
       '@types/node': 25.6.0
       esbuild: 0.27.3
@@ -8156,7 +8139,7 @@ snapshots:
       '@cloudflare/workerd-linux-arm64': 1.20260401.1
       '@cloudflare/workerd-windows-64': 1.20260401.1
 
-  wrangler@4.80.0(@cloudflare/workers-types@4.20260414.1):
+  wrangler@4.80.0(@cloudflare/workers-types@4.20260418.1):
     dependencies:
       '@cloudflare/kv-asset-handler': 0.4.2
       '@cloudflare/unenv-preset': 2.16.0(unenv@2.0.0-rc.24)(workerd@1.20260401.1)
@@ -8167,7 +8150,7 @@ snapshots:
       unenv: 2.0.0-rc.24
       workerd: 1.20260401.1
     optionalDependencies:
-      '@cloudflare/workers-types': 4.20260414.1
+      '@cloudflare/workers-types': 4.20260418.1
       fsevents: 2.3.3
     transitivePeerDependencies:
       - bufferutil

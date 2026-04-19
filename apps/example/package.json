@@ -46,7 +46,7 @@
     "db:init": "wrangler d1 execute payments-db --local --file=sql/init.sql"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260412.1",
+    "@cloudflare/workers-types": "^4.20260418.1",
     "@types/node": "^25.5.2",
     "wrangler-deploy": "workspace:*",
     "concurrently": "^9.2.1",
