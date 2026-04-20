@@ -1,5 +1,5 @@
 import type { StatusRow } from "./guard/status.js";
-import type { BreachForensic, UsageReport } from "usage-guard-shared";
+import type { BreachForensic, UsageReport } from "../usage-guard-shared/index.js";
 import type { RuntimeProtectedRow } from "./guard/runtime-protected-client.js";
 
 export type GuardPageData = {

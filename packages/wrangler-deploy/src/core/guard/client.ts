@@ -1,4 +1,4 @@
-import { signRequest } from "usage-guard-shared";
+import { signRequest } from "../../usage-guard-shared/index.js";
 
 export type GuardClientConfig = {
   endpoint: string;

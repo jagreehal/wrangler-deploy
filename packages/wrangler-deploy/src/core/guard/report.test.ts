@@ -6,7 +6,7 @@ import {
   renderReportJson,
   type ReportRunnerDeps,
 } from "./report.js";
-import type { UsageReport } from "usage-guard-shared";
+import type { UsageReport } from "../../usage-guard-shared/index.js";
 
 const report: UsageReport = {
   id: "r-1",

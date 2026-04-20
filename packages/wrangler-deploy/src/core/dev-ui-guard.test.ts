@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { renderGuardPage, type GuardPageData } from "./dev-ui-guard.js";
 import type { StatusRow } from "./guard/status.js";
-import type { BreachForensic, UsageReport } from "usage-guard-shared";
+import type { BreachForensic, UsageReport } from "../usage-guard-shared/index.js";
 import type { RuntimeProtectedRow } from "./guard/runtime-protected-client.js";
 
 const status: StatusRow[] = [

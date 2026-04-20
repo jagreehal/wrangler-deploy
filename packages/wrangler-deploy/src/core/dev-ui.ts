@@ -28,7 +28,7 @@ import { runBreaches } from "./guard/breaches.js";
 import { runReport } from "./guard/report.js";
 import { runListRuntimeProtected } from "./guard/runtime-protected-client.js";
 import { createGuardClient } from "./guard/client.js";
-import { fetchWorkerUsage } from "usage-guard-shared";
+import { fetchWorkerUsage } from "../usage-guard-shared/index.js";
 
 export interface DevUiHandle {
   port: number;
