@@ -1,4 +1,4 @@
-import type { NotificationChannelConfig } from "usage-guard-shared";
+import type { NotificationChannelConfig } from "../../usage-guard-shared/index.js";
 import { readFileSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 

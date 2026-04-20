@@ -1,5 +1,5 @@
 // packages/wrangler-deploy/src/core/guard/report.ts
-import type { UsageReport } from "usage-guard-shared";
+import type { UsageReport } from "../../usage-guard-shared/index.js";
 import type { GuardClient, GuardClientDeps } from "./client.js";
 
 export type ReportRunnerDeps = {

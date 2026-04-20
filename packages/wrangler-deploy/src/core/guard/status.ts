@@ -1,4 +1,4 @@
-import type { AccountConfig, WorkerUsage } from "usage-guard-shared";
+import type { AccountConfig, WorkerUsage } from "../../usage-guard-shared/index.js";
 
 const INCLUDED_REQUESTS = 10_000_000;
 const INCLUDED_CPU_MS = 30_000_000;
@@ -45,7 +45,7 @@ export type StatusRow = {
   estimatedCostUsd: number;
   periodStart: string;
   periodEnd: string;
-  recentBreaches?: import("usage-guard-shared").BreachForensic[];
+  recentBreaches?: import("../../usage-guard-shared/index.js").BreachForensic[];
 };
 
 export async function runStatus(
@@ -64,11 +64,11 @@ export async function runStatus(
       periodEnd: period.end,
       scriptNames,
     });
-    let recentBreaches: import("usage-guard-shared").BreachForensic[] | undefined;
+    let recentBreaches: import("../../usage-guard-shared/index.js").BreachForensic[] | undefined;
     if (deps.breachClient) {
       try {
         const res = await deps.breachClient.get<{
-          breaches: import("usage-guard-shared").BreachForensic[];
+          breaches: import("../../usage-guard-shared/index.js").BreachForensic[];
         }>(`/api/breaches?account=${encodeURIComponent(account.accountId)}&limit=5`);
         recentBreaches = res.breaches;
       } catch {

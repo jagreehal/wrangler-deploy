@@ -44,7 +44,7 @@ import { generateSigningKey, createD1Database } from "../core/guard/init.js";
 import { runListApprovals, runApprove, runReject } from "../core/guard/approvals.js";
 import { deployGuard } from "../core/guard/deploy.js";
 import { runMigrations } from "../core/guard/migrate.js";
-import { fetchWorkerUsage, type NotificationChannelConfig } from "usage-guard-shared";
+import { fetchWorkerUsage, type NotificationChannelConfig } from "../usage-guard-shared/index.js";
 import { buildDevPlan, startDev } from "../core/dev.js";
 import { generateGitHubWorkflow } from "../core/ci/workflow-gen.js";
 import { detectCiEnvironment } from "../core/ci/detect.js";

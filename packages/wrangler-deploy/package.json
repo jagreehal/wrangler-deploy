@@ -1,6 +1,6 @@
 {
   "name": "wrangler-deploy",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Create, deploy, and tear down full Cloudflare Workers environments per stage",
   "type": "module",
   "bin": {
@@ -29,8 +29,7 @@
     "wrangler": ">=4.80.0"
   },
   "dependencies": {
-    "@cloudflare/workers-types": "^4.20260418.1",
-    "usage-guard-shared": "workspace:*"
+    "@cloudflare/workers-types": "^4.20260418.1"
   },
   "devDependencies": {
     "@types/node": "^25.5.2",
