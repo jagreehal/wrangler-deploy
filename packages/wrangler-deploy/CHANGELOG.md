@@ -1,5 +1,11 @@
 # wrangler-deploy
 
+## 1.4.2
+
+### Patch Changes
+
+- c4e11df: Remove usage-guard-shared
+
 ## 1.4.0
 
 ### Minor Changes
