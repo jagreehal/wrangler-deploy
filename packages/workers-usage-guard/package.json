@@ -17,7 +17,7 @@
     "deploy": "wrangler deploy"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260418.1",
+    "@cloudflare/workers-types": "^4.20260426.1",
     "@faker-js/faker": "^9.0.0",
     "@types/node": "^25.5.2",
     "miniflare": "^4.20260415.0",
