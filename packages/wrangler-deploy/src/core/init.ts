@@ -22,7 +22,6 @@ function findWranglerConfigs(dir: string, rootDir: string): DiscoveredWorker[] {
     ".wrangler-deploy",
     ".turbo",
     ".wrangler",
-    ".alchemy",
     "test",
     "tests",
   ]);

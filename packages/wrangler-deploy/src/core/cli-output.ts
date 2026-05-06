@@ -6,9 +6,27 @@ export interface JsonOutputOptions {
 }
 
 let activeJsonOutputOptions: JsonOutputOptions = {};
+let quietMode = false;
 
 export function setJsonOutputOptions(options: JsonOutputOptions): void {
   activeJsonOutputOptions = options;
+}
+
+export function setQuietMode(quiet: boolean): void {
+  quietMode = quiet;
+}
+
+export function isQuiet(): boolean {
+  return quietMode;
+}
+
+export function parseQuiet(args: string[]): boolean {
+  return args.includes("--quiet") || args.includes("-q");
+}
+
+export function info(message: string): void {
+  if (quietMode) return;
+  process.stdout.write(`${message}\n`);
 }
 
 function readFlagValues(args: string[], flagName: string): string[] {

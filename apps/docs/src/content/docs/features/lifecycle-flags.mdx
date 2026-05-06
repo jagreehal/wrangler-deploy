@@ -1,0 +1,52 @@
+---
+title: Lifecycle Flags
+description: Per-resource adopt and delete:false hints for surgical control
+---
+
+Two opt-in flags on every resource declaration give you surgical control
+over the create/destroy lifecycle without touching CLI behaviour or stage
+protection.
+
+## `adopt: true | false`
+
+When `wd apply` provisions a resource and Cloudflare reports an
+already-exists conflict, wrangler-deploy adopts the existing resource by
+default — the same idempotency you've always had. Sometimes you want
+that to be louder.
+
+```ts
+resources: {
+  "billing-db": {
+    type: "d1",
+    bindings: { "apps/api": "DB" },
+    adopt: false, // fail loudly if a billing-db-prod already exists
+  },
+}
+```
+
+- `adopt: true` (default) — silent adoption. Equivalent to today's
+  behaviour. Documenting intent is still valuable.
+- `adopt: false` — fail loudly. Useful in CI to catch stage collisions
+  before you accidentally overwrite a sibling team's resource.
+
+## `delete: false`
+
+When you remove a resource from `wrangler-deploy.config.ts` and run
+`wd destroy` (or remove it from a stage), wrangler-deploy deletes the
+underlying Cloudflare resource. For shared infrastructure or hand-offs
+to other tools, that's wrong.
+
+```ts
+resources: {
+  "shared-cache": {
+    type: "kv",
+    bindings: { "apps/api": "CACHE" },
+    delete: false, // detach from project, leave the KV namespace alone
+  },
+}
+```
+
+- State is still cleared so the resource is detached from the project.
+- The actual Cloudflare resource is untouched.
+- This is per-resource — orthogonal to stage protection (which protects
+  whole stages from accidental destroy).

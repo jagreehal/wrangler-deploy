@@ -21,6 +21,7 @@ import { deploy } from "../core/deploy.js";
 import { destroy } from "../core/destroy.js";
 import { verify, verifyLocal } from "../core/verify.js";
 import {
+  buildSecretSyncPreview,
   checkSecrets,
   setSecret,
   syncSecretsFromEnvFile,
@@ -86,11 +87,48 @@ import { cliManifest } from "../core/cli-manifest.js";
 import {
   formatCliError,
   isDryRun,
+  isQuiet,
   parseOutputFields,
   parseOutputFormat,
+  parseQuiet,
   printJson,
   setJsonOutputOptions,
+  setQuietMode,
 } from "../core/cli-output.js";
+import { defaultUserStage } from "../core/defaults.js";
+import { loadEnvFileFromArgs } from "../core/dotenv.js";
+import {
+  applyProfileToEnv,
+  defaultProfileName,
+  deleteCloudflareCredential,
+  getProfile,
+  listProfiles,
+  profileCredentialsPath,
+  profilesConfigPath,
+  removeProfile,
+  resolveProfileSelection,
+  upsertCloudflareProfile,
+  writeCloudflareCredential,
+  type AuthMethod,
+} from "../core/profiles.js";
+import {
+  dashboardCreateUrl,
+  REQUIRED_SCOPES,
+  renderTokenInstructions,
+  tokenInstructionsJson,
+} from "../core/cf-token.js";
+import {
+  buildStateList,
+  buildStateTree,
+  getStateEntry,
+  renderStateGetText,
+  renderStateListText,
+  renderTreeAscii,
+} from "../core/state-commands.js";
+import { startTunnel } from "../core/tunnel.js";
+import { parseVibeTargets, writeVibeRules } from "../core/vibe-rules.js";
+import { resolveWatchTargets, startWatch } from "../core/watch.js";
+import { eraseSecrets, rotatePassword } from "../core/rotate-password.js";
 import type { ProjectContext } from "../types.js";
 
 const args = process.argv.slice(2);
@@ -100,6 +138,7 @@ setJsonOutputOptions({
   fields: parseOutputFields(args),
   ndjson: args.includes("--ndjson") || getFlag("format") === "ndjson",
 });
+setQuietMode(parseQuiet(args));
 const silentLogger = { log: () => {}, warn: () => {}, error: () => {} };
 
 function getFlag(name: string): string | undefined {
@@ -166,8 +205,37 @@ async function loadConfig(rootDir: string) {
   return mod.default;
 }
 
+function resolveRootDir(): string {
+  const cwdFlag = getFlag("cwd");
+  if (cwdFlag) {
+    const target = resolve(process.cwd(), cwdFlag);
+    if (!existsSync(target)) {
+      throw new Error(`--cwd directory does not exist: ${target}`);
+    }
+    return target;
+  }
+  return process.cwd();
+}
+
 async function main() {
-  const rootDir = process.cwd();
+  const rootDir = resolveRootDir();
+
+  const envFileResult = loadEnvFileFromArgs(args, rootDir);
+  if (envFileResult && !isQuiet() && !wantsJsonOutput()) {
+    console.log(`  loaded ${envFileResult.loaded} vars from ${envFileResult.path}`);
+  }
+
+  const profileSelection = resolveProfileSelection(args);
+  const isProfileCommand =
+    command === "configure" ||
+    command === "login" ||
+    command === "logout" ||
+    command === "profile" ||
+    command === "util";
+  if (!isProfileCommand) {
+    applyProfileToEnv(profileSelection.name);
+  }
+
   const projectContext = loadProjectContext(rootDir);
   const projectContextDetails = loadProjectContextDetails(rootDir);
 
@@ -182,12 +250,18 @@ async function main() {
 
   Commands:
     create      Scaffold a new starter project
+                wd create vite [dir]                Cloudflare + Vite starter
+                wd create vibe-rules [targets]      AI agent rules (claude-code, cursor, all, ...)
     init        Scan local wrangler configs and generate wrangler-deploy.config.ts
     introspect  Scan live Cloudflare account and generate config from existing resources
     plan        Show what would be created/changed
     apply    Provision resources and generate configs
     deploy   Deploy workers using rendered configs
     destroy  Tear down all resources for a stage
+    run      Read-only: validate config, summarise current state for a stage
+    state list                                                      List managed resources for a stage
+    state get <resource>                                            Show full output for one resource
+    state tree                                                      Render workers + bindings as an ASCII tree
     gc       Garbage collect expired stages past their TTL
     status   Show stage status
     secrets  Check which declared secrets are set/missing
@@ -197,7 +271,7 @@ async function main() {
     diff        <stage-a> <stage-b> [--format json]                 Compare stages
     schema      Emit the CLI manifest as JSON
     tools       Emit tool metadata derived from the manifest
-    dev         [--stage <stage>] [--filter <worker>] [--fallback-stage <stage>] [--port <base>] [--session]  Start local dev
+    dev         [--stage <stage>] [--filter <worker>] [--fallback-stage <stage>] [--port <base>] [--session] [--tunnel [worker|all]]  Start local dev
     dev doctor                                                      Validate local dev setup
     dev ui                                                          Start a local runtime dashboard
     snapshot list                                                   List saved local runtime snapshots
@@ -235,6 +309,13 @@ async function main() {
     guard reject <approval-id> --account <id>                       Reject a pending kill-switch
     doctor                                                          Run diagnostic checks
     completions --shell zsh|bash|fish                               Generate shell completions
+    rotate-password --old-password <pw> --new-password <pw>          Re-encrypt every stage's state with a new password
+    configure  [--profile <name>] [--method api-token|oauth] [--account-id <id>] [--account-name <name>] [--yes]  Set up a profile
+    login      [--profile <name>] [--token <token>]                 Save Cloudflare API token for a profile
+    logout     [--profile <name>] [--purge]                         Remove credentials (and profile entry with --purge)
+    profile list                                                    List configured profiles and the active one
+    util create-cf-token [--profile <name>]                         Print scopes + dashboard URL for token creation
+    util scopes                                                     Print required Cloudflare API token scopes
     context                                                         Show resolved project defaults
     context get <key>                                               Show one default value
     context set                                                     Update project defaults in .wdrc
@@ -247,7 +328,14 @@ async function main() {
     secrets sync --to <stage> --from-env-file <path> Bulk set from .dev.vars file
 
   Options:
-    --stage <name>       Stage name (required)
+    --stage <name>       Stage name (defaults to $USER, or WD_STAGE if set)
+    --profile <name>     Profile to use (overrides WD_PROFILE / CLOUDFLARE_PROFILE)
+    --cwd <path>         Run against a different project directory
+    --env-file <path>    Load env vars from a .env file before resolving config
+    --quiet, -q          Suppress non-error output (errors and JSON still print)
+    --force              apply: re-run lifecycle even when state shows in-sync
+    --watch              apply/deploy: re-run when config files change
+    --erase-secrets      apply: clear encrypted secrets from state (recovery; requires --force)
     --database-url <url> Postgres URL (required for Hyperdrive on first apply)
     --account-id <id>    Cloudflare account ID override
     --force              Force destructive operations on protected stages
@@ -314,7 +402,7 @@ async function main() {
     return;
   }
 
-  const stage = getFlag("stage") ?? projectContext.stage;
+  const stage = getFlag("stage") ?? projectContext.stage ?? defaultUserStage();
 
   switch (command) {
     case "init": {
@@ -337,8 +425,32 @@ async function main() {
 
     case "create": {
       const template = args[1];
+      if (template === "vibe-rules") {
+        const targetsValue = getFlag("targets") ?? args[2] ?? "claude-code";
+        const targets = parseVibeTargets(targetsValue);
+        if (targets.length === 0) {
+          throw new Error(
+            `Specify targets via --targets or as the second arg. Examples: claude-code, cursor, all`,
+          );
+        }
+        const result = writeVibeRules({
+          targetDir: rootDir,
+          targets,
+          force: hasFlag("force"),
+        });
+        if (wantsJsonOutput()) {
+          printJson({ ...result, targets });
+          break;
+        }
+        console.log(`\n  wrangler-deploy create vibe-rules\n`);
+        for (const file of result.files) console.log(`  ✓ ${file}`);
+        for (const file of result.skipped) console.log(`  · ${file} (exists, pass --force to overwrite)`);
+        console.log("");
+        break;
+      }
+
       if (template !== "vite") {
-        throw new Error(`Unknown starter template "${template}". Available templates: vite.`);
+        throw new Error(`Unknown starter template "${template}". Available templates: vite, vibe-rules.`);
       }
 
       const targetDir = getFlag("dir") ?? args[2] ?? "cloudflare-vite-app";
@@ -347,6 +459,17 @@ async function main() {
         projectName: getFlag("name"),
         force: hasFlag("force"),
       });
+
+      if (hasFlag("vibe-rules")) {
+        const targetsValue = getFlag("vibe-rules") ?? "claude-code";
+        const targets = parseVibeTargets(targetsValue === "true" ? "claude-code" : targetsValue);
+        const vibeResult = writeVibeRules({
+          targetDir: result.targetDir,
+          targets,
+          force: hasFlag("force"),
+        });
+        result.files.push(...vibeResult.files);
+      }
 
       if (wantsJsonOutput()) {
         printJson(result);
@@ -468,12 +591,56 @@ async function main() {
         break;
       }
 
-      const result = await apply(
-        { stage, databaseUrl: getFlag("database-url") ?? projectContext.databaseUrl },
-        { rootDir, config, state: stateProvider, wrangler, logger: wantsJsonOutput() ? silentLogger : console },
-      );
+      const runApply = async () => {
+        const liveConfig = await loadConfig(rootDir);
+        const password = resolveStatePassword(liveConfig, projectContext);
+        const liveState = resolveStateProvider(rootDir, liveConfig.state, password);
+
+        if (hasFlag("erase-secrets")) {
+          if (!hasFlag("force")) {
+            throw new Error("--erase-secrets requires --force (this is a destructive recovery path)");
+          }
+          const existing = await liveState.read(stage);
+          if (existing) {
+            const erased = eraseSecrets(existing);
+            await liveState.write(stage, erased);
+            console.log(`  · erased encrypted secrets from state for ${stage}\n`);
+          }
+        }
+
+        return apply(
+          {
+            stage,
+            databaseUrl: getFlag("database-url") ?? projectContext.databaseUrl,
+            force: hasFlag("force"),
+          },
+          { rootDir, config: liveConfig, state: liveState, wrangler, logger: wantsJsonOutput() ? silentLogger : console },
+        );
+      };
+
+      const result = await runApply();
       if (wantsJsonOutput()) {
         printJson(result);
+      }
+
+      if (hasFlag("watch")) {
+        const targets = resolveWatchTargets(rootDir, config.workers ?? []);
+        console.log(`\n  watching ${targets.length} files for changes (Ctrl+C to stop)\n`);
+        const watcher = startWatch({
+          paths: targets,
+          onChange: async () => {
+            try {
+              console.log(`\n  config change detected — re-applying...\n`);
+              await runApply();
+            } catch (error) {
+              console.error(`\n  apply failed: ${(error as Error).message}\n`);
+            }
+          },
+        });
+        const shutdown = () => { watcher.close(); process.exit(0); };
+        process.on("SIGINT", shutdown);
+        process.on("SIGTERM", shutdown);
+        await new Promise(() => {});
       }
       break;
     }
@@ -504,24 +671,7 @@ async function main() {
             envVars.set(trimmed.slice(0, eqIndex).trim(), trimmed.slice(eqIndex + 1).trim());
           }
 
-          const set: string[] = [];
-          const skipped: string[] = [];
-          if (config.secrets) {
-            for (const [workerPath, secretNames] of Object.entries(config.secrets as Record<string, string[]>)) {
-              const workerState = state.workers[workerPath];
-              if (!workerState) {
-                skipped.push(...secretNames.map((n) => `${workerPath}/${n} (worker not in state)`));
-                continue;
-              }
-              for (const secretName of secretNames) {
-                if (envVars.get(secretName)) {
-                  set.push(`${workerPath}/${secretName}`);
-                } else {
-                  skipped.push(`${workerPath}/${secretName} (not in env file)`);
-                }
-              }
-            }
-          }
+          const { set, skipped } = buildSecretSyncPreview(config.secrets, state, envVars);
 
           const result = { stage: toStage, dryRun: true, set, skipped };
           if (wantsJsonOutput()) {
@@ -642,8 +792,9 @@ async function main() {
           currentWorker = s.worker;
           console.log(`  ${currentWorker}:`);
         }
-        const icon = s.status === "set" ? "+" : "x";
-        console.log(`    ${icon} ${s.name}: ${s.status}`);
+        const icon = s.status === "set" ? "+" : s.status === "ref" ? "→" : "x";
+        const note = s.status === "ref" ? "ref (external)" : s.status;
+        console.log(`    ${icon} ${s.name}: ${note}`);
       }
 
       const missingCount = statuses.filter((s) => s.status === "missing");
@@ -700,20 +851,43 @@ async function main() {
         break;
       }
 
-      const result = await deploy(
-        { stage, verify: hasFlag("verify") },
-        {
-          rootDir,
-          config,
-          state: stateProvider,
-          wrangler,
-          logger,
-          validateSecretsFn: validateSecrets,
-          verifyFn: verify,
-        },
-      );
+      const runDeploy = () =>
+        deploy(
+          { stage, verify: hasFlag("verify") },
+          {
+            rootDir,
+            config,
+            state: stateProvider,
+            wrangler,
+            logger,
+            validateSecretsFn: validateSecrets,
+            verifyFn: verify,
+          },
+        );
+
+      const result = await runDeploy();
       if (wantsJsonOutput()) {
         printJson(result);
+      }
+
+      if (hasFlag("watch")) {
+        const targets = resolveWatchTargets(rootDir, config.workers ?? []);
+        console.log(`\n  watching ${targets.length} files for changes (Ctrl+C to stop)\n`);
+        const watcher = startWatch({
+          paths: targets,
+          onChange: async () => {
+            try {
+              console.log(`\n  config change detected — re-deploying...\n`);
+              await runDeploy();
+            } catch (error) {
+              console.error(`\n  deploy failed: ${(error as Error).message}\n`);
+            }
+          },
+        });
+        const shutdown = () => { watcher.close(); process.exit(0); };
+        process.on("SIGINT", shutdown);
+        process.on("SIGTERM", shutdown);
+        await new Promise(() => {});
       }
       break;
     }
@@ -1446,6 +1620,29 @@ async function main() {
       });
       const logDir = resolveDevLogDir(rootDir);
       const handle = await startDev(plan, { logDir, rootDir });
+
+      const tunnelHandles: Array<{ worker: string; close: () => Promise<void> }> = [];
+      if (hasFlag("tunnel")) {
+        const tunnelFilter = getFlag("tunnel");
+        const targetWorkers = plan.workers.filter((worker) =>
+          !tunnelFilter || tunnelFilter === "all" || tunnelFilter === worker.workerPath,
+        );
+        if (targetWorkers.length === 0 && tunnelFilter) {
+          console.error(`\n  ✗ --tunnel value "${tunnelFilter}" did not match any worker.\n`);
+        }
+        for (const worker of targetWorkers) {
+          const port = handle.ports[worker.workerPath];
+          if (!port) continue;
+          try {
+            const tunnel = startTunnel({ localUrl: `http://localhost:${port}` });
+            tunnelHandles.push({ worker: worker.workerPath, close: tunnel.close });
+            const url = await tunnel.url;
+            console.log(`  tunnel: ${worker.workerPath} -> ${url}`);
+          } catch (error) {
+            console.error(`  ✗ tunnel for ${worker.workerPath} failed: ${(error as Error).message}`);
+          }
+        }
+      }
       const sessionLogFile = plan.session ? logFilePathForTarget(logDir, "wrangler") : undefined;
       writeActiveDevState(rootDir, {
         mode: plan.mode,
@@ -1466,6 +1663,7 @@ async function main() {
       });
       const shutdown = async () => {
         console.log("\n  Stopping all workers...");
+        await Promise.all(tunnelHandles.map((t) => t.close().catch(() => {})));
         await handle.stop();
         clearActiveDevState(rootDir);
         process.exit(0);
@@ -2406,6 +2604,338 @@ async function main() {
       }
       console.log("");
       break;
+    }
+
+    case "state": {
+      const subCommand = args[1];
+      if (!subCommand || !["list", "get", "tree"].includes(subCommand)) {
+        throw new Error(`state requires a subcommand: list, get <resource>, or tree`);
+      }
+
+      const config = await loadConfig(rootDir);
+      const stateProvider = resolveStateProvider(rootDir, config.state, resolveStatePassword(config, projectContext));
+      const stageState = await stateProvider.read(stage);
+      if (!stageState) {
+        const result = { stage, exists: false, message: `no state for stage "${stage}"` };
+        if (wantsJsonOutput()) {
+          printJson(result);
+          break;
+        }
+        console.log(`\n  no state found for stage "${stage}". Run "wd apply --stage ${stage}" first.\n`);
+        break;
+      }
+
+      if (subCommand === "list") {
+        const entries = buildStateList(stageState);
+        if (wantsJsonOutput()) {
+          printJson({ stage, resources: entries });
+          break;
+        }
+        process.stdout.write(renderStateListText(stageState));
+        break;
+      }
+
+      if (subCommand === "get") {
+        const resourceName = args[2];
+        if (!resourceName) throw new Error("state get <resource> requires a resource name");
+        const entry = getStateEntry(stageState, resourceName);
+        if (!entry) {
+          throw new Error(`Resource "${resourceName}" not found in stage "${stage}"`);
+        }
+        if (wantsJsonOutput()) {
+          printJson(entry);
+          break;
+        }
+        process.stdout.write(renderStateGetText(entry));
+        break;
+      }
+
+      if (subCommand === "tree") {
+        const tree = buildStateTree(stageState, config);
+        if (wantsJsonOutput()) {
+          printJson({ stage, tree });
+          break;
+        }
+        process.stdout.write(renderTreeAscii(tree));
+        break;
+      }
+      break;
+    }
+
+    case "run": {
+      const config = await loadConfig(rootDir);
+      const validationErrors = validateConfig(config);
+      if (validationErrors.length > 0) {
+        const result = { ok: false, errors: validationErrors };
+        if (wantsJsonOutput()) {
+          printJson(result);
+          process.exit(1);
+        }
+        console.error(`\n  config errors (${validationErrors.length}):\n`);
+        for (const error of validationErrors) {
+          console.error(`    ✗ ${error}`);
+        }
+        console.error("");
+        process.exit(1);
+      }
+
+      const stateProvider = resolveStateProvider(rootDir, config.state, resolveStatePassword(config, projectContext));
+      const stageState = await stateProvider.read(stage);
+      const summary = {
+        ok: true,
+        readOnly: true,
+        stage,
+        workers: config.workers ?? [],
+        resources: Object.fromEntries(
+          Object.entries(config.resources).map(([name, resource]) => [name, { type: (resource as { type: string }).type }]),
+        ),
+        stagedResources: stageState ? Object.keys(stageState.resources).length : 0,
+        deployedWorkers: stageState
+          ? Object.values(stageState.workers).filter((w) => w.deployed).length
+          : 0,
+      };
+
+      if (wantsJsonOutput()) {
+        printJson(summary);
+        break;
+      }
+
+      console.log(`\n  wrangler-deploy run --stage ${stage}  (read-only)\n`);
+      console.log(`  config: ok`);
+      console.log(`  workers (${summary.workers.length}): ${summary.workers.join(", ")}`);
+      console.log(`  resources (${Object.keys(summary.resources).length}): ${Object.keys(summary.resources).join(", ")}`);
+      if (stageState) {
+        console.log(`  state: ${summary.stagedResources} resources, ${summary.deployedWorkers}/${summary.workers.length} workers deployed`);
+      } else {
+        console.log(`  state: none yet`);
+      }
+      console.log("");
+      break;
+    }
+
+    case "rotate-password": {
+      const oldPw = getFlag("old-password") ?? process.env.WD_STATE_PASSWORD_OLD;
+      const newPw = getFlag("new-password") ?? process.env.WD_STATE_PASSWORD_NEW;
+      if (!oldPw) throw new Error("--old-password (or WD_STATE_PASSWORD_OLD) is required");
+      if (!newPw) throw new Error("--new-password (or WD_STATE_PASSWORD_NEW) is required");
+      if (oldPw === newPw) throw new Error("--old-password and --new-password must differ");
+
+      const config = await loadConfig(rootDir);
+      const stateProvider = resolveStateProvider(rootDir, config.state);
+      const result = await rotatePassword({
+        provider: stateProvider,
+        oldPassword: oldPw,
+        newPassword: newPw,
+      });
+
+      if (wantsJsonOutput()) {
+        printJson(result);
+        if (result.skipped.length > 0) process.exit(1);
+        break;
+      }
+      console.log(`\n  wrangler-deploy rotate-password\n`);
+      for (const stage of result.rotated) console.log(`  ✓ ${stage}`);
+      for (const entry of result.skipped) console.log(`  · ${entry.stage}: ${entry.reason}`);
+      console.log(`\n  ${result.rotated.length} rotated, ${result.skipped.length} skipped\n`);
+      if (result.skipped.length > 0) process.exit(1);
+      break;
+    }
+
+    case "configure": {
+      const profileName = getFlag("profile") ?? defaultProfileName();
+      const method: AuthMethod = (getFlag("method") as AuthMethod) ?? "api-token";
+      if (method !== "api-token" && method !== "oauth") {
+        throw new Error(`--method must be "api-token" or "oauth", got "${method}"`);
+      }
+      const accountId = getFlag("account-id");
+      const accountName = getFlag("account-name");
+
+      if (hasFlag("yes") || (accountId && method === "api-token")) {
+        if (!accountId) {
+          throw new Error("--account-id is required with --yes (interactive prompts disabled)");
+        }
+        const file = upsertCloudflareProfile(profileName, {
+          method,
+          metadata: { id: accountId, ...(accountName ? { name: accountName } : {}) },
+        });
+        const result = {
+          profile: profileName,
+          method,
+          accountId,
+          accountName,
+          configPath: profilesConfigPath(),
+          profiles: Object.keys(file.profiles),
+        };
+        if (wantsJsonOutput()) {
+          printJson(result);
+          break;
+        }
+        console.log(`\n  Configured profile "${profileName}" (${method}) → ${accountId}`);
+        console.log(`  Saved to ${result.configPath}`);
+        console.log(`\n  Next: wd login --profile ${profileName}\n`);
+        break;
+      }
+
+      const rl = createInterface({ input: process.stdin, output: process.stdout });
+      const question = (q: string): Promise<string> => new Promise((res) => rl.question(q, res));
+
+      try {
+        console.log(`\n  Configuring profile "${profileName}"\n`);
+        const methodAnswer = (await question(`  Auth method [api-token]: `)).trim() || "api-token";
+        if (methodAnswer !== "api-token" && methodAnswer !== "oauth") {
+          throw new Error(`method must be "api-token" or "oauth"`);
+        }
+        const idAnswer = (await question(`  Cloudflare account ID: `)).trim();
+        if (!idAnswer) throw new Error("account ID is required");
+        const nameAnswer = (await question(`  Account name (optional): `)).trim();
+
+        upsertCloudflareProfile(profileName, {
+          method: methodAnswer as AuthMethod,
+          metadata: { id: idAnswer, ...(nameAnswer ? { name: nameAnswer } : {}) },
+        });
+
+        console.log(`\n  Saved to ${profilesConfigPath()}`);
+        console.log(`\n  Next: wd login --profile ${profileName}\n`);
+      } finally {
+        rl.close();
+      }
+      break;
+    }
+
+    case "login": {
+      const profileName = getFlag("profile") ?? defaultProfileName();
+      const profile = getProfile(profileName);
+      if (!profile?.cloudflare) {
+        throw new Error(
+          `Profile "${profileName}" is not configured. Run "wd configure --profile ${profileName}" first.`,
+        );
+      }
+
+      const tokenFlag = getFlag("token") ?? process.env.CLOUDFLARE_API_TOKEN;
+      let token = tokenFlag;
+      if (!token) {
+        const rl = createInterface({ input: process.stdin, output: process.stdout });
+        const question = (q: string): Promise<string> => new Promise((res) => rl.question(q, res));
+        try {
+          console.log(`\n  Logging in to profile "${profileName}"\n`);
+          console.log(`  Create a token: ${dashboardCreateUrl()}\n`);
+          token = (await question(`  Cloudflare API token: `)).trim();
+        } finally {
+          rl.close();
+        }
+      }
+      if (!token) throw new Error("No token provided.");
+
+      const path = writeCloudflareCredential(profileName, { type: "api-token", token });
+      const result = {
+        profile: profileName,
+        credentialPath: path,
+        accountId: profile.cloudflare.metadata?.id,
+      };
+      if (wantsJsonOutput()) {
+        printJson(result);
+        break;
+      }
+      console.log(`\n  Saved credentials for "${profileName}" to ${path}\n`);
+      if (profile.cloudflare.metadata?.id) {
+        console.log(`  Account: ${profile.cloudflare.metadata.id}`);
+        if (profile.cloudflare.metadata.name) {
+          console.log(`           ${profile.cloudflare.metadata.name}`);
+        }
+      }
+      console.log("");
+      break;
+    }
+
+    case "logout": {
+      const profileName = getFlag("profile") ?? defaultProfileName();
+      const removed = deleteCloudflareCredential(profileName);
+      const purge = hasFlag("purge");
+      let configRemoved = false;
+      if (purge) {
+        configRemoved = removeProfile(profileName);
+      }
+      const result = {
+        profile: profileName,
+        credentialRemoved: removed,
+        profileRemoved: configRemoved,
+      };
+      if (wantsJsonOutput()) {
+        printJson(result);
+        break;
+      }
+      if (!removed && !configRemoved) {
+        console.log(`\n  Nothing to remove for profile "${profileName}".\n`);
+      } else {
+        console.log(`\n  Logged out of profile "${profileName}"`);
+        if (removed) console.log(`    credential file deleted`);
+        if (configRemoved) console.log(`    profile entry removed from config`);
+        console.log("");
+      }
+      break;
+    }
+
+    case "profile": {
+      const subCommand = args[1];
+      if (subCommand === "list" || subCommand === undefined) {
+        const names = listProfiles();
+        const active = profileSelection.name;
+        const entries = names.map((name) => {
+          const profile = getProfile(name);
+          return {
+            name,
+            active: name === active,
+            method: profile?.cloudflare?.method,
+            accountId: profile?.cloudflare?.metadata?.id,
+            accountName: profile?.cloudflare?.metadata?.name,
+            credentialPath: profileCredentialsPath(name, "cloudflare"),
+          };
+        });
+        if (wantsJsonOutput()) {
+          printJson({ active, source: profileSelection.source, profiles: entries });
+          break;
+        }
+        if (entries.length === 0) {
+          console.log(`\n  No profiles configured. Run "wd configure" to create one.\n`);
+          break;
+        }
+        console.log(`\n  wrangler-deploy profiles  (active: ${active}, via ${profileSelection.source})\n`);
+        for (const entry of entries) {
+          const marker = entry.active ? "*" : " ";
+          const account = entry.accountId ? ` → ${entry.accountId}` : "";
+          const name = entry.accountName ? ` (${entry.accountName})` : "";
+          console.log(`  ${marker} ${entry.name.padEnd(20)} ${entry.method ?? "(unconfigured)"}${account}${name}`);
+        }
+        console.log("");
+        break;
+      }
+      throw new Error(`Unknown profile subcommand "${subCommand}". Available: list.`);
+    }
+
+    case "util": {
+      const subCommand = args[1];
+      if (subCommand === "create-cf-token") {
+        const profileName = getFlag("profile") ?? defaultProfileName();
+        if (wantsJsonOutput()) {
+          printJson(tokenInstructionsJson({ profileName }));
+          break;
+        }
+        process.stdout.write(renderTokenInstructions({ profileName }));
+        break;
+      }
+      if (subCommand === "scopes") {
+        if (wantsJsonOutput()) {
+          printJson({ scopes: REQUIRED_SCOPES });
+          break;
+        }
+        console.log("\n  Required Cloudflare API token scopes:\n");
+        for (const scope of REQUIRED_SCOPES) {
+          console.log(`    ${scope.group.padEnd(28)} ${scope.level.padEnd(5)}  ${scope.why}`);
+        }
+        console.log("");
+        break;
+      }
+      throw new Error(`Unknown util subcommand "${subCommand}". Available: create-cf-token, scopes.`);
     }
 
     default:

@@ -132,4 +132,23 @@ describe("validateConfig", () => {
     story.then("an error is returned because deadLetterFor must target another queue");
     expect(errors.some((e) => e.includes("deadLetterFor") && e.includes("queue"))).toBe(true);
   });
+
+  it("catches adopt on unsupported resource types", ({ task }) => {
+    story.init(task);
+    story.given("a D1 resource with adopt explicitly set");
+    const config: CfStageConfig = {
+      ...validConfig,
+      resources: {
+        ...validConfig.resources,
+        "my-db": {
+          type: "d1",
+          adopt: true,
+          bindings: { "apps/api": "DB" },
+        },
+      },
+    };
+    const errors = validateConfig(config);
+    story.then("an error is returned because adopt is not supported for D1");
+    expect(errors.some((e) => e.includes("my-db") && e.includes("does not support adopt"))).toBe(true);
+  });
 });

@@ -9,6 +9,15 @@ describe("cliManifest", () => {
     expect(cliManifest.machineReadableDefaults.ndjson).toBe(true);
   });
 
+  it("publishes resource capability metadata", () => {
+    expect(cliManifest.resourceCapabilities.adopt.supportedResourceTypes).toEqual([
+      "kv",
+      "queue",
+      "hyperdrive",
+    ]);
+    expect(cliManifest.resourceCapabilities.adopt.unsupportedBehavior).toBe("error");
+  });
+
   it("exposes schema and json flags for the main commands", () => {
     const commandNames = cliManifest.commands.map((command) => command.name);
     expect(commandNames).toContain("create");

@@ -2,9 +2,9 @@
 
 | Key | Value |
 | --- | --- |
-| Date | 2026-04-20T11:11:57.910Z |
-| Version | 1.4.1 |
-| Git SHA | 1c7b46f |
+| Date | 2026-05-07T06:17:31.609Z |
+| Version | 1.4.2 |
+| Git SHA | 42bd376 |
 
 ## src/github.test.ts
 
@@ -1281,6 +1281,11 @@
 
 - **Given** a deadLetterFor reference that points at an existing KV resource instead of a queue
 - **Then** an error is returned because deadLetterFor must target another queue
+
+### ✅ catches adopt on unsupported resource types
+
+- **Given** a D1 resource with adopt explicitly set
+- **Then** an error is returned because adopt is not supported for D1
 
 ## src/core/verify.test.ts
 

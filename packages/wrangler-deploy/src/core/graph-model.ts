@@ -1,7 +1,7 @@
 import type { CfStageConfig, LifecycleStatus, StageState } from "../types.js";
 import { resourceId } from "../types.js";
 
-export type RichNodeType = "worker" | "kv" | "queue" | "d1" | "hyperdrive" | "r2" | "vectorize";
+export type RichNodeType = "worker" | "kv" | "queue" | "d1" | "hyperdrive" | "r2" | "vectorize" | "dns";
 
 export interface RichNode {
   id: string;

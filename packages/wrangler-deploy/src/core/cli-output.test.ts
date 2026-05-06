@@ -1,14 +1,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  info,
+  isQuiet,
   parseOutputFields,
   parseOutputFormat,
+  parseQuiet,
   printJson,
   redactSensitiveText,
   setJsonOutputOptions,
+  setQuietMode,
 } from "./cli-output.js";
 
 afterEach(() => {
   setJsonOutputOptions({});
+  setQuietMode(false);
 });
 
 describe("cli-output", () => {
@@ -50,5 +55,26 @@ describe("cli-output", () => {
   it("redacts long token-like strings from error text", () => {
     expect(redactSensitiveText("token=abcdefghijklmnopqrstuvwxyz0123456789ABCDEF"))
       .toContain("[REDACTED]");
+  });
+
+  it("parses --quiet and -q from args", () => {
+    expect(parseQuiet(["plan"])).toBe(false);
+    expect(parseQuiet(["plan", "--quiet"])).toBe(true);
+    expect(parseQuiet(["plan", "-q"])).toBe(true);
+  });
+
+  it("info() suppresses output when quiet mode is on", () => {
+    const write = vi.spyOn(process.stdout, "write").mockImplementation((() => true) as never);
+    setQuietMode(false);
+    info("hello");
+    expect(write).toHaveBeenCalledWith("hello\n");
+
+    write.mockClear();
+    setQuietMode(true);
+    expect(isQuiet()).toBe(true);
+    info("nope");
+    expect(write).not.toHaveBeenCalled();
+
+    write.mockRestore();
   });
 });

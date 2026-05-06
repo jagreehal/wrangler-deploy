@@ -1,3 +1,5 @@
+import { adoptSupportedResourceTypes } from "./resource-capabilities.js";
+
 export interface CliCommandManifest {
   name: string;
   description: string;
@@ -10,6 +12,12 @@ export interface CliCommandManifest {
 export const cliManifest = {
   package: "wrangler-deploy",
   version: 1,
+  resourceCapabilities: {
+    adopt: {
+      supportedResourceTypes: adoptSupportedResourceTypes(),
+      unsupportedBehavior: "error",
+    },
+  },
   machineReadableDefaults: {
     json: true,
     dryRun: true,

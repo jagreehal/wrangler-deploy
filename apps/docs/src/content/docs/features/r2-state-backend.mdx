@@ -1,0 +1,43 @@
+---
+title: R2 State Backend
+description: Store stage state as JSON objects in a Cloudflare R2 bucket
+---
+
+The R2 state backend stores each stage's state as one JSON object in
+an R2 bucket. Useful when you've already standardised on R2 for
+everything else and want one less service to think about.
+
+```ts
+state: {
+  backend: "r2",
+  bucketName: "wd-state",
+  keyPrefix: "wrangler-deploy/", // optional, defaults to wrangler-deploy/
+}
+```
+
+Object key layout: `<keyPrefix><stage>` — so `dev` lives at
+`wrangler-deploy/dev`, `prod` at `wrangler-deploy/prod`.
+
+## Permissions
+
+The token needs **R2: Edit** on the bucket. `wd util create-cf-token`
+already includes Workers R2 Storage Edit in its scope list.
+
+## Trade-offs vs KV and D1
+
+- **R2** — pay-per-storage, no per-key size limit, mature S3 tooling
+  for offline inspection. Higher latency than KV for tiny objects.
+- **KV** — fastest reads, eventual consistency, 25 MB per-value cap.
+- **D1** — SQL inspection, joinable across stages, lowest read latency
+  for filter queries.
+
+If you're not sure which to pick, KV is the safe default for projects
+under ~50 stages and small resource lists. Switch to D1 when you want
+SQL; switch to R2 when you want to keep state alongside other R2 data.
+
+## Encryption
+
+`statePassword` (or `WD_STATE_PASSWORD`) encrypts secret-bearing fields
+before R2 sees them, identical to the KV and D1 backends. See
+[State Encryption](/wrangler-deploy/features/state-encryption) for the
+rotation and recovery flows.

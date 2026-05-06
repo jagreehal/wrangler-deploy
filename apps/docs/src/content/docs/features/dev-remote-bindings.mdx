@@ -1,0 +1,65 @@
+---
+title: Remote Dev Bindings
+description: Use deployed Cloudflare resources during local dev for AI, Vectorize, and other bindings miniflare can't emulate
+---
+
+Some Cloudflare bindings can't be emulated locally:
+
+- **Workers AI** — calls the live model gateway.
+- **Vectorize** — there's no local index.
+- **Browser Rendering** — needs the real headless browser fleet.
+- **AI Search**, **Dispatch Namespace**, and certain RPC paths.
+
+For those, `wd dev` can wire the binding through to the deployed
+resource instead of miniflare. Mark the resource `dev.remote: true`:
+
+```ts
+resources: {
+  embeddings: {
+    type: "vectorize",
+    dimensions: 1024,
+    metric: "cosine",
+    bindings: { "apps/api": "EMBEDDINGS" },
+    dev: { remote: true },
+  },
+}
+```
+
+When `wd dev` builds the per-worker override at
+`.wrangler-deploy/dev/<worker>/wrangler.dev.jsonc`, it emits the binding
+into the right wrangler section with `experimental_remote: true`:
+
+```json
+{
+  "extends": "../../../apps/api/wrangler.jsonc",
+  "vectorize": [
+    { "binding": "EMBEDDINGS", "experimental_remote": true }
+  ]
+}
+```
+
+The override is layered on top of your real `wrangler.jsonc` via
+wrangler's `extends` mechanism, so the runtime IDs (and any other
+properties) flow through unchanged.
+
+## Coverage
+
+| Resource type | `dev.remote` honoured? |
+|---------------|-----------------------|
+| KV            | ✅ |
+| D1            | ✅ |
+| R2            | ✅ |
+| Hyperdrive    | ✅ |
+| Vectorize     | ✅ |
+| Queue producer | ✅ |
+| Queue consumer | n/a (no env binding) |
+| DNS           | n/a (terminal resource) |
+
+## Caveats
+
+- Requires Wrangler 4.
+- The deployed resource must already exist in the stage you're targeting.
+  `wd apply --stage <stage>` first; then `wd dev --stage <stage>` will
+  point at those resources.
+- Network calls hit live Cloudflare edge — counts against your real
+  account quotas.

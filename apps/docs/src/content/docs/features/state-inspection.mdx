@@ -1,0 +1,43 @@
+---
+title: State Inspection
+description: List, get, and visualise managed resources without grepping JSON
+---
+
+`wd state` exposes the contents of `.wrangler-deploy/<stage>/state.json`
+(or your remote KV state) without making you parse the file by hand.
+
+## Commands
+
+```sh
+wd state list --stage staging       # table of resources, ids, status
+wd state get cache --stage staging  # full output + props for one resource
+wd state tree --stage staging       # ASCII tree: workers → bindings
+```
+
+All commands honour `--stage` (defaulting to `$USER`) and `--json` for
+machine-readable output.
+
+## Tree output
+
+```
+  stage: staging  (workers: 2, deployed: 1)
+  ├── apps/api  deployed https://api.example.com
+  │   ├── CACHE  kv → cache (kv_abc123)
+  │   ├── DB     d1 → my-db (d1_def456)
+  │   └── BACKEND  service → apps/worker
+  └── apps/worker  pending
+```
+
+The tree mixes live state with the source config so a worker that
+hasn't deployed yet still appears, and bindings show their resolved
+Cloudflare IDs once `wd apply` has run.
+
+## Read-only check
+
+```sh
+wd run --stage staging
+```
+
+`wd run` validates the config, reads (but never writes) state, and prints
+a summary — handy in CI before mutating commands or for sanity checks
+when switching between profiles.

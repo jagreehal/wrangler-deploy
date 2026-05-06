@@ -1,0 +1,63 @@
+---
+title: D1 State Backend
+description: Store stage state in a Cloudflare D1 database for SQL inspection and unbounded size
+---
+
+By default wrangler-deploy keeps state in `.wrangler-deploy/<stage>/state.json`
+on disk. For shared environments and teams the existing
+[KV state backend](/wrangler-deploy/features/remote-state) lifts that into
+Cloudflare KV. The D1 backend is a third option for setups where:
+
+- You'd rather inspect state with SQL than `cat` JSON.
+- Your state is over KV's 25 MB per-key limit (lots of resources / lots
+  of stages).
+- You want a join-friendly source of truth for build-out reports.
+
+## Configure
+
+```ts
+import { defineConfig } from "wrangler-deploy";
+
+export default defineConfig({
+  version: 1,
+  workers: ["apps/api"],
+  resources: {
+    /* ... */
+  },
+  state: {
+    backend: "d1",
+    databaseId: "abcdef12-3456-...",
+    tableName: "stage_state", // optional, defaults to stage_state
+  },
+});
+```
+
+The schema is created on first write — no migration step:
+
+```sql
+CREATE TABLE IF NOT EXISTS stage_state (
+  stage      TEXT PRIMARY KEY,
+  state      TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+```
+
+State JSON is stored in the `state` column. Encryption (via the project's
+`statePassword`) still applies before serialisation, so D1 sees only the
+ciphertext when a password is configured.
+
+## Required permissions
+
+The token used by `wd apply` / `wd deploy` needs **D1: Edit** on the
+database. `wd util create-cf-token` already includes D1 Edit in its scope
+list, so no extra setup is needed beyond pointing at the database id.
+
+## Trade-offs vs KV
+
+- D1 gives you SQL — handy for "show me every stage that hasn't been
+  re-applied this month" without ad-hoc tooling.
+- D1's read latency is higher than KV; for very chatty workflows (e.g.
+  hundreds of state writes per apply on huge configs) KV will feel
+  snappier.
+- D1 has no per-row size limit you'll plausibly hit; KV caps values at
+  25 MB.

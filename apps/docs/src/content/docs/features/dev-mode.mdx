@@ -190,3 +190,25 @@ You could build many of these flows manually with raw Wrangler plus custom scrip
 The practical win is consistency. The same fixture can drive `wd worker call`, `wd queue send`, `wd d1 exec`, `wd verify local`, and buttons inside `wd dev ui`. Snapshot save/load adds reproducible state on top of that, and the UI now keeps replayable local actions so you can rerun a known-good workflow without rebuilding the command by hand. None of that replaces `wrangler.jsonc`; it removes the repo-memory tax around it.
 
 The dashboard also surfaces the resolved `.wdrc` / `.wdrc.json` defaults and the same manifest that powers `wd schema` and `wd tools`, which makes it easier for agents and humans to confirm what the CLI will do before they run it.
+
+## Quick tunnels
+
+Need a public URL for a webhook or OAuth callback? Pass `--tunnel` to spawn
+a [Cloudflare Quick Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/)
+in front of one or all running workers:
+
+```bash
+wd dev --tunnel              # tunnel every worker
+wd dev --tunnel workers/api  # only one
+```
+
+Output looks like:
+
+```
+Starting dev servers:
+  workers/api -> http://localhost:8787
+  tunnel: workers/api -> https://round-fox-42.trycloudflare.com
+```
+
+Tunnels shut down with the workers on Ctrl+C. Requires `cloudflared` on your
+PATH — install via Cloudflare's [downloads page](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/).

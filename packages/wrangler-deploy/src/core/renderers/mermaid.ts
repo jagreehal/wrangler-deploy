@@ -47,7 +47,7 @@ function edgeArrow(edge: RichEdge): string {
   return `${fromId} -.-> ${toId}`;
 }
 
-const TYPE_ORDER: RichNodeType[] = ["worker", "kv", "d1", "r2", "queue", "hyperdrive", "vectorize"];
+const TYPE_ORDER: RichNodeType[] = ["worker", "kv", "d1", "r2", "queue", "hyperdrive", "vectorize", "dns"];
 
 const TYPE_LABELS: Record<RichNodeType, string> = {
   worker: "Workers",
@@ -57,6 +57,7 @@ const TYPE_LABELS: Record<RichNodeType, string> = {
   queue: "Queues",
   hyperdrive: "Hyperdrive",
   vectorize: "Vectorize",
+  dns: "DNS Records",
 };
 
 export function renderMermaid(graph: RichGraph): string {

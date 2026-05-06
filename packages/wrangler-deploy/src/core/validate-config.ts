@@ -1,4 +1,5 @@
 import type { CfStageConfig, QueueResourceConfig } from "../types.js";
+import { supportsAdopt, adoptUnsupportedMessage } from "./resource-capabilities.js";
 
 /**
  * Validates a CfStageConfig and returns an array of error strings.
@@ -11,6 +12,10 @@ export function validateConfig(config: CfStageConfig): string[] {
 
   // Check resource bindings reference valid workers
   for (const [resourceName, resource] of Object.entries(config.resources)) {
+    if (resource.adopt !== undefined && !supportsAdopt(resource.type)) {
+      errors.push(`Resource "${resourceName}": ${adoptUnsupportedMessage(resource.type)}`);
+    }
+
     for (const workerPath of Object.keys(resource.bindings)) {
       if (!workerSet.has(workerPath)) {
         errors.push(

@@ -19,9 +19,19 @@ import {
   writeRenderedConfigs as defaultWriteRenderedConfigs,
 } from "./render.js";
 import type { WranglerRunner } from "./wrangler-runner.js";
-import { createD1Database as defaultCreateD1 } from "../providers/d1.js";
+import { classifyReplacement, describeReplacement } from "./replacement.js";
+import { supportsAdopt, adoptUnsupportedMessage } from "./resource-capabilities.js";
+import {
+  applyD1Migrations as defaultApplyD1Migrations,
+  createD1Database as defaultCreateD1,
+  executeD1File as defaultExecuteD1File,
+} from "../providers/d1.js";
 import { createR2Bucket as defaultCreateR2 } from "../providers/r2.js";
 import { createVectorizeIndex as defaultCreateVectorize } from "../providers/vectorize.js";
+import {
+  findZoneId as defaultFindZoneId,
+  reconcileDnsRecords as defaultReconcileDns,
+} from "../providers/dns.js";
 
 // ============================================================================
 // plan()
@@ -58,12 +68,38 @@ export async function plan(args: PlanArgs, deps: PlanDeps): Promise<Plan> {
         name: stagedName,
       });
     } else if (isActive(stateResource)) {
-      items.push({
-        resource: logicalName,
+      const newProps: ResourceProps = {
         type: resource.type,
-        action: "in-sync",
-        name: resourceStagedName(stateResource),
-      });
+        name: stagedName,
+        bindings: resource.bindings as Record<string, unknown>,
+        ...(resource.type === "vectorize"
+          ? {
+              ...(resource.dimensions !== undefined ? { dimensions: resource.dimensions } : {}),
+              ...(resource.metric !== undefined ? { metric: resource.metric } : {}),
+              ...(resource.preset !== undefined ? { preset: resource.preset } : {}),
+            }
+          : {}),
+        ...(resource.type === "hyperdrive" && resource.database
+          ? { database: resource.database }
+          : {}),
+      };
+      const verdict = classifyReplacement(resource.type, stateResource.props, newProps);
+      if (verdict.required) {
+        items.push({
+          resource: logicalName,
+          type: resource.type,
+          action: "drifted",
+          name: resourceStagedName(stateResource),
+          details: describeReplacement(verdict),
+        });
+      } else {
+        items.push({
+          resource: logicalName,
+          type: resource.type,
+          action: "in-sync",
+          name: resourceStagedName(stateResource),
+        });
+      }
     } else {
       const ls = stateResource.lifecycleStatus;
       const action = ls === "missing" ? "orphaned" : ls as "drifted" | "orphaned";
@@ -101,6 +137,12 @@ export async function plan(args: PlanArgs, deps: PlanDeps): Promise<Plan> {
 export type ApplyArgs = {
   stage: string;
   databaseUrl?: string;
+  /**
+   * Re-run lifecycle for resources marked in-sync. Useful when a property
+   * change was made out-of-band on Cloudflare and you want wrangler-deploy
+   * to overwrite it back to the configured shape.
+   */
+  force?: boolean;
 };
 
 export type ApplyDeps = {
@@ -110,11 +152,15 @@ export type ApplyDeps = {
   wrangler: WranglerRunner;
   logger?: Pick<Console, "log" | "warn" | "error">;
   createD1?: typeof defaultCreateD1;
+  applyD1Migrations?: typeof defaultApplyD1Migrations;
+  executeD1File?: typeof defaultExecuteD1File;
   createR2?: typeof defaultCreateR2;
   createVectorize?: typeof defaultCreateVectorize;
   readConfig?: typeof defaultReadWranglerConfig;
   renderConfig?: typeof defaultRenderWranglerConfig;
   writeConfigs?: typeof defaultWriteRenderedConfigs;
+  findZoneId?: typeof defaultFindZoneId;
+  reconcileDns?: typeof defaultReconcileDns;
 };
 
 export interface ApplyResourceSummary {
@@ -149,23 +195,34 @@ function extractId(output: string): string | undefined {
   return undefined;
 }
 
-function wranglerWithIdempotency(runner: WranglerRunner, args: string[], cwd: string): string {
+function wranglerWithIdempotency(
+  runner: WranglerRunner,
+  args: string[],
+  cwd: string,
+  options: { adopt?: boolean } = {},
+): string {
   try {
     return runner.run(args, cwd);
   } catch (err: unknown) {
     const message = (err as Error).message || "";
-    // Idempotent — treat "already exists" as success
-    if (
+    const isAlreadyExists =
       message.includes("already exists") ||
       message.includes("already taken") ||
       message.includes("11009") || // queue already exists
       message.includes("10014") || // kv namespace already exists
-      message.includes("10026") // kv namespace already exists (alt code)
-    ) {
-      console.log(`    (already exists — adopting)`);
-      return message;
+      message.includes("10026"); // kv namespace already exists (alt code)
+
+    if (!isAlreadyExists) throw err;
+
+    if (options.adopt === false) {
+      throw new Error(
+        `Resource already exists in Cloudflare and adopt: false is set. ` +
+        `Pass adopt: true on this resource (or remove the flag) to take it under management.`,
+        { cause: err },
+      );
     }
-    throw err;
+    console.log(`    (already exists — adopting)`);
+    return message;
   }
 }
 
@@ -175,7 +232,7 @@ function wranglerWithIdempotency(runner: WranglerRunner, args: string[], cwd: st
  * call and "created" after, so a resume after crash retries incomplete resources.
  */
 export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<ApplyResult> {
-  const { stage, databaseUrl } = args;
+  const { stage, databaseUrl, force = false } = args;
   const {
     rootDir,
     config,
@@ -183,11 +240,15 @@ export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<ApplyResu
     wrangler,
     logger = console,
     createD1 = defaultCreateD1,
+    applyD1Migrations = defaultApplyD1Migrations,
+    executeD1File = defaultExecuteD1File,
     createR2 = defaultCreateR2,
     createVectorize = defaultCreateVectorize,
     readConfig = defaultReadWranglerConfig,
     renderConfig = defaultRenderWranglerConfig,
     writeConfigs = defaultWriteRenderedConfigs,
+    findZoneId = defaultFindZoneId,
+    reconcileDns = defaultReconcileDns,
   } = deps;
 
   // Load or create state (from remote if using provider)
@@ -208,8 +269,24 @@ export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<ApplyResu
     const stagedName = resourceName(logicalName, stage);
     const existing = state.resources[logicalName];
 
-    if (existing && isActive(existing)) {
+    if (existing && isActive(existing) && !force) {
       logger.log(`  = ${stagedName} (${resource.type}) in sync`);
+      // Migrations are idempotent (tracked in d1_migrations) and need to
+      // run on every apply so newly added migration files get picked up
+      // without forcing a re-create.
+      if (resource.type === "d1") {
+        const d1Config = resource as import("../types.js").D1ResourceConfig;
+        if (d1Config.migrationsDir) {
+          logger.log(`    applying migrations from ${d1Config.migrationsDir}`);
+          applyD1Migrations({
+            name: stagedName,
+            migrationsDir: resolve(rootDir, d1Config.migrationsDir),
+            migrationsTable: d1Config.migrationsTable,
+            remote: true,
+            cwd: rootDir,
+          });
+        }
+      }
       resourceSummaries.push({
         logicalName,
         type: resource.type,
@@ -219,15 +296,25 @@ export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<ApplyResu
       });
       continue;
     }
+    if (existing && isActive(existing) && force) {
+      logger.log(`  ~ ${stagedName} (${resource.type}) re-applying (--force)`);
+    }
 
     logger.log(`  + creating ${stagedName} (${resource.type})...`);
 
     try {
+      if (resource.adopt !== undefined && !supportsAdopt(resource.type)) {
+        throw new Error(
+          `${adoptUnsupportedMessage(resource.type)} Remove adopt from "${logicalName}" or use a supported resource type.`,
+        );
+      }
       // Build props snapshot — common fields plus type-specific extras
       const props: ResourceProps = {
         type: resource.type,
         name: stagedName,
         bindings: resource.bindings as Record<string, unknown>,
+        ...(resource.adopt !== undefined ? { adopt: resource.adopt } : {}),
+        ...(resource.delete === false ? { delete: false } : {}),
       };
       if (resource.type === "vectorize") {
         const vr = resource as VectorizeResourceConfig;
@@ -245,6 +332,9 @@ export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<ApplyResu
       state.resources[logicalName] = {
         type: resource.type,
         lifecycleStatus: existing ? "updating" : "creating",
+        lifecycle: resource.adopt !== undefined
+          ? { adoptRequested: resource.adopt, adoptSupported: supportsAdopt(resource.type) }
+          : undefined,
         props,
         ...(existing ? { oldProps: existing.props } : {}),
         source: "managed",
@@ -252,6 +342,7 @@ export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<ApplyResu
       await provider.write(stage, state);
 
       let resourceOutput: ResourceOutput | undefined;
+      const adopt = resource.adopt;
 
       switch (resource.type) {
         case "kv": {
@@ -259,6 +350,7 @@ export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<ApplyResu
             wrangler,
             ["kv", "namespace", "create", stagedName],
             rootDir,
+            { adopt },
           );
           let id = extractId(output);
           // If "already exists" didn't give us an ID, look it up
@@ -279,6 +371,7 @@ export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<ApplyResu
             wrangler,
             ["queues", "create", stagedName],
             rootDir,
+            { adopt },
           );
           let id = extractId(output);
           // If "already exists" didn't give us an ID, look it up
@@ -304,13 +397,35 @@ export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<ApplyResu
             wrangler,
             ["hyperdrive", "create", stagedName, "--database-url", databaseUrl],
             rootDir,
+            { adopt },
           );
           const id = extractId(output);
           resourceOutput = { id: id!, name: stagedName, origin: databaseUrl };
           break;
         }
         case "d1": {
+          const d1Config = resource as import("../types.js").D1ResourceConfig;
           resourceOutput = createD1(stagedName, rootDir);
+
+          // Imports run only on fresh creates — these are bootstrap data,
+          // not migrations.
+          if (d1Config.importFiles && !existing) {
+            for (const file of d1Config.importFiles) {
+              const filePath = resolve(rootDir, file);
+              logger.log(`    importing ${file}`);
+              executeD1File({ name: stagedName, file: filePath, remote: true, cwd: rootDir });
+            }
+          }
+          if (d1Config.migrationsDir) {
+            logger.log(`    applying migrations from ${d1Config.migrationsDir}`);
+            applyD1Migrations({
+              name: stagedName,
+              migrationsDir: resolve(rootDir, d1Config.migrationsDir),
+              migrationsTable: d1Config.migrationsTable,
+              remote: true,
+              cwd: rootDir,
+            });
+          }
           break;
         }
         case "r2": {
@@ -331,12 +446,36 @@ export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<ApplyResu
           );
           break;
         }
+        case "dns": {
+          const dnsConfig = resource as import("../types.js").DnsResourceConfig;
+          const apiToken = process.env.CLOUDFLARE_API_TOKEN;
+          if (!apiToken) {
+            throw new Error("CLOUDFLARE_API_TOKEN is required to manage DNS records");
+          }
+          const desired = dnsConfig.records.map((record) => ({
+            ...record,
+            name: record.name.replace(/\{stage\}/g, stage),
+          }));
+          const zoneId = await findZoneId(dnsConfig.zone, { apiToken });
+          const records = await reconcileDns(zoneId, desired, { apiToken });
+          resourceOutput = {
+            zoneId,
+            records: records.map((r) => ({
+              id: r.id,
+              name: r.name,
+              type: r.type,
+              content: r.content,
+            })),
+          };
+          break;
+        }
       }
 
       // Write "created" status after provider succeeds (clears oldProps)
       state.resources[logicalName] = {
         type: resource.type,
         lifecycleStatus: existing ? "updated" : "created",
+        lifecycle: state.resources[logicalName]!.lifecycle,
         props: state.resources[logicalName]!.props,
         output: resourceOutput,
         source: "managed",

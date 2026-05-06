@@ -7,6 +7,7 @@ import { resolveDeployOrder } from "./graph.js";
 import { deleteD1Database } from "../providers/d1.js";
 import { deleteR2Bucket } from "../providers/r2.js";
 import { deleteVectorizeIndex } from "../providers/vectorize.js";
+import { deleteDnsRecord } from "../providers/dns.js";
 
 export type DestroyArgs = {
   stage: string;
@@ -184,6 +185,18 @@ export async function destroy(args: DestroyArgs, deps: DestroyDeps): Promise<Des
     if (!resource) continue;
     if (resource.source !== "managed") continue;
 
+    // Honour per-resource `delete: false` — detach from state but leave the
+    // actual Cloudflare resource alone. Useful for shared infrastructure or
+    // when handing a resource off to another tool.
+    const configResource = config.resources[logicalName];
+    const stateDeleteFalse = (resource.props as { delete?: false }).delete === false;
+    if (configResource?.delete === false || stateDeleteFalse) {
+      logger.log(`  · keeping ${resourceStagedName(resource)} (${resource.type}) — delete: false`);
+      delete state.resources[logicalName];
+      await provider.write(stage, state);
+      continue;
+    }
+
     logger.log(`  - deleting ${resourceStagedName(resource)} (${resource.type})...`);
 
     try {
@@ -226,6 +239,19 @@ export async function destroy(args: DestroyArgs, deps: DestroyDeps): Promise<Des
         case "r2":
           deleteR2Bucket(resourceStagedName(resource), rootDir);
           break;
+        case "dns": {
+          const apiToken = process.env.CLOUDFLARE_API_TOKEN;
+          if (!apiToken) {
+            throw new Error("CLOUDFLARE_API_TOKEN is required to delete DNS records");
+          }
+          const dnsOutput = resource.output as { zoneId?: string; records?: Array<{ id: string }> } | undefined;
+          if (dnsOutput?.zoneId && dnsOutput.records) {
+            for (const record of dnsOutput.records) {
+              await deleteDnsRecord(dnsOutput.zoneId, record.id, { apiToken });
+            }
+          }
+          break;
+        }
       }
 
       delete state.resources[logicalName];

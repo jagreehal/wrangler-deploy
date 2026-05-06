@@ -1,0 +1,56 @@
+---
+title: D1 Migrations & Imports
+description: Declare SQL migrations and seed data next to the D1 resource
+---
+
+D1 resources accept three optional fields that wire migrations and
+seed data into the apply lifecycle. They live in
+`wrangler-deploy.config.ts` next to the resource — `wrangler.jsonc`
+stays untouched.
+
+```ts
+"users-db": {
+  type: "d1",
+  bindings: { "apps/api": "DB" },
+  migrationsDir: "./migrations",        // SQL files applied in order on every apply
+  migrationsTable: "drizzle_migrations", // optional; default is "d1_migrations"
+  importFiles: ["./seed.sql"],          // applied once on first create
+}
+```
+
+## How it runs
+
+| File set         | When                          | Tool                                      |
+|------------------|-------------------------------|-------------------------------------------|
+| `migrationsDir`  | Every `wd apply` (idempotent) | `wrangler d1 migrations apply --remote`   |
+| `importFiles`    | Only on first create          | `wrangler d1 execute --file --remote`     |
+
+Migrations are tracked in the `migrationsTable` (default `d1_migrations`)
+so re-applies are no-ops once everything is up to date. To share the
+tracker with Drizzle ORM, set `migrationsTable: "drizzle_migrations"`.
+
+`importFiles` are bootstrap data — they run *once*, on the apply that
+creates the database. Subsequent applies skip them. If you want
+re-runnable seed data, put it in a migration file instead.
+
+## File ordering
+
+`wrangler d1 migrations apply` reads `.sql` files lexicographically.
+Use timestamps:
+
+```
+migrations/
+  2026-05-06-0001-create-users.sql
+  2026-05-07-0002-add-roles.sql
+```
+
+## Per-stage variation
+
+Migrations and imports are the same shape across stages (different DBs,
+same SQL). If you need stage-specific seeding, gate it in your apply
+script — `importFiles` doesn't support `{stage}` interpolation.
+
+## Permissions
+
+The token used by `wd apply` needs **D1 Edit** (already in
+`wd util create-cf-token`'s default scopes).

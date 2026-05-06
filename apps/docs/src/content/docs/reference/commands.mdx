@@ -879,6 +879,79 @@ $ wd doctor
   ✓ config valid: No config errors
 ```
 
+## `wd configure / login / logout / profile`
+
+See the [Profiles guide](/wrangler-deploy/features/profiles) for the full
+flow. Quick reference:
+
+```bash
+wd configure --profile prod        # set up account metadata for a profile
+wd login --profile prod            # save Cloudflare API token for a profile
+wd logout --profile prod [--purge] # delete the credential file (and config entry)
+wd profile list                    # active profile + every configured one
+```
+
+## `wd util create-cf-token`
+
+Print the required Cloudflare API token scopes plus a deeplink to the
+dashboard's token-creation page with the right scopes pre-selected.
+
+```bash
+wd util create-cf-token --profile prod   # prints scopes + URL
+wd util scopes                           # just the scope table
+```
+
+## `wd state list / get / tree`
+
+Inspect what's in state without parsing JSON. See [State Inspection](/wrangler-deploy/features/state-inspection).
+
+```bash
+wd state list --stage staging
+wd state get cache --stage staging
+wd state tree --stage staging
+```
+
+## `wd run`
+
+Read-only: validate config, summarise current deploy state, exit. Useful
+in CI before any mutating command.
+
+```bash
+wd run --stage staging
+```
+
+## `wd dev --tunnel`
+
+Spawn a Cloudflare Quick Tunnel in front of one or all running workers.
+
+```bash
+wd dev --tunnel              # tunnel every worker
+wd dev --tunnel workers/api  # only one
+```
+
+## `wd create vibe-rules`
+
+Drop wrangler-deploy guidance for AI agents into editor-specific paths.
+
+```bash
+wd create vibe-rules claude-code,cursor   # specific targets
+wd create vibe-rules all                  # everything (claude-code, cursor,
+                                          #  windsurf, vscode, zed, codex,
+                                          #  agents-md)
+```
+
+Pass `--force` to overwrite existing files.
+
+## Global options
+
+- `--profile <name>` — pick a profile (also reads `WD_PROFILE`/`CLOUDFLARE_PROFILE`)
+- `--cwd <path>` — run against a different project directory
+- `--env-file <path>` — load `.env`-style file before resolving env vars
+- `--quiet`, `-q` — suppress non-error output
+- `--stage <name>` — defaults to `$USER` (or `WD_STAGE` if set)
+- `--force` — apply: re-run lifecycle even when state shows in-sync
+- `--watch` — apply/deploy: re-run when config files change
+
 ## `wd completions --shell zsh|bash|fish`
 
 Generate shell completion scripts for tab-completion of commands and flags.

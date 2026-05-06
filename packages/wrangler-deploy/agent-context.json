@@ -202,7 +202,8 @@
           "hyperdrive",
           "d1",
           "r2",
-          "vectorize"
+          "vectorize",
+          "dns"
         ]
       },
       "LifecycleStatus": {
@@ -214,6 +215,8 @@
           "updated",
           "deleting",
           "deleted",
+          "replacing",
+          "replaced",
           "missing",
           "drifted",
           "orphaned"
@@ -256,8 +259,9 @@
           },
           {
             "name": "secrets",
-            "type": "Record<string, string[]>",
-            "required": false
+            "type": "Record<string, Array<string | SecretRef>>",
+            "required": false,
+            "description": "Declared secrets per worker. Each entry is either a plain name\n(`wrangler-deploy` manages the value), or `{ name, ref: true }`\n(the secret already exists in Cloudflare via `wrangler secret put`\nor another tool — wrangler-deploy will not push it, but it will\nstill appear in `wd secrets` reports as `ref`)."
           },
           {
             "name": "verify",
@@ -331,18 +335,38 @@
         "fields": [
           {
             "name": "backend",
-            "type": "\"local\" | \"kv\"",
+            "type": "\"local\" | \"kv\" | \"d1\" | \"r2\"",
             "required": true
           },
           {
             "name": "namespaceId",
             "type": "string",
-            "required": false
+            "required": false,
+            "description": "KV namespace ID for backend: \"kv\"."
           },
           {
             "name": "keyPrefix",
             "type": "string",
-            "required": false
+            "required": false,
+            "description": "Key prefix for KV / R2 (default: \"wrangler-deploy/\")."
+          },
+          {
+            "name": "databaseId",
+            "type": "string",
+            "required": false,
+            "description": "D1 database id for backend: \"d1\". The schema is bootstrapped on first\nwrite — `wd apply` creates a `stage_state` table if missing."
+          },
+          {
+            "name": "tableName",
+            "type": "string",
+            "required": false,
+            "description": "Table name for backend: \"d1\" (default: \"stage_state\")."
+          },
+          {
+            "name": "bucketName",
+            "type": "string",
+            "required": false,
+            "description": "Bucket name for backend: \"r2\"."
           }
         ]
       },
