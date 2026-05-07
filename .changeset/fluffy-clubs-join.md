@@ -1,5 +1,4 @@
 ---
-"workers-usage-guard": patch
 "wrangler-deploy": patch
 ---
 
