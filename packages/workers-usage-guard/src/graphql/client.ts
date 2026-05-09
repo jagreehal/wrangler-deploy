@@ -1,3 +1,3 @@
 // src/graphql/client.ts
-export { gql } from "usage-guard-shared";
-export type { GqlDeps } from "usage-guard-shared";
+export { gql } from "workers-usage-guard-shared";
+export type { GqlDeps } from "workers-usage-guard-shared";

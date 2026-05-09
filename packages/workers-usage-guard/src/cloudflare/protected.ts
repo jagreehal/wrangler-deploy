@@ -1,5 +1,5 @@
 // src/cloudflare/protected.ts
-import type { AccountConfig } from "usage-guard-shared";
+import type { AccountConfig } from "workers-usage-guard-shared";
 
 export function isProtected(args: {
   scriptName: string;

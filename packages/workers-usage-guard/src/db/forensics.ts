@@ -1,4 +1,4 @@
-import type { BreachForensic, KillSwitchActions } from "usage-guard-shared";
+import type { BreachForensic, KillSwitchActions } from "workers-usage-guard-shared";
 
 export async function insertBreachForensic(
   args: { forensic: Omit<BreachForensic, "actionsTaken" | "estimatedSavingsUsd"> },

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { runStatus, type StatusDeps, type StatusRow } from "./status.js";
-import type { AccountConfig } from "../../usage-guard-shared/index.js";
+import type { AccountConfig } from "workers-usage-guard-shared";
 
 function mkDeps(): StatusDeps {
   return {

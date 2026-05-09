@@ -1,4 +1,4 @@
-import type { BreachForensic } from "../../usage-guard-shared/index.js";
+import type { BreachForensic } from "workers-usage-guard-shared";
 import type { GuardClient, GuardClientDeps } from "./client.js";
 
 export type BreachesRunnerDeps = {

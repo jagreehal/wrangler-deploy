@@ -1,3 +1,3 @@
 // src/graphql/queries.ts
-export { fetchWorkerUsage } from "usage-guard-shared";
-export type { WorkerUsage, FetchWorkerUsageArgs } from "usage-guard-shared";
+export { fetchWorkerUsage } from "workers-usage-guard-shared";
+export type { WorkerUsage, FetchWorkerUsageArgs } from "workers-usage-guard-shared";

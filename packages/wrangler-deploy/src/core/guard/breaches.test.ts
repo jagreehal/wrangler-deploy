@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { runBreaches, renderBreachesTable, renderBreachesJson, type BreachesRunnerDeps } from "./breaches.js";
-import type { BreachForensic } from "../../usage-guard-shared/index.js";
+import type { BreachForensic } from "workers-usage-guard-shared";
 
 const breach: BreachForensic = {
   id: "f-1",

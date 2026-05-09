@@ -1,4 +1,4 @@
-import type { UsageSnapshot } from "usage-guard-shared";
+import type { UsageSnapshot } from "workers-usage-guard-shared";
 
 export async function insertUsageSnapshot(
   args: { snapshot: UsageSnapshot },

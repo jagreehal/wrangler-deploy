@@ -589,7 +589,7 @@ export interface WranglerConfig {
 
 // ---- Guard (optional usage-monitor integration) ----
 
-import type { AccountConfig as GuardAccountConfig } from "./usage-guard-shared/index.js";
+import type { AccountConfig as GuardAccountConfig } from "workers-usage-guard-shared";
 
 export type GuardConfig = {
   /**

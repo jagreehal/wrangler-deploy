@@ -2,7 +2,7 @@ import type {
   NotificationEvent,
   NotificationResult,
   ActivityEvent,
-} from "usage-guard-shared";
+} from "workers-usage-guard-shared";
 import type { NotificationChannel, NotifyDeps } from "./types.js";
 import { ok } from "./types.js";
 import { isDeduped, recordDedupe } from "../db/dedupe.js";

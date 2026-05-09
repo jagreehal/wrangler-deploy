@@ -10,3 +10,4 @@ ___temp
 **/.astro
 ___temp
 .playwright-cli
+.claude

@@ -1,4 +1,4 @@
-import type { AccountConfig, ActivityEvent, UsageSnapshot } from "usage-guard-shared";
+import type { AccountConfig, ActivityEvent, UsageSnapshot } from "workers-usage-guard-shared";
 import type { OverageStateRow } from "../db/state.js";
 import type { WorkerUsage } from "../graphql/queries.js";
 import { expandPresetsForWorker } from "../config.js";

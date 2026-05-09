@@ -49,6 +49,25 @@ describe("HTTP API", () => {
     expect(Array.isArray(body.reports)).toBe(true);
   });
 
+  it("signed /api/snapshots maps window to limit", async () => {
+    const d = mkDeps();
+    const req = await signedFetch("/api/snapshots?account=a&script=api&window=2d", d);
+    const res = await handleApiRequest({ request: req }, d);
+    expect(res.status).toBe(200);
+    expect(d.listSnapshots).toHaveBeenCalledWith({
+      accountId: "a",
+      scriptName: "api",
+      limit: 576,
+    });
+  });
+
+  it("signed /api/snapshots rejects invalid window", async () => {
+    const d = mkDeps();
+    const req = await signedFetch("/api/snapshots?account=a&script=api&window=last-week", d);
+    const res = await handleApiRequest({ request: req }, d);
+    expect(res.status).toBe(400);
+  });
+
   it("rejects missing signature", async () => {
     const d = mkDeps();
     const res = await handleApiRequest(

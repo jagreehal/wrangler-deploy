@@ -1,4 +1,4 @@
-import type { UsageReport } from "usage-guard-shared";
+import type { UsageReport } from "workers-usage-guard-shared";
 
 export async function insertUsageReport(
   args: { report: UsageReport },

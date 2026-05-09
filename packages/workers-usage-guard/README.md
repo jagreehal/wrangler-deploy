@@ -2,11 +2,115 @@
 
 Control-plane Cloudflare Worker that monitors Workers usage (requests, CPU ms, estimated cost) across configured accounts and automatically detaches public entry points (zone routes, custom domains) when thresholds are crossed. Fans breach and daily-report events out to pluggable notification channels (Discord, Slack, generic webhooks).
 
-Built and maintained with superpowers for Claude Code. Implementation plans and design spec live in `docs/superpowers/` — load the `wrangler-deploy` skill in Claude Code for AI-assisted usage.
+## Install
 
-### CLI integration (Phase 2)
+```bash
+npm install -g workers-usage-guard
+# or one-shot, no install:
+npx workers-usage-guard setup --account <id> --scripts api,worker --api-token <token> --yes
+```
 
-If you also use `wrangler-deploy` in the same repo, you can run `wd guard status` to pull live Cloudflare Workers usage for the same accounts without deploying this guard. See the wrangler-deploy README.
+The package ships a CLI binary (`wug`, also available as `workers-usage-guard`) with everything needed to provision, deploy, and operate the guard.
+
+## One-command install
+
+```bash
+wug setup
+```
+
+`wug setup` walks through:
+
+1. Verifies wrangler is installed and authed.
+2. Creates a D1 database (or reuses `--database-id`).
+3. Generates a signing key (or reuses `$GUARD_API_SIGNING_KEY`).
+4. Writes `wug.config.json` to the current directory — the only file you ever edit.
+5. Applies D1 migrations.
+6. Deploys the Worker.
+7. Sets `CLOUDFLARE_API_TOKEN` and `GUARD_API_SIGNING_KEY` as Worker secrets.
+8. Polls `/api/health` until the endpoint responds.
+9. Prints the live endpoint URL and the signing key (save it).
+
+For CI, pass `--yes` plus all required flags:
+
+```bash
+wug setup --yes \
+  --account 1234abcd \
+  --scripts payment-api,event-router \
+  --api-token $CLOUDFLARE_API_TOKEN
+```
+
+## After setup
+
+All operational commands read endpoint + signing key from `wug.config.json` (or `$WUG_ENDPOINT` / `$GUARD_API_SIGNING_KEY`):
+
+```bash
+wug breaches              # recent breach forensics
+wug report                # latest daily usage report
+wug snapshots --script payment-api --window 24h
+wug disarm payment-api    # block kill-switch on a script
+wug arm payment-api       # re-enable
+wug approvals             # pending human approvals
+wug approve appr-123
+wug logs                  # tail wrangler logs
+wug doctor                # check config + endpoint reachability
+wug preflight             # check secrets are set on the Worker
+wug safe-mode             # non-destructive risk preview + blockers
+wug destroy               # delete the Worker (and its D1)
+```
+
+Run `wug --help` for the full surface, `wug <command> --help` for details. Every command supports `--json` for machine-readable output.
+
+## Configuration
+
+`wug.config.json` is the source of truth. Sample:
+
+```json
+{
+  "endpoint": "https://workers-usage-guard.example.workers.dev",
+  "databaseId": "bd0274ea-ea3b-4fd7-966d-ee55d6ce9947",
+  "scriptName": "workers-usage-guard",
+  "accounts": [
+    {
+      "accountId": "1234abcd",
+      "billingCycleDay": 1,
+      "workers": [
+        {
+          "scriptName": "payment-api",
+          "thresholds": { "requests": 500000, "cpuMs": 5000000 }
+        }
+      ]
+    }
+  ],
+  "notifications": {
+    "channels": [
+      { "type": "discord", "webhookUrlSecret": "DISCORD_WEBHOOK" }
+    ]
+  },
+  "vars": {
+    "requestThreshold": 500000,
+    "cpuTimeThresholdMs": 5000000,
+    "overageCooldownSeconds": 3600,
+    "overageGraceSeconds": 14400
+  }
+}
+```
+
+The signing key is **never** stored here. Always pass it via `$GUARD_API_SIGNING_KEY` or `--signing-key`.
+
+## Inspection helpers
+
+```bash
+wug secret-audit                                # list every secret your config requires
+wug diff-config --before a.json --after b.json  # diff two ACCOUNTS_JSON snapshots
+wug blast-radius                                # which scripts the kill-switch could affect
+wug safe-mode                                   # one-shot safety simulation before changes
+wug keygen                                      # generate a fresh signing key
+wug sign --method GET --path /api/breaches?...  # raw signed headers for manual curl
+```
+
+## Working with `wrangler-deploy`
+
+If you already use `wrangler-deploy`, the same Worker can be installed via `wd guard init` instead of `wug setup`. The two paths produce identical deployments — `wug` writes `wug.config.json`, `wd` writes `guard.*` into `wrangler-deploy.config.ts`.
 
 ## What this package ships
 
@@ -31,49 +135,16 @@ If you also use `wrangler-deploy` in the same repo, you can run `wd guard status
 - An API token scoped to: Workers Routes Write, Workers Scripts Read, Account Analytics Read, plus Workers Routes Write on every zone where the guarded Workers have routes.
 - Workflows enabled on your account.
 
-## First deploy
+## Manual deploy (without `wug setup`)
 
-1. Create the D1 database.
+`wug setup` does all of this for you. The manual flow is documented for reference if you want to wire deployment into existing CI:
 
-   ```bash
-   wrangler d1 create workers-usage-guard
-   ```
-
-   Copy the `database_id` into `wrangler.jsonc`.
-
-2. Run the migration.
-
-   ```bash
-   wrangler d1 migrations apply workers-usage-guard --remote
-   ```
-
-3. Configure `vars` in `wrangler.jsonc` or via `wrangler deploy --var`:
-
-   - `ACCOUNTS_JSON` — an array of `AccountConfig` describing which accounts and workers to monitor, their thresholds, and which scripts are protected.
-   - `NOTIFICATIONS_JSON` — an object with a `channels` array. Each channel entry references a secret by name (`webhookUrlSecret` for Discord/Slack, `urlSecret` for generic webhooks).
-
-4. Set the required secrets.
-
-   Always required:
-
-   ```bash
-   wrangler secret put CLOUDFLARE_API_TOKEN
-   wrangler secret put GUARD_API_SIGNING_KEY
-   ```
-
-   Per channel listed in `NOTIFICATIONS_JSON`, set the named secret, e.g.:
-
-   ```bash
-   wrangler secret put DISCORD_PROD_WEBHOOK
-   wrangler secret put SLACK_ENG_WEBHOOK
-   wrangler secret put OPS_WEBHOOK_URL
-   ```
-
-5. Deploy.
-
-   ```bash
-   wrangler deploy
-   ```
+1. `wrangler d1 create workers-usage-guard` → copy the `database_id` into `wug.config.json` (`databaseId` field).
+2. Configure `accounts`, `notifications`, and `vars` in `wug.config.json`.
+3. `wug migrate` — applies bundled D1 migrations against the configured database.
+4. `wug deploy` — renders a wrangler config from your `wug.config.json` and deploys.
+5. `wrangler secret put CLOUDFLARE_API_TOKEN` and `wrangler secret put GUARD_API_SIGNING_KEY`. Plus any notification-channel webhook secrets.
+6. `wug doctor` to verify, `wug health` to confirm the endpoint is live.
 
 ## Safety notes
 
@@ -92,12 +163,13 @@ pnpm test:int   # integration (miniflare)
 
 Integration tests throw if `CLOUDFLARE_API_TOKEN` is set without `GUARD_TEST_ALLOW_REMOTE=1`, so they cannot accidentally hit a production account.
 
-### Migration 0002
+### Migrations
 
-Phase 3b adds a `runtime_protected` D1 table to hold runtime kill-switch overrides added via `wd guard disarm`. Apply with:
+D1 migrations ship inside the package (`migrations/`). Apply them with:
 
 ```bash
-wrangler d1 migrations apply workers-usage-guard --remote
+wug migrate           # remote (default)
+wug migrate --local   # local D1 emulator
 ```
 
 ## Forecast mode

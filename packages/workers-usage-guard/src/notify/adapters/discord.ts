@@ -1,4 +1,4 @@
-import type { NotificationEvent } from "usage-guard-shared";
+import type { NotificationEvent } from "workers-usage-guard-shared";
 import type { NotificationChannel, NotifyDeps } from "../types.js";
 import { err, ok, postWithTimeout } from "../types.js";
 

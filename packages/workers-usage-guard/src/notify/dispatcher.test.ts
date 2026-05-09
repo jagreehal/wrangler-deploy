@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { mock } from "vitest-mock-extended";
 import { computeDedupKey, dispatch } from "./dispatcher.js";
 import type { NotifyDeps, NotificationChannel } from "./types.js";
-import type { NotificationEvent, NotificationResult } from "usage-guard-shared";
+import type { NotificationEvent, NotificationResult } from "workers-usage-guard-shared";
 import { stubs } from "../test-utils/stubs.js";
 
 function makeChannel(name: string, result: NotificationResult): NotificationChannel {

@@ -29,7 +29,8 @@
     "wrangler": ">=4.88.0"
   },
   "dependencies": {
-    "@cloudflare/workers-types": "^4.20260503.1"
+    "@cloudflare/workers-types": "^4.20260503.1",
+    "workers-usage-guard-shared": "workspace:^"
   },
   "devDependencies": {
     "@types/node": "^25.5.2",

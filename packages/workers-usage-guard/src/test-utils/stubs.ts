@@ -10,7 +10,7 @@ import type {
   UsageReport,
   UsageSnapshot,
   WorkerConfig,
-} from "usage-guard-shared";
+} from "workers-usage-guard-shared";
 
 faker.seed(1);
 

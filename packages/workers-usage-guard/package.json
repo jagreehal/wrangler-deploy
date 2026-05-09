@@ -1,12 +1,50 @@
 {
   "name": "workers-usage-guard",
-  "version": "0.0.0",
-  "private": true,
-  "description": "Cloudflare Worker that monitors Workers usage and detaches public entry points on threshold breach",
+  "version": "0.1.0",
+  "description": "Cloudflare Workers kill-switch — auto-disable Workers when usage crosses thresholds. Ships with the `wug` CLI for one-command setup.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jagreehal/wrangler-deploy",
+    "directory": "packages/workers-usage-guard"
+  },
+  "homepage": "https://github.com/jagreehal/wrangler-deploy/tree/main/packages/workers-usage-guard",
+  "bugs": {
+    "url": "https://github.com/jagreehal/wrangler-deploy/issues"
+  },
+  "keywords": [
+    "cloudflare",
+    "workers",
+    "monitoring",
+    "workflows",
+    "usage",
+    "guardrail"
+  ],
   "type": "module",
-  "main": "src/index.ts",
+  "bin": {
+    "wug": "./dist/cli/index.js",
+    "workers-usage-guard": "./dist/cli/index.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "migrations",
+    "wrangler.jsonc",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
-    "usage-guard-shared": "workspace:*"
+    "workers-usage-guard-shared": "workspace:*"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
@@ -14,6 +52,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --config vitest.config.ts",
     "test:int": "vitest run --config vitest.int.config.ts",
+    "check": "pnpm typecheck && pnpm test && pnpm build",
+    "prepublishOnly": "pnpm check",
     "deploy": "wrangler deploy"
   },
   "devDependencies": {
