@@ -1,1 +1,1 @@
-export { signRequest, verifyRequest } from "usage-guard-shared";
+export { signRequest, verifyRequest } from "workers-usage-guard-shared";

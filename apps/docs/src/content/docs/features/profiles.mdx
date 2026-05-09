@@ -1,0 +1,80 @@
+---
+title: Profiles
+description: Manage credentials for multiple Cloudflare accounts without juggling .env files
+---
+
+Profiles let you target different Cloudflare accounts from the same project
+without rewriting `wrangler.jsonc` or shuffling `.env` files. They sit alongside
+your config — `wrangler-deploy.config.ts` and `wrangler.jsonc` files stay
+untouched. Profiles only change which credentials are used at runtime.
+
+## Layout
+
+```
+~/.wrangler-deploy/
+  config.json                              # non-sensitive metadata
+  credentials/<profile>/cloudflare.json    # secret token, chmod 600
+```
+
+Override the location with `WD_HOME`.
+
+## Configure a profile
+
+```sh
+# Interactive
+wd configure --profile prod
+
+# Non-interactive (CI / scripts)
+wd configure --profile prod \
+  --method api-token \
+  --account-id <CLOUDFLARE_ACCOUNT_ID> \
+  --account-name "Acme Production" \
+  --yes
+```
+
+## Save a token
+
+```sh
+# Prompts for the token
+wd login --profile prod
+
+# Or pass explicitly
+wd login --profile prod --token cf_pat_xxx
+```
+
+Need a token? `wd util create-cf-token` prints the required scopes and a
+deeplink to the Cloudflare dashboard's token-creation page with the right
+boxes pre-checked.
+
+## Pick a profile per command
+
+In order of precedence:
+
+1. `--profile prod` flag
+2. `WD_PROFILE=prod` env var
+3. `CLOUDFLARE_PROFILE=prod` env var
+4. `default` profile
+
+```sh
+wd plan --stage staging --profile prod
+WD_PROFILE=prod wd deploy --stage staging
+```
+
+When a profile resolves, `applyProfileToEnv` injects
+`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` into the process — but
+**never overrides** values already present. Explicit env vars set by CI
+always win.
+
+## Inspect
+
+```sh
+wd profile list           # text table, marks the active profile
+wd profile list --json    # machine-readable
+```
+
+## Tear down
+
+```sh
+wd logout --profile prod          # delete the credential file
+wd logout --profile prod --purge  # also remove the entry from config.json
+```

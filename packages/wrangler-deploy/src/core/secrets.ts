@@ -1,12 +1,13 @@
 import { readFileSync } from "node:fs";
 import type { StateProvider } from "./state.js";
-import type { CfStageConfig } from "../types.js";
+import type { CfStageConfig, StageState } from "../types.js";
+import { isSecretRef, secretName } from "../types.js";
 import type { WranglerRunner } from "./wrangler-runner.js";
 
 export interface SecretStatus {
   worker: string;
   name: string;
-  status: "set" | "missing";
+  status: "set" | "missing" | "ref";
 }
 
 // ============================================================================
@@ -38,11 +39,16 @@ export async function checkSecrets(args: CheckSecretsArgs, deps: CheckSecretsDep
 
   if (!config.secrets) return results;
 
-  for (const [workerPath, secretNames] of Object.entries(config.secrets)) {
+  for (const [workerPath, secretSpecs] of Object.entries(config.secrets)) {
     const workerState = state.workers[workerPath];
     if (!workerState) {
-      for (const name of secretNames) {
-        results.push({ worker: workerPath, name, status: "missing" });
+      for (const spec of secretSpecs) {
+        const name = secretName(spec);
+        results.push({
+          worker: workerPath,
+          name,
+          status: isSecretRef(spec) ? "ref" : "missing",
+        });
       }
       continue;
     }
@@ -61,22 +67,27 @@ export async function checkSecrets(args: CheckSecretsArgs, deps: CheckSecretsDep
       // If worker doesn't exist yet or list fails, all secrets are missing
     }
 
-    for (const name of secretNames) {
-      results.push({
-        worker: workerPath,
-        name,
-        status: existingSecrets.includes(name) ? "set" : "missing",
-      });
+    for (const spec of secretSpecs) {
+      const name = secretName(spec);
+      const present = existingSecrets.includes(name);
+      // External refs report as "ref" when they're actually present in CF,
+      // and "missing" when they're not — surfacing the gap loudly.
+      const status: SecretStatus["status"] = isSecretRef(spec)
+        ? present ? "ref" : "missing"
+        : present ? "set" : "missing";
+      results.push({ worker: workerPath, name, status });
     }
   }
 
   // Update state with secret status
   if (!config.secrets) return results;
-  for (const [workerPath, secretNames] of Object.entries(config.secrets)) {
+  for (const [workerPath, secretSpecs] of Object.entries(config.secrets)) {
     if (!state.secrets[workerPath]) state.secrets[workerPath] = {};
-    for (const name of secretNames) {
+    for (const spec of secretSpecs) {
+      const name = secretName(spec);
       const found = results.find((r) => r.worker === workerPath && r.name === name);
-      state.secrets[workerPath][name] = found?.status ?? "missing";
+      const recorded = found?.status === "ref" ? "set" : found?.status ?? "missing";
+      state.secrets[workerPath][name] = recorded;
     }
   }
   state.updatedAt = new Date().toISOString();
@@ -130,6 +141,43 @@ export type SyncSecretsDeps = {
   setSecretFn?: typeof setSecret;
 };
 
+export interface SecretSyncPreview {
+  set: string[];
+  skipped: string[];
+}
+
+export function buildSecretSyncPreview(
+  secretsConfig: CfStageConfig["secrets"] | undefined,
+  stageState: StageState,
+  envVars: Map<string, string>,
+): SecretSyncPreview {
+  const set: string[] = [];
+  const skipped: string[] = [];
+  if (!secretsConfig) return { set, skipped };
+
+  for (const [workerPath, secretSpecs] of Object.entries(secretsConfig)) {
+    const workerState = stageState.workers[workerPath];
+    if (!workerState) {
+      skipped.push(...secretSpecs.map((s) => `${workerPath}/${secretName(s)} (worker not in state)`));
+      continue;
+    }
+    for (const spec of secretSpecs) {
+      const name = secretName(spec);
+      if (isSecretRef(spec)) {
+        skipped.push(`${workerPath}/${name} (ref: managed externally)`);
+        continue;
+      }
+      if (envVars.get(name)) {
+        set.push(`${workerPath}/${name}`);
+      } else {
+        skipped.push(`${workerPath}/${name} (not in env file)`);
+      }
+    }
+  }
+
+  return { set, skipped };
+}
+
 /**
  * Sync secrets from an env file to a stage's workers.
  * File format: KEY=value (same as .dev.vars)
@@ -157,37 +205,40 @@ export async function syncSecretsFromEnvFile(
     envVars.set(key, value);
   }
 
+  const preview = buildSecretSyncPreview(config.secrets, state, envVars);
   const setSecrets: string[] = [];
   const skippedSecrets: string[] = [];
+  if (!config.secrets) return preview;
 
-  if (!config.secrets) return { set: setSecrets, skipped: skippedSecrets };
-
-  for (const [workerPath, secretNames] of Object.entries(config.secrets)) {
+  for (const [workerPath, secretSpecs] of Object.entries(config.secrets)) {
     const workerState = state.workers[workerPath];
     if (!workerState) {
-      skippedSecrets.push(...secretNames.map((n) => `${workerPath}/${n} (worker not in state)`));
       continue;
     }
 
-    for (const secretName of secretNames) {
-      const value = envVars.get(secretName);
+    for (const spec of secretSpecs) {
+      const name = secretName(spec);
+      // External refs are owned out-of-band — sync should never push them.
+      if (isSecretRef(spec)) {
+        continue;
+      }
+      const value = envVars.get(name);
       if (!value) {
-        skippedSecrets.push(`${workerPath}/${secretName} (not in env file)`);
         continue;
       }
 
       try {
         setSecretFn(
-          { workerName: workerState.name, secretName, value },
+          { workerName: workerState.name, secretName: name, value },
           { rootDir, wrangler },
         );
-        setSecrets.push(`${workerPath}/${secretName}`);
+        setSecrets.push(`${workerPath}/${name}`);
 
         // Update state
         if (!state.secrets[workerPath]) state.secrets[workerPath] = {};
-        state.secrets[workerPath][secretName] = "set";
+        state.secrets[workerPath][name] = "set";
       } catch (err) {
-        skippedSecrets.push(`${workerPath}/${secretName} (failed: ${(err as Error).message})`);
+        skippedSecrets.push(`${workerPath}/${name} (failed: ${(err as Error).message})`);
       }
     }
   }
@@ -195,7 +246,9 @@ export async function syncSecretsFromEnvFile(
   state.updatedAt = new Date().toISOString();
   await provider.write(stage, state);
 
-  return { set: setSecrets, skipped: skippedSecrets };
+  // Preserve preview ordering/reasons for deterministic dry-run parity, but
+  // append runtime failures from actual set attempts.
+  return { set: setSecrets, skipped: [...preview.skipped, ...skippedSecrets] };
 }
 
 // ============================================================================
@@ -223,11 +276,20 @@ export async function validateSecrets(args: ValidateSecretsArgs, deps: ValidateS
   if (!state || !config.secrets) return [];
 
   const missing: string[] = [];
-  for (const [workerPath, secretNames] of Object.entries(config.secrets)) {
-    for (const name of secretNames) {
-      if (state.secrets[workerPath]?.[name] !== "set") {
-        missing.push(`${workerPath}/${name}`);
+  for (const [workerPath, secretSpecs] of Object.entries(config.secrets)) {
+    for (const spec of secretSpecs) {
+      const name = secretName(spec);
+      // External refs are assumed present in CF (set out-of-band). They
+      // pass validation as long as they were observed by checkSecrets.
+      const recorded = state.secrets[workerPath]?.[name];
+      if (recorded === "set") continue;
+      if (isSecretRef(spec)) {
+        // No record yet — surface as missing so deploy gating still
+        // catches a genuinely missing externally-owned secret.
+        if (recorded === undefined) missing.push(`${workerPath}/${name} (ref)`);
+        continue;
       }
+      missing.push(`${workerPath}/${name}`);
     }
   }
   return missing;

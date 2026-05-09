@@ -1,4 +1,4 @@
-import type { AccountConfig, NotificationResult, UsageReport } from "usage-guard-shared";
+import type { AccountConfig, NotificationResult, UsageReport } from "workers-usage-guard-shared";
 import type { WorkerUsage } from "../graphql/queries.js";
 import { estimateWorkersCost } from "../cost.js";
 

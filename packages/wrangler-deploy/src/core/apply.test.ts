@@ -336,6 +336,21 @@ describe("apply", () => {
     expect(writeWithKvCreated).toBeDefined();
   });
 
+  it("persists lifecycle flags in state props for destroy-time behavior", async () => {
+    const provider = createMockProvider(null);
+    const config: CfStageConfig = {
+      version: 1,
+      workers: ["apps/api"],
+      resources: {
+        "cache-kv": { type: "kv", delete: false, bindings: { "apps/api": "CACHE" } },
+      },
+    };
+    const deps = stubDeps({ config, state: provider });
+
+    const result = await apply({ stage: "staging" }, deps);
+    expect(result.resources["cache-kv"]?.props.delete).toBe(false);
+  });
+
   it("removes workers from state that are no longer declared in the manifest", async ({ task }) => {
     story.init(task);
 

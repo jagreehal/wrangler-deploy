@@ -1,0 +1,55 @@
+---
+title: State Encryption
+description: Encrypted state, password rotation, and recovery from a lost password
+---
+
+When `state.statePassword` (or `WD_STATE_PASSWORD`, or
+`--state-password`) is set, wrangler-deploy encrypts every secret-bearing
+field in state before persisting:
+
+- Hyperdrive `origin` (the Postgres connection string)
+- Stored secret values written via `wd secrets sync --to <stage> --from-env-file <path>`
+
+Encrypted values are prefixed with `v1:`. The encryption is
+AES-GCM-256 with a per-record nonce.
+
+## Rotate the password
+
+```sh
+wd rotate-password \
+  --old-password $OLD_PW \
+  --new-password $NEW_PW
+```
+
+Walks every stage in your state backend, decrypts with the old password,
+re-encrypts with the new one, and writes back. Works with all backends
+(local, KV, D1, R2). Stages that fail to decrypt (probably the wrong
+old password) are skipped and reported — partial rotation never
+corrupts state.
+
+Env-var equivalents: `WD_STATE_PASSWORD_OLD` and `WD_STATE_PASSWORD_NEW`.
+
+## Recover from a lost password
+
+If you've lost the old password, you can't decrypt the existing
+encrypted fields. Run:
+
+```sh
+wd apply --stage <name> --erase-secrets --force
+```
+
+This:
+1. Clears every `v1:`-prefixed value from state for that stage.
+2. Runs the normal apply, which re-fetches resource IDs but leaves a
+   gap where secrets used to be.
+
+After it completes, re-set the secrets:
+
+```sh
+wd secrets set --stage <name>          # interactive
+wd secrets sync --to <name> --from-env-file .env.<name>  # bulk
+```
+
+`--erase-secrets` is destructive — it requires `--force` and is meant
+for one-off recovery, not regular use. Treat it the same way you'd
+treat `git reset --hard`.

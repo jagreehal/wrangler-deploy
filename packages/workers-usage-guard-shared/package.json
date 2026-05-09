@@ -1,0 +1,41 @@
+{
+  "name": "workers-usage-guard-shared",
+  "version": "0.1.0",
+  "description": "Shared types and pure helpers consumed by both workers-usage-guard (Worker) and wrangler-deploy (Node CLI)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jagreehal/wrangler-deploy",
+    "directory": "packages/workers-usage-guard-shared"
+  },
+  "homepage": "https://github.com/jagreehal/wrangler-deploy/tree/main/packages/workers-usage-guard-shared",
+  "bugs": {
+    "url": "https://github.com/jagreehal/wrangler-deploy/issues"
+  },
+  "keywords": ["cloudflare", "workers", "usage", "monitoring", "helpers"],
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config vitest.config.ts",
+    "check": "pnpm typecheck && pnpm test && pnpm build",
+    "prepublishOnly": "pnpm check"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.2",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.5"
+  }
+}

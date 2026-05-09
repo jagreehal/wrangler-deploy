@@ -1,7 +1,7 @@
 import { existsSync, writeFileSync, mkdirSync } from "node:fs";
 import { resolve, isAbsolute, relative } from "node:path";
 import { spawn } from "node:child_process";
-import type { CfStageConfig, DevCompanionConfig } from "../types.js";
+import type { CfStageConfig, DevCompanionConfig, ResourceType } from "../types.js";
 import type { StateProvider } from "./state.js";
 import { resolveDeployOrder } from "./graph.js";
 import { assignPorts } from "./dev-ports.js";
@@ -18,6 +18,14 @@ export interface WorkerDevPlan {
   args: string[];
   /** Env-var-name → deployed worker name (or null = missing from state, omit with warning). */
   serviceBindingFallbacks?: Record<string, string | null>;
+  /**
+   * Bindings flagged `dev.remote: true` in wrangler-deploy.config.ts.
+   * Each entry is a binding name in this worker's wrangler.jsonc that
+   * should be fulfilled by the live Cloudflare resource during dev,
+   * grouped by the underlying resource type so the override emitter can
+   * write into the right `kv_namespaces` / `d1_databases` / etc. section.
+   */
+  remoteBindings?: Array<{ binding: string; type: ResourceType }>;
 }
 
 export interface DevCompanionPlan {
@@ -78,6 +86,87 @@ function resolveWorkerConfigPath(rootDir: string, workerPath: string): string {
 
 function resolveDevPath(rootDir: string, path: string): string {
   return isAbsolute(path) ? path : resolve(rootDir, path);
+}
+
+/**
+ * Walk the config and collect every binding marked `dev.remote: true`,
+ * grouped by the worker that declares it. Returns a map keyed by worker
+ * path so dev plan and override emission can both consume it without
+ * re-walking the config.
+ *
+ * Bindings come in three shapes in this codebase:
+ *   - `bindings: { workerPath: "BINDING_NAME" }`         (kv/d1/r2/hyperdrive/vectorize)
+ *   - `bindings: { workerPath: { producer: "X" } }`      (queue producers)
+ *   - `bindings: { workerPath: { consumer: true, ... } }` (queue consumers)
+ *
+ * Queue consumers don't have a runtime binding name — they're not
+ * something the worker pulls from env — so they're skipped here.
+ */
+export function computeRemoteBindings(
+  config: CfStageConfig,
+): Map<string, Array<{ binding: string; type: ResourceType }>> {
+  const result = new Map<string, Array<{ binding: string; type: ResourceType }>>();
+  for (const [, resource] of Object.entries(config.resources)) {
+    if (!resource.dev?.remote) continue;
+    for (const [workerPath, binding] of Object.entries(resource.bindings)) {
+      let bindingName: string | undefined;
+      if (typeof binding === "string") {
+        bindingName = binding;
+      } else if (binding && typeof binding === "object") {
+        if ("producer" in binding && typeof binding.producer === "string") {
+          bindingName = binding.producer;
+        }
+      }
+      if (!bindingName) continue;
+
+      const list = result.get(workerPath) ?? [];
+      list.push({ binding: bindingName, type: resource.type });
+      result.set(workerPath, list);
+    }
+  }
+  return result;
+}
+
+interface DevOverridePayload {
+  extends?: string;
+  services?: Array<{ binding: string; service: string }>;
+  kv_namespaces?: Array<{ binding: string; experimental_remote: true }>;
+  d1_databases?: Array<{ binding: string; experimental_remote: true }>;
+  r2_buckets?: Array<{ binding: string; experimental_remote: true }>;
+  hyperdrive?: Array<{ binding: string; experimental_remote: true }>;
+  vectorize?: Array<{ binding: string; experimental_remote: true }>;
+  queues?: { producers?: Array<{ binding: string; experimental_remote: true }> };
+}
+
+const REMOTE_BINDING_FIELDS: Record<ResourceType, keyof DevOverridePayload | "queue-producer" | "skip"> = {
+  kv: "kv_namespaces",
+  d1: "d1_databases",
+  r2: "r2_buckets",
+  hyperdrive: "hyperdrive",
+  vectorize: "vectorize",
+  queue: "queue-producer",
+  dns: "skip",
+};
+
+export function applyRemoteBindingsToOverride(
+  base: DevOverridePayload,
+  remoteBindings: Array<{ binding: string; type: ResourceType }>,
+): DevOverridePayload {
+  const out: DevOverridePayload = { ...base };
+  for (const { binding, type } of remoteBindings) {
+    const target = REMOTE_BINDING_FIELDS[type];
+    if (target === "skip") continue;
+    if (target === "queue-producer") {
+      out.queues = out.queues ?? {};
+      out.queues.producers = out.queues.producers ?? [];
+      out.queues.producers.push({ binding, experimental_remote: true });
+      continue;
+    }
+    const list = (out[target] as Array<{ binding: string; experimental_remote: true }> | undefined) ?? [];
+    list.push({ binding, experimental_remote: true });
+    (out as Record<string, unknown>)[target] = list;
+  }
+  return out;
 }
 
 function writeRenderedDevConfig(
@@ -263,11 +352,13 @@ export async function buildDevPlan(
   const ports = assignPorts(filteredConfig, basePort, portOverrides);
 
   const globalArgs = config.dev?.args ?? [];
+  const remoteBindingsByWorker = computeRemoteBindings(config);
   const workerPlans: WorkerDevPlan[] = workers.map((workerPath) => {
     const port = ports[workerPath]!;
     const customArgs = workerOptions?.[workerPath]?.devArgs ?? [];
     const serviceBindingFallbacks = serviceBindingFallbacksByWorker.get(workerPath);
     const configPath = renderedConfigPathsByWorker.get(workerPath) ?? resolveWorkerConfigPath(rootDir, workerPath);
+    const remoteBindings = remoteBindingsByWorker.get(workerPath);
 
     return {
       workerPath,
@@ -276,6 +367,7 @@ export async function buildDevPlan(
       port,
       args: [...globalArgs, ...customArgs],
       ...(serviceBindingFallbacks ? { serviceBindingFallbacks } : {}),
+      ...(remoteBindings && remoteBindings.length > 0 ? { remoteBindings } : {}),
     };
   });
 
@@ -433,24 +525,34 @@ export async function startDev(
       const devPort = devPorts[i]!;
       const inspectorPort = inspectorPorts[i]!;
 
-      // Write dev override config if worker has fallback service bindings
+      // Write dev override config when the worker has either fallback
+      // service bindings (--filter excludes deps) or remote-marked bindings.
       let configOverridePath: string | undefined;
-      if (rootDir && worker.serviceBindingFallbacks) {
-        const activeFallbacks = Object.entries(worker.serviceBindingFallbacks).filter(
-          ([, name]) => name !== null,
-        );
-        if (activeFallbacks.length > 0) {
-          const overrideDir = resolve(rootDir, ".wrangler-deploy", "dev", worker.workerPath);
-          const overridePath = resolve(overrideDir, "wrangler.dev.jsonc");
-          mkdirSync(overrideDir, { recursive: true });
-          const extendsPath = relative(overrideDir, worker.configPath);
-          const overrideContent = {
-            extends: extendsPath,
-            services: activeFallbacks.map(([binding, service]) => ({ binding, service: service! })),
-          };
-          writeFileSync(overridePath, JSON.stringify(overrideContent, null, 2) + "\n");
-          configOverridePath = overridePath;
+      const hasRemote = (worker.remoteBindings?.length ?? 0) > 0;
+      const activeFallbacks = worker.serviceBindingFallbacks
+        ? Object.entries(worker.serviceBindingFallbacks).filter(([, name]) => name !== null)
+        : [];
+      if (rootDir && (activeFallbacks.length > 0 || hasRemote)) {
+        const overrideDir = resolve(rootDir, ".wrangler-deploy", "dev", worker.workerPath);
+        const overridePath = resolve(overrideDir, "wrangler.dev.jsonc");
+        mkdirSync(overrideDir, { recursive: true });
+        const extendsPath = relative(overrideDir, worker.configPath);
+        let overrideContent: DevOverridePayload = {
+          extends: extendsPath,
+          ...(activeFallbacks.length > 0
+            ? {
+                services: activeFallbacks.map(([binding, service]) => ({
+                  binding,
+                  service: service!,
+                })),
+              }
+            : {}),
+        };
+        if (worker.remoteBindings) {
+          overrideContent = applyRemoteBindingsToOverride(overrideContent, worker.remoteBindings);
         }
+        writeFileSync(overridePath, JSON.stringify(overrideContent, null, 2) + "\n");
+        configOverridePath = overridePath;
       }
 
       const args = [

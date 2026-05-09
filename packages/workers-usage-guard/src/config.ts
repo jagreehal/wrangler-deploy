@@ -4,7 +4,7 @@ import type {
   NotificationChannelConfig,
   PresetRule,
   WorkerConfig,
-} from "usage-guard-shared";
+} from "workers-usage-guard-shared";
 
 export type PresetExpansionContext = {
   defaults: { requests: number; cpuMs: number };

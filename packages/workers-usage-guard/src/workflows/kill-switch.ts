@@ -14,7 +14,7 @@ import type {
   BreachType,
   KillSwitchActions,
   NotificationResult,
-} from "usage-guard-shared";
+} from "workers-usage-guard-shared";
 import type { Env } from "../env.js";
 import type { RemovedRoute } from "../cloudflare/routes.js";
 

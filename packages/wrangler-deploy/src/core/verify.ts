@@ -131,8 +131,9 @@ export async function verify(args: VerifyArgs, deps: VerifyDeps): Promise<Verify
 
   // 6. Every declared secret is accounted for
   if (config.secrets) {
-    for (const [workerPath, secretNames] of Object.entries(config.secrets)) {
-      for (const secretName of secretNames) {
+    for (const [workerPath, secretSpecs] of Object.entries(config.secrets)) {
+      for (const spec of secretSpecs) {
+        const secretName = typeof spec === "string" ? spec : spec.name;
         const secretStatus = state.secrets[workerPath]?.[secretName];
         const isSet = secretStatus === "set";
         checks.push({

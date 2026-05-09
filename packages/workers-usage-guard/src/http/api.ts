@@ -1,5 +1,5 @@
 // src/http/api.ts
-import type { BreachForensic, UsageReport, UsageSnapshot } from "usage-guard-shared";
+import type { BreachForensic, UsageReport, UsageSnapshot } from "workers-usage-guard-shared";
 import { verifyRequest } from "./signing.js";
 import type { ApprovalRow } from "../db/approvals.js";
 
@@ -8,7 +8,7 @@ export type ApiDeps = {
   signingKey: string;
   listReports: (args: { accountId: string; from?: string; to?: string }) => Promise<UsageReport[]>;
   listBreaches: (args: { accountId: string; limit: number }) => Promise<BreachForensic[]>;
-  listSnapshots: (args: { accountId: string; scriptName: string; window: string }) => Promise<UsageSnapshot[]>;
+  listSnapshots: (args: { accountId: string; scriptName: string; limit: number }) => Promise<UsageSnapshot[]>;
   healthInfo: () => Promise<{ lastCheck: string | null; lastReport: string | null }>;
   addRuntimeProtection: (args: { accountId: string; scriptName: string; addedBy: string; reason?: string }) => Promise<void>;
   removeRuntimeProtection: (args: { accountId: string; scriptName: string }) => Promise<void>;
@@ -28,6 +28,18 @@ function json(status: number, body: unknown): Response {
     status,
     headers: { "content-type": "application/json" },
   });
+}
+
+function parseSnapshotWindow(window: string): number | null {
+  const trimmed = window.trim().toLowerCase();
+  const match = trimmed.match(/^(\d+)([dh])$/);
+  if (!match) return null;
+  const count = Number(match[1]);
+  if (!Number.isFinite(count) || count <= 0) return null;
+  const unit = match[2];
+  const hours = unit === "d" ? count * 24 : count;
+  // snapshots are captured every 5 minutes
+  return Math.ceil((hours * 60) / 5);
 }
 
 async function requireSigned(req: Request, deps: ApiDeps, path: string): Promise<Response | null> {
@@ -146,7 +158,9 @@ export async function handleApiRequest(
     const scriptName = url.searchParams.get("script");
     if (!scriptName) return json(400, { error: "missing script" });
     const window = url.searchParams.get("window") ?? "7d";
-    const snapshots = await deps.listSnapshots({ accountId, scriptName, window });
+    const limit = parseSnapshotWindow(window);
+    if (limit === null) return json(400, { error: "invalid window (expected <n>d or <n>h)" });
+    const snapshots = await deps.listSnapshots({ accountId, scriptName, limit });
     return json(200, { snapshots });
   }
   if (route === "/api/runtime-protected") {

@@ -16,7 +16,7 @@ import { discordAdapter } from "../notify/adapters/discord.js";
 import { slackAdapter } from "../notify/adapters/slack.js";
 import { webhookAdapter } from "../notify/adapters/webhook.js";
 import type { NotificationChannel } from "../notify/types.js";
-import type { NotificationChannelConfig } from "usage-guard-shared";
+import type { NotificationChannelConfig } from "workers-usage-guard-shared";
 
 function channelFor(cfg: NotificationChannelConfig): NotificationChannel {
   if (cfg.type === "discord") return discordAdapter(cfg);

@@ -1,4 +1,4 @@
-import type { ActivityEvent } from "usage-guard-shared";
+import type { ActivityEvent } from "workers-usage-guard-shared";
 
 export async function appendActivity(
   args: { event: ActivityEvent },

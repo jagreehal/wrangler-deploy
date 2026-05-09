@@ -1,0 +1,73 @@
+---
+title: DNS Records
+description: Declare A/AAAA/CNAME/TXT/MX records per stage
+---
+
+Most wrangler-deploy resources are bindings injected into your
+`wrangler.jsonc`. DNS records are different — they're terminal Cloudflare
+zone records, managed via the Cloudflare DNS API.
+
+## Declare records
+
+```ts
+import { defineConfig } from "wrangler-deploy";
+
+export default defineConfig({
+  version: 1,
+  workers: ["apps/api"],
+  resources: {
+    "api-dns": {
+      type: "dns",
+      zone: "example.com",
+      bindings: {},
+      records: [
+        { type: "CNAME", name: "api-{stage}.example.com", content: "apps.example.workers.dev", proxied: true },
+        { type: "TXT",   name: "_verify-{stage}.example.com", content: "verify=abc123" },
+      ],
+    },
+  },
+});
+```
+
+- `zone` is the Cloudflare zone name. The token must have Zone:Read on it.
+- `name` supports `{stage}` interpolation, so the same declaration can
+  produce `api-staging.example.com` and `api-prod.example.com`.
+- Records are matched by `(type, name)` for diff detection. If
+  `content`/`ttl`/`proxied` change, the record is updated in place; if a
+  record disappears from the config, it's deleted.
+
+## Lifecycle
+
+`wd apply --stage <name>` reconciles the desired records against what's
+live in the zone:
+- Missing records: created.
+- Drifted records: updated in place (no delete + recreate flicker).
+- Stale records: deleted on the next apply.
+
+`wd destroy --stage <name>` deletes every record this stage created.
+Pair with [`delete: false`](/wrangler-deploy/features/lifecycle-flags)
+when you want to keep critical records around even if you stop tracking
+them in this project.
+
+## Required permissions
+
+The token used for `wd apply` needs:
+
+| Scope             | Level | Why |
+|-------------------|-------|-----|
+| Zone              | Read  | Look up the zone by name |
+| Zone:DNS          | Edit  | Create/update/delete records |
+
+`wd util create-cf-token` does not include these by default — DNS
+edit access is broader than wrangler-deploy's other operations need.
+Add them in the dashboard token-creation page when you wire up DNS for
+the first time.
+
+## Limitations
+
+- One record per `(type, name)` pair. Round-robin A records are not
+  modeled today.
+- No support for DNSSEC, custom origin overrides, or Cloudflare-managed
+  records (those keep flowing through the dashboard or `wrangler`).
+- Worker custom domains are managed via [routes](/wrangler-deploy/features/route-templating)
+  in `wrangler-deploy.config.ts`, not via DNS records.

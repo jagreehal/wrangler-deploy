@@ -1,4 +1,4 @@
-import type { BreachType } from "usage-guard-shared";
+import type { BreachType } from "workers-usage-guard-shared";
 
 export type ApprovalRow = {
   id: string;

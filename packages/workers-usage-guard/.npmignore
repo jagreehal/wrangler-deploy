@@ -1,0 +1,7 @@
+src/**/*.test.ts
+src/**/test-utils/**
+tests/**
+dist-bundle/**
+.wrangler/**
+.turbo/**
+node_modules/**

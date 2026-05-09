@@ -198,6 +198,7 @@ Use packs when the repo needs a fast smoke run and a stricter regression run wit
 ## Guard integration
 
 `guard` connects wrangler-deploy to a deployed `workers-usage-guard` Worker.
+The guard runtime can be managed by `wd guard ...` or deployed standalone from the published [`workers-usage-guard`](https://www.npmjs.com/package/workers-usage-guard) npm package via its bundled `wug` CLI (see [`wug` reference](/wrangler-deploy/reference/commands/#wug--standalone-helper-cli)).
 
 ```ts
 guard: {
@@ -227,6 +228,7 @@ guard: {
 - `guard.databaseId` is used by `wd guard deploy` and `wd guard migrate` to target the correct D1.
 - Signed commands require `WRANGLER_DEPLOY_GUARD_SIGNING_KEY` at runtime.
 - Status requires `CLOUDFLARE_API_TOKEN`.
+- Guard health (`/api/health`) reports the latest breach/report timestamps across all configured guard accounts.
 
 ## Shared fixtures
 

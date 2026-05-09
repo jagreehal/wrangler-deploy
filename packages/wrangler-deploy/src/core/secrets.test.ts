@@ -6,7 +6,7 @@ import { story } from "executable-stories-vitest";
 import type { CfStageConfig, StageState } from "../types.js";
 import type { StateProvider } from "./state.js";
 import type { WranglerRunner } from "./wrangler-runner.js";
-import { checkSecrets, setSecret, syncSecretsFromEnvFile, validateSecrets } from "./secrets.js";
+import { buildSecretSyncPreview, checkSecrets, setSecret, syncSecretsFromEnvFile, validateSecrets } from "./secrets.js";
 
 const config: CfStageConfig = {
   version: 1,
@@ -211,5 +211,34 @@ describe("secrets", () => {
         },
       }),
     );
+  });
+
+  it("builds dry-run preview using SecretRef semantics", () => {
+    const previewConfig: CfStageConfig = {
+      version: 1,
+      workers: ["apps/api"],
+      deployOrder: ["apps/api"],
+      resources: {},
+      secrets: {
+        "apps/api": ["AUTH_SECRET", { name: "EXTERNAL_KEY", ref: true }],
+      },
+    };
+    const stageState: StageState = {
+      stage: "staging",
+      createdAt: "",
+      updatedAt: "",
+      resources: {},
+      workers: { "apps/api": { name: "api-staging" } },
+      secrets: {},
+    };
+    const envVars = new Map<string, string>([
+      ["AUTH_SECRET", "alpha"],
+      ["EXTERNAL_KEY", "should-not-be-used"],
+    ]);
+
+    expect(buildSecretSyncPreview(previewConfig.secrets, stageState, envVars)).toEqual({
+      set: ["apps/api/AUTH_SECRET"],
+      skipped: ["apps/api/EXTERNAL_KEY (ref: managed externally)"],
+    });
   });
 });

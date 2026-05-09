@@ -1,6 +1,6 @@
-import type { NotificationEvent, NotificationResult } from "usage-guard-shared";
+import type { NotificationEvent, NotificationResult } from "workers-usage-guard-shared";
 import type { SsrfValidator } from "./ssrf.js";
-import type { ActivityEvent } from "usage-guard-shared";
+import type { ActivityEvent } from "workers-usage-guard-shared";
 
 export type NotifyDeps = {
   fetch: typeof fetch;

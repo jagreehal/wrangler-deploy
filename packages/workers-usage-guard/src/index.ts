@@ -21,7 +21,7 @@ import { slackAdapter } from "./notify/adapters/slack.js";
 import { webhookAdapter } from "./notify/adapters/webhook.js";
 import { ssrfValidator } from "./notify/ssrf.js";
 import type { NotificationChannel } from "./notify/types.js";
-import type { NotificationChannelConfig } from "usage-guard-shared";
+import type { NotificationChannelConfig } from "workers-usage-guard-shared";
 
 export { OverageWorkflow } from "./workflows/kill-switch.js";
 
@@ -49,6 +49,20 @@ function makeDispatch(env: Env, channels: NotificationChannel[], dedupWindowSeco
     );
 }
 
+function parsePositiveNumber(raw: string, name: string): number {
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${name} must be a positive number (got "${raw}")`);
+  }
+  return value;
+}
+
+function maxIso(a: string | null, b: string | null): string | null {
+  if (!a) return b;
+  if (!b) return a;
+  return a > b ? a : b;
+}
+
 export default {
   async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext) {
     const accounts = loadAccountConfig(env.ACCOUNTS_JSON);
@@ -57,17 +71,20 @@ export default {
     const token = env.CLOUDFLARE_API_TOKEN;
 
     if (controller.cron === "*/5 * * * *") {
+      const requestThreshold = parsePositiveNumber(env.REQUEST_THRESHOLD, "REQUEST_THRESHOLD");
+      const cpuThresholdMs = parsePositiveNumber(env.CPU_TIME_THRESHOLD_MS, "CPU_TIME_THRESHOLD_MS");
+      const cooldownSeconds = parsePositiveNumber(env.OVERAGE_COOLDOWN_SECONDS, "OVERAGE_COOLDOWN_SECONDS");
       ctx.waitUntil(expireStaleApprovals({}, { db: env.DB }).catch(() => undefined));
       ctx.waitUntil(
         runOverageCheck(
           {
             accounts,
             defaults: {
-              requests: Number(env.REQUEST_THRESHOLD),
-              cpuMs: Number(env.CPU_TIME_THRESHOLD_MS),
+              requests: requestThreshold,
+              cpuMs: cpuThresholdMs,
               costUsd: Number.POSITIVE_INFINITY,
             },
-            cooldownSeconds: Number(env.OVERAGE_COOLDOWN_SECONDS),
+            cooldownSeconds,
           },
           {
             now: () => new Date(),
@@ -110,11 +127,18 @@ export default {
 
   async fetch(request: Request, env: Env): Promise<Response> {
     const healthQuery = async () => {
-      const reports = await listRecentReports({ accountId: "-", limit: 1 }, { db: env.DB }).catch(() => []);
-      const breaches = await listRecentBreaches({ accountId: "-", limit: 1 }, { db: env.DB }).catch(() => []);
+      const accounts = loadAccountConfig(env.ACCOUNTS_JSON);
+      let lastCheck: string | null = null;
+      let lastReport: string | null = null;
+      for (const account of accounts) {
+        const reports = await listRecentReports({ accountId: account.accountId, limit: 1 }, { db: env.DB }).catch(() => []);
+        const breaches = await listRecentBreaches({ accountId: account.accountId, limit: 1 }, { db: env.DB }).catch(() => []);
+        lastCheck = maxIso(lastCheck, breaches[0]?.triggeredAt ?? null);
+        lastReport = maxIso(lastReport, reports[0]?.generatedAt ?? null);
+      }
       return {
-        lastCheck: breaches[0]?.triggeredAt ?? null,
-        lastReport: reports[0]?.generatedAt ?? null,
+        lastCheck,
+        lastReport,
       };
     };
 
@@ -125,7 +149,7 @@ export default {
         signingKey: env.GUARD_API_SIGNING_KEY,
         listReports: (a) => listRecentReports(a as { accountId: string; limit: number }, { db: env.DB }),
         listBreaches: (a) => listRecentBreaches(a, { db: env.DB }),
-        listSnapshots: (a) => listRecentSnapshots({ accountId: a.accountId, scriptName: a.scriptName, limit: 288 }, { db: env.DB }),
+        listSnapshots: (a) => listRecentSnapshots({ accountId: a.accountId, scriptName: a.scriptName, limit: a.limit }, { db: env.DB }),
         healthInfo: healthQuery,
         addRuntimeProtection: (a) => addRuntimeProtection(a, { db: env.DB }),
         removeRuntimeProtection: (a) => removeRuntimeProtection(a, { db: env.DB }),

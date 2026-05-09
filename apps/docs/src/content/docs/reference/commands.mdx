@@ -183,7 +183,7 @@ $ wd status --stage staging
 Workers usage guard commands. These are split into:
 
 - `status`: direct Cloudflare GraphQL usage view (requires `CLOUDFLARE_API_TOKEN`)
-- `init|deploy|migrate`: provision and deploy the bundled `workers-usage-guard` Worker
+- `init|deploy|migrate`: provision and deploy the `workers-usage-guard` Worker package
 - `breaches|report|disarm|arm|approvals|approve|reject`: require a deployed guard endpoint and `WRANGLER_DEPLOY_GUARD_SIGNING_KEY`
 
 ### `wd guard status [--json]`
@@ -196,7 +196,7 @@ $ CLOUDFLARE_API_TOKEN=... wd guard status
 
 ### `wd guard init --account <id> [--billing-cycle-day <1-31>] [--workers <names>] [--database-id <id>] [--yes]`
 
-One-command setup: creates the D1 database, applies migrations, sets secrets, and deploys the bundled `workers-usage-guard` Worker. Prints the config snippet to add to `wrangler-deploy.config.ts`.
+One-command setup: creates the D1 database, applies migrations, sets secrets, and deploys `workers-usage-guard`. Prints the config snippet to add to `wrangler-deploy.config.ts`.
 
 ```bash
 $ wd guard init --account 1234abcd --workers api,event-router --yes
@@ -211,7 +211,7 @@ Prompts for notification channels interactively (skip with `--yes`).
 
 ### `wd guard deploy [--database-id <id>]`
 
-Re-deploy the bundled `workers-usage-guard` Worker using `guard.databaseId` from config (or `--database-id`).
+Re-deploy `workers-usage-guard` using `guard.databaseId` from config (or `--database-id`).
 
 ```bash
 $ wd guard deploy
@@ -243,6 +243,8 @@ $ wd guard report --account 1234abcd
 $ wd guard report --account 1234abcd --date 2026-04-19
 ```
 
+The guard API also exposes `/api/snapshots` with `window=<n>d|<n>h` (for example `window=7d` or `window=24h`) and validates this format server-side.
+
 ### `wd guard disarm <script> --account <id> [--reason <text>]`
 ### `wd guard arm <script> --account <id>`
 
@@ -264,6 +266,110 @@ $ wd guard approvals --account 1234abcd
 $ wd guard approve appr-123 --account 1234abcd
 $ wd guard reject appr-456 --account 1234abcd
 ```
+
+## `wug ...` (standalone CLI)
+
+`workers-usage-guard` ships a standalone CLI for teams that run the guard service without `wrangler-deploy`. The binary is published as both `wug` and `workers-usage-guard`. All commands read endpoint and signing key from `wug.config.json` (in the current directory) or from `$WUG_ENDPOINT` / `$GUARD_API_SIGNING_KEY` / flags.
+
+The fastest way in:
+
+```bash
+$ npx workers-usage-guard setup
+```
+
+### Setup
+
+#### `wug setup [--account <id>] [--scripts <a,b,c>] [--api-token <token>] [--yes]`
+
+End-to-end install: create D1, generate signing key, write `wug.config.json`, apply migrations, deploy the Worker, set required secrets, and poll `/api/health`. Pass `--yes` for non-interactive (CI) installs — every required value must then be a flag or env var.
+
+```bash
+$ wug setup --yes \
+    --account 1234abcd \
+    --scripts payment-api,event-router \
+    --api-token $CLOUDFLARE_API_TOKEN
+```
+
+#### `wug init --account <id> [--script-name <name>] [--billing-cycle-day <1-31>] [--force]`
+
+Write a minimal `wug.config.json` without provisioning anything. Useful when you want to inspect/edit the config before running `wug setup`.
+
+#### `wug keygen [--json]`
+
+Print a fresh 32-byte hex signing key. Set as `$GUARD_API_SIGNING_KEY`. Never store the key in `wug.config.json`.
+
+#### `wug doctor [--json]`
+
+Validate `wug.config.json`, environment variables, and (if endpoint is reachable) `/api/health`. Exits non-zero on any failure.
+
+#### `wug preflight [--json]`
+
+Pre-deploy checks: confirms wrangler is authed and lists any required Worker secrets that are not yet set. Run between `wug setup` and `wug deploy` when iterating.
+
+### Deploy
+
+#### `wug migrate [--local]`
+
+Apply D1 migrations bundled with the package against the database referenced in `wug.config.json`. `--remote` by default; `--local` for the D1 emulator.
+
+#### `wug deploy`
+
+Render a wrangler config from your `wug.config.json` and run `wrangler deploy` against the package's compiled Worker. Stores the deployed endpoint back in `wug.config.json` on success.
+
+#### `wug destroy [--keep-data] [--yes]`
+
+Delete the deployed Worker. With `--keep-data`, leaves the D1 database in place; otherwise also deletes the configured database. Always prompts unless `--yes`.
+
+#### `wug health [--endpoint <url>]`
+
+Call `/api/health` (unsigned). Reads endpoint from flag, `$WUG_ENDPOINT`, or `wug.config.json`.
+
+#### `wug logs [--format pretty|json]`
+
+Tail logs from the deployed guard via `wrangler tail`.
+
+### Operations
+
+All operational commands are signed; they need `$GUARD_API_SIGNING_KEY` (or `--signing-key`). All support `--json`.
+
+```bash
+wug breaches [--account <id>] [--limit <n>]
+wug report [--account <id>] [--date YYYY-MM-DD]
+wug snapshots --script <name> [--account <id>] [--window <Nd|Nh>]
+wug disarm <script> [--account <id>] [--reason <text>]
+wug arm <script> [--account <id>]
+wug approvals [--account <id>]
+wug approve <approval-id> [--account <id>]
+wug reject <approval-id> [--account <id>]
+wug runtime-protected [--account <id>]
+```
+
+### Inspection
+
+#### `wug secret-audit [--json]`
+
+Print every secret the guard will need (always-required + per-notification-channel), derived from `wug.config.json`.
+
+#### `wug diff-config --before <file> --after <file> [--json]`
+
+Compare two `ACCOUNTS_JSON` snapshots (or two `wug.config.json` files). Reports added/removed accounts, added/removed workers, and threshold changes.
+
+#### `wug blast-radius [--json]`
+
+For each configured account, list scripts the guard could detach (killable) versus those it cannot (protected). Use before changing protection rules.
+
+#### `wug safe-mode [--json]`
+
+Run a non-destructive safety simulation before deploy/policy changes:
+- missing required secrets
+- killable vs protected scripts
+- low-threshold/forecast-noise warnings
+
+Exits non-zero if blockers are found, so it can gate CI.
+
+#### `wug sign --method <verb> --path <path> [--key <secret>] [--timestamp <iso>]`
+
+Generate `x-guard-timestamp` and `x-guard-signature` headers for a manual `curl` call.
 
 ## `wd verify --stage <name>`
 
@@ -878,6 +984,79 @@ $ wd doctor
   ✓ worker path: workers/event-router exists
   ✓ config valid: No config errors
 ```
+
+## `wd configure / login / logout / profile`
+
+See the [Profiles guide](/wrangler-deploy/features/profiles) for the full
+flow. Quick reference:
+
+```bash
+wd configure --profile prod        # set up account metadata for a profile
+wd login --profile prod            # save Cloudflare API token for a profile
+wd logout --profile prod [--purge] # delete the credential file (and config entry)
+wd profile list                    # active profile + every configured one
+```
+
+## `wd util create-cf-token`
+
+Print the required Cloudflare API token scopes plus a deeplink to the
+dashboard's token-creation page with the right scopes pre-selected.
+
+```bash
+wd util create-cf-token --profile prod   # prints scopes + URL
+wd util scopes                           # just the scope table
+```
+
+## `wd state list / get / tree`
+
+Inspect what's in state without parsing JSON. See [State Inspection](/wrangler-deploy/features/state-inspection).
+
+```bash
+wd state list --stage staging
+wd state get cache --stage staging
+wd state tree --stage staging
+```
+
+## `wd run`
+
+Read-only: validate config, summarise current deploy state, exit. Useful
+in CI before any mutating command.
+
+```bash
+wd run --stage staging
+```
+
+## `wd dev --tunnel`
+
+Spawn a Cloudflare Quick Tunnel in front of one or all running workers.
+
+```bash
+wd dev --tunnel              # tunnel every worker
+wd dev --tunnel workers/api  # only one
+```
+
+## `wd create vibe-rules`
+
+Drop wrangler-deploy guidance for AI agents into editor-specific paths.
+
+```bash
+wd create vibe-rules claude-code,cursor   # specific targets
+wd create vibe-rules all                  # everything (claude-code, cursor,
+                                          #  windsurf, vscode, zed, codex,
+                                          #  agents-md)
+```
+
+Pass `--force` to overwrite existing files.
+
+## Global options
+
+- `--profile <name>` — pick a profile (also reads `WD_PROFILE`/`CLOUDFLARE_PROFILE`)
+- `--cwd <path>` — run against a different project directory
+- `--env-file <path>` — load `.env`-style file before resolving env vars
+- `--quiet`, `-q` — suppress non-error output
+- `--stage <name>` — defaults to `$USER` (or `WD_STAGE` if set)
+- `--force` — apply: re-run lifecycle even when state shows in-sync
+- `--watch` — apply/deploy: re-run when config files change
 
 ## `wd completions --shell zsh|bash|fish`
 

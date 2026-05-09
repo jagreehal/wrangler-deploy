@@ -23,9 +23,72 @@ export interface ProjectContext {
   statePassword?: string;
 }
 
-export type ResourceType = "kv" | "queue" | "hyperdrive" | "d1" | "r2" | "vectorize";
+export type ResourceType = "kv" | "queue" | "hyperdrive" | "d1" | "r2" | "vectorize" | "dns";
 
-export interface KvResourceConfig {
+export type DnsRecordType =
+  | "A"
+  | "AAAA"
+  | "CNAME"
+  | "TXT"
+  | "MX";
+
+/**
+ * Declarative DNS record. Unlike workers/KV/etc, DNS records don't go
+ * in wrangler.jsonc — they're managed directly via Cloudflare's DNS API.
+ *
+ * The `name` is the record's hostname (e.g. "api.example.com"). It's
+ * stage-templated like routes: use `{stage}` to vary across stages.
+ *
+ * Records have no bindings — they're terminal resources. The empty
+ * `bindings: {}` keeps the shape uniform with other ResourceConfigs.
+ */
+export interface DnsRecordConfig {
+  type: DnsRecordType;
+  name: string;
+  content: string;
+  ttl?: number;
+  proxied?: boolean;
+  comment?: string;
+}
+
+export interface DnsResourceConfig extends ResourceLifecycleFlags {
+  type: "dns";
+  zone: string;
+  records: DnsRecordConfig[];
+  bindings: Record<string, never>;
+}
+
+/**
+ * Per-resource lifecycle hints. These are orthogonal to type-specific
+ * config — every resource type accepts them.
+ *
+ * `adopt: true`   — on first apply for wrangler-cli managed resource types
+ *                   (currently KV, Queues, Hyperdrive), if a CF resource
+ *                   with the same staged name already exists, take it under
+ *                   management instead of erroring. Setting adopt on an
+ *                   unsupported type fails config validation and apply.
+ *
+ * `delete: false` — on destroy (or when removed from config), leave the
+ *                   actual CF resource alone. State is still cleared so
+ *                   the resource is detached from this project. Useful
+ *                   for shared infrastructure or hand-offs to other tools.
+ */
+export interface ResourceLifecycleFlags {
+  adopt?: boolean;
+  delete?: false;
+  /**
+   * Local-dev hints. When `dev.remote: true`, `wd dev` writes
+   * `experimental_remote: true` into a wrangler.dev.jsonc override so this
+   * binding is fulfilled by the deployed Cloudflare resource instead of
+   * miniflare's local emulation. Necessary for Vectorize, AI, and
+   * Browser Rendering, which miniflare can't emulate fully.
+   */
+  dev?: {
+    remote?: boolean;
+  };
+}
+
+export interface KvResourceConfig extends ResourceLifecycleFlags {
   type: "kv";
   bindings: Record<string, string>;
 }
@@ -45,12 +108,12 @@ export interface QueueDlqBinding {
 
 export type QueueBinding = string | QueueProducerBinding | QueueConsumerBinding | QueueDlqBinding;
 
-export interface QueueResourceConfig {
+export interface QueueResourceConfig extends ResourceLifecycleFlags {
   type: "queue";
   bindings: Record<string, QueueBinding>;
 }
 
-export interface HyperdriveResourceConfig {
+export interface HyperdriveResourceConfig extends ResourceLifecycleFlags {
   type: "hyperdrive";
   bindings: Record<string, string>;
   database?: {
@@ -59,17 +122,37 @@ export interface HyperdriveResourceConfig {
   };
 }
 
-export interface D1ResourceConfig {
+export interface D1ResourceConfig extends ResourceLifecycleFlags {
   type: "d1";
   bindings: Record<string, string>;
+  /**
+   * Directory holding `.sql` migration files. wrangler-deploy sorts them
+   * lexicographically and applies new migrations on every `wd apply`. A
+   * tracker table (`migrationsTable`, default `d1_migrations`) records
+   * which have run, so re-applies are no-ops once everything is up to
+   * date. Mirrors `wrangler d1 migrations apply`.
+   */
+  migrationsDir?: string;
+  /**
+   * Override the migration tracker table name. Set to `drizzle_migrations`
+   * if you also use Drizzle ORM so wrangler-deploy and Drizzle share one
+   * tracker.
+   */
+  migrationsTable?: string;
+  /**
+   * SQL files to import on first apply (after creation). Each file is
+   * applied via `wrangler d1 execute --file`. Subsequent applies skip
+   * imports — these are bootstrap data, not migrations.
+   */
+  importFiles?: string[];
 }
 
-export interface R2ResourceConfig {
+export interface R2ResourceConfig extends ResourceLifecycleFlags {
   type: "r2";
   bindings: Record<string, string>;
 }
 
-export interface VectorizeResourceConfig {
+export interface VectorizeResourceConfig extends ResourceLifecycleFlags {
   type: "vectorize";
   bindings: Record<string, string>;
   dimensions?: number;
@@ -84,7 +167,26 @@ export type ResourceConfig =
   | HyperdriveResourceConfig
   | D1ResourceConfig
   | R2ResourceConfig
-  | VectorizeResourceConfig;
+  | VectorizeResourceConfig
+  | DnsResourceConfig;
+
+/**
+ * Declarative reference to a Cloudflare secret already present in the
+ * account (e.g. set out-of-band via `wrangler secret put`). Skipped on
+ * deploy and reported as `ref` in `wd secrets`.
+ */
+export interface SecretRef {
+  name: string;
+  ref: true;
+}
+
+export function isSecretRef(value: unknown): value is SecretRef {
+  return typeof value === "object" && value !== null && (value as { ref?: unknown }).ref === true;
+}
+
+export function secretName(spec: string | SecretRef): string {
+  return typeof spec === "string" ? spec : spec.name;
+}
 
 export interface StageRule {
   protected: boolean;
@@ -214,9 +316,20 @@ export interface RouteConfig {
 }
 
 export interface StateConfig {
-  backend: "local" | "kv";
-  namespaceId?: string; // KV namespace ID for remote state
-  keyPrefix?: string; // prefix for keys in KV (default: "wrangler-deploy/")
+  backend: "local" | "kv" | "d1" | "r2";
+  /** KV namespace ID for backend: "kv". */
+  namespaceId?: string;
+  /** Key prefix for KV / R2 (default: "wrangler-deploy/"). */
+  keyPrefix?: string;
+  /**
+   * D1 database id for backend: "d1". The schema is bootstrapped on first
+   * write — `wd apply` creates a `stage_state` table if missing.
+   */
+  databaseId?: string;
+  /** Table name for backend: "d1" (default: "stage_state"). */
+  tableName?: string;
+  /** Bucket name for backend: "r2". */
+  bucketName?: string;
 }
 
 export interface DevCompanionConfig {
@@ -304,7 +417,14 @@ export interface CfStageConfig {
   resources: Record<string, ResourceConfig>;
   serviceBindings?: Record<string, Record<string, string>>;
   stages?: Record<string, StageRule>;
-  secrets?: Record<string, string[]>;
+  /**
+   * Declared secrets per worker. Each entry is either a plain name
+   * (`wrangler-deploy` manages the value), or `{ name, ref: true }`
+   * (the secret already exists in Cloudflare via `wrangler secret put`
+   * or another tool — wrangler-deploy will not push it, but it will
+   * still appear in `wd secrets` reports as `ref`).
+   */
+  secrets?: Record<string, Array<string | SecretRef>>;
   verify?: Record<string, VerifyConfig>;
   routes?: Record<string, RouteConfig>;
   /** Shared local fixtures for worker calls, queue sends, and D1 commands. */
@@ -335,6 +455,7 @@ export type LifecycleStatus =
   | "creating" | "created"
   | "updating" | "updated"
   | "deleting" | "deleted"
+  | "replacing" | "replaced"
   | "missing" | "drifted" | "orphaned";
 
 export type ResourceProps = {
@@ -351,14 +472,22 @@ export interface QueueOutput     { id?: string; name: string }
 export interface R2Output        { name: string }
 export interface HyperdriveOutput{ id: string;  name: string; origin: string }
 export interface VectorizeOutput { id?: string; name: string; dimensions?: number; metric?: "euclidean" | "cosine" | "dot-product" }
+export interface DnsOutput {
+  zoneId: string;
+  records: Array<{ id: string; name: string; type: DnsRecordType; content: string }>;
+}
 
 export type ResourceOutput =
   | D1Output | KvOutput | QueueOutput
-  | R2Output | HyperdriveOutput | VectorizeOutput;
+  | R2Output | HyperdriveOutput | VectorizeOutput | DnsOutput;
 
 export interface ResourceState {
   type: ResourceType;
   lifecycleStatus: LifecycleStatus;
+  lifecycle?: {
+    adoptRequested?: boolean;
+    adoptSupported?: boolean;
+  };
   props: ResourceProps;
   oldProps?: ResourceProps;  // set when updating, cleared on completion
   output?: ResourceOutput;
@@ -460,7 +589,7 @@ export interface WranglerConfig {
 
 // ---- Guard (optional usage-monitor integration) ----
 
-import type { AccountConfig as GuardAccountConfig } from "./usage-guard-shared/index.js";
+import type { AccountConfig as GuardAccountConfig } from "workers-usage-guard-shared";
 
 export type GuardConfig = {
   /**
