@@ -107,8 +107,8 @@ importers:
         specifier: ^25.5.2
         version: 25.5.2
       miniflare:
-        specifier: ^4.20260424.0
-        version: 4.20260504.0
+        specifier: ^4.20260507.1
+        version: 4.20260507.1
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
