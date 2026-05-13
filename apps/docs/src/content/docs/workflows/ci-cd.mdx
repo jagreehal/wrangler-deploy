@@ -10,9 +10,20 @@ wrangler-deploy uses wrangler under the hood. CI runs the same `wrangler.jsonc` 
 Set these environment variables in your CI:
 
 ```bash
-CLOUDFLARE_API_TOKEN=xxx    # required
-CLOUDFLARE_ACCOUNT_ID=xxx   # recommended (auto-detected if omitted)
+CLOUDFLARE_API_TOKEN=xxx     # required
+CLOUDFLARE_ACCOUNT_ID=xxx    # required unless the account id is set another way (see below)
 ```
+
+You must give wrangler-deploy a **32-character hexadecimal Cloudflare account id** when using an API token, either:
+
+- **`CLOUDFLARE_ACCOUNT_ID`** in the job environment (wins over `.wdrc` when both are set), or
+- **`accountId`** in **`.wdrc` / `.wdrc.json`** at the repo root (for example commit the file or run `wd context set --account-id …` once and commit the result).
+
+If `wrangler whoami` succeeds in CI with the same token and scopes, resolution can work without `CLOUDFLARE_ACCOUNT_ID`—but pinning the id explicitly avoids flaky pipelines and documents intent.
+
+When **`CLOUDFLARE_API_TOKEN`** is set, wrangler-deploy **does not** read **`~/.wrangler/config/default.toml`** for the account. That OAuth file is often a personal login while the token targets another account; mixing them leads to **Cloudflare API error 10000**.
+
+More detail: [How it works — Authentication](/wrangler-deploy/getting-started/how-it-works/#authentication).
 
 For PR comments and check runs, also set:
 

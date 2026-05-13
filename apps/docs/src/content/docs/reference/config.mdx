@@ -15,6 +15,20 @@ This file sits alongside your existing Wrangler config. It does not replace `wra
 
 You can also add a project defaults file, `.wdrc` or `.wdrc.json`, at the repo root or any parent directory. `wd context` uses it for defaults like stage name, dev port, account ID, and state password. It is optional, but helpful when you want agents or teammates to reuse the same settings without repeating flags.
 
+### Cloudflare account ID
+
+wrangler-deploy resolves account id in this order for all `wrangler` subprocesses:
+
+1. **`CLOUDFLARE_ACCOUNT_ID`** (explicit override; must be exactly 32 hex characters when set, whitespace trimmed)
+2. **`accountId`** in `.wdrc` / `.wdrc.json`
+3. **`wrangler whoami`**
+
+For monorepos, the best default is one root `.wdrc` with `accountId` so every worker inherits it. In CI, set `CLOUDFLARE_ACCOUNT_ID` when you need an explicit per-environment override.
+
+Rendered **`wrangler.rendered.jsonc`** files include a pinned **`account_id`** when generated with the repo root, aligned with the same resolution so `wrangler deploy -c …` does not disagree with the environment Wrangler sees.
+
+If **`CLOUDFLARE_API_TOKEN`** is set and the account id cannot be resolved from **`CLOUDFLARE_ACCOUNT_ID`**, **`.wdrc` `accountId`**, or **`wrangler whoami`**, wrangler-deploy fails with an actionable error instead of reading **`~/.wrangler/config/default.toml`**, which reflects OAuth login and often mismatches API tokens (**Cloudflare API error 10000**). Without a token, that `default.toml` path remains a local fallback after a failed `whoami`.
+
 The config also gives you inferred worker types through `workerEnv(...)` and `typeof api.Env`. That keeps the runtime config and the TypeScript `Env` shape in one place, with no generated files and no separate type generation step.
 
 ## Minimal example

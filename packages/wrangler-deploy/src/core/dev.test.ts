@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { story } from "executable-stories-vitest";
 import { buildDevPlan } from "./dev.js";
 import type { CfStageConfig } from "../types.js";
@@ -23,6 +23,15 @@ function makeConfig(overrides?: Partial<CfStageConfig>): CfStageConfig {
 }
 
 describe("buildDevPlan", () => {
+  beforeEach(() => {
+    // renderWranglerConfig pins account_id via resolveAccountId; avoid real `npx wrangler whoami` in tests.
+    process.env.CLOUDFLARE_ACCOUNT_ID = "00000000000000000000000000000001";
+  });
+
+  afterEach(() => {
+    delete process.env.CLOUDFLARE_ACCOUNT_ID;
+  });
+
   it("creates plan for all workers in dependency order", async ({ task }) => {
     story.init(task);
 

@@ -25,7 +25,7 @@ flowchart TD
 2. Resolves state backend (local filesystem or remote KV)
 3. For each resource, calls `wrangler kv namespace create`, `wrangler d1 create`, `wrangler queues create`, etc.
 4. Writes state after each resource (resumable on failure)
-5. Generates a rendered `wrangler.rendered.jsonc` per worker with real IDs and stage-suffixed names
+5. Generates a rendered `wrangler.rendered.jsonc` per worker with real IDs, stage-suffixed names, and a pinned `account_id` when the repo root is known (same resolution as `wrangler` child processes)
 6. Idempotent: existing resources are adopted, not recreated
 
 ### `wd deploy`
@@ -68,12 +68,23 @@ All commands (apply, deploy, destroy, verify, secrets, gc, status) go through th
 
 ## Authentication
 
-wrangler-deploy uses wrangler for all Cloudflare operations:
+wrangler-deploy uses wrangler for all Cloudflare operations. It resolves the **Cloudflare account ID** in a fixed order and passes `CLOUDFLARE_ACCOUNT_ID` into every `wrangler` subprocess so commands do not hang on account prompts.
 
-- **Local**: `wrangler login` (OAuth), account ID auto-resolved from `wrangler whoami`
-- **CI/CD**: `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`
+Resolution order:
 
-No separate authentication needed. If wrangler works, wrangler-deploy works.
+1. **`CLOUDFLARE_ACCOUNT_ID`** environment variable (32-character hexadecimal id from Workers & Pages → your account). Whitespace is trimmed; invalid shapes fail with a clear error
+2. **`accountId`** in [`.wdrc` / `.wdrc.json`](/wrangler-deploy/reference/config/) (repo root or parent), if set
+3. **`wrangler whoami`**, using the same environment as the process (OAuth or API token)
+
+If both **`CLOUDFLARE_ACCOUNT_ID`** and **`.wdrc` `accountId`** are set, the **environment variable wins** for that run (useful in CI overriding a committed `.wdrc`).
+
+If **`CLOUDFLARE_API_TOKEN`** is set and the account id still cannot be resolved from the steps above, wrangler-deploy **throws** instead of reading **`~/.wrangler/config/default.toml`**. That file reflects `wrangler login` (OAuth) and is often a *different* account than a CI or team API token. Using it together with a token commonly surfaces as **Cloudflare API error 10000** (token vs wrong account). With a token, set the account explicitly (`CLOUDFLARE_ACCOUNT_ID` or `.wdrc`) or ensure `wrangler whoami` succeeds with that token.
+
+**Without** an API token, if `whoami` fails, wrangler-deploy may fall back to OAuth `default.toml`—the usual local-only path.
+
+**CI/CD:** set **`CLOUDFLARE_API_TOKEN`** and provide the account id via **`CLOUDFLARE_ACCOUNT_ID`** or **`accountId`** in `.wdrc` (for example `wd context set --account-id …`). Do not rely on `default.toml` on the runner.
+
+No separate authentication layer beyond Wrangler. If credentials and account resolution are correct, wrangler-deploy and `wrangler` agree on the target account.
 
 ## Trust boundary
 

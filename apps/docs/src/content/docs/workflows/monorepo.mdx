@@ -38,3 +38,17 @@ export default defineConfig({
 ```
 
 wrangler-deploy infers deploy order from service bindings.
+
+## Account ID (best DX)
+
+Set **`accountId`** once in a root **`.wdrc`** / **`.wdrc.json`** and let all workers inherit it:
+
+```json
+{
+  "accountId": "1234567890abcdef1234567890abcdef"
+}
+```
+
+That context file is discovered by walking up from each worker directory, so one repo-level value covers the monorepo.
+
+If you set **`CLOUDFLARE_ACCOUNT_ID`** in the environment (for example in CI), it explicitly overrides `.wdrc` for that run.

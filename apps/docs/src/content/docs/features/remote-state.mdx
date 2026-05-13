@@ -54,10 +54,10 @@ All commands go through the `StateProvider` interface. Switching between local a
 
 ### Authentication
 
-Remote state uses the same auth as all other wrangler-deploy operations:
+Remote state uses the same auth as all other wrangler-deploy operations. Account resolution is documented in [How it works — Authentication](/wrangler-deploy/getting-started/how-it-works/#authentication). In short:
 
-- **Local**: `wrangler login` (account ID auto-resolved from `wrangler whoami`)
-- **CI**: `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`
+- **Local:** `wrangler login` / `wrangler whoami`, with optional fallback to OAuth `default.toml` when no API token is set
+- **CI:** `CLOUDFLARE_API_TOKEN` plus an explicit account id (**`CLOUDFLARE_ACCOUNT_ID`** overrides **`.wdrc` `accountId`** when both are set), or a working `wrangler whoami` with that token. With a token set, **`default.toml` is not used** (avoids error **10000**)
 
 ### Key format
 

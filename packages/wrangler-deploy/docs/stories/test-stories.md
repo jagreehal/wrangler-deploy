@@ -2,9 +2,9 @@
 
 | Key | Value |
 | --- | --- |
-| Date | 2026-05-08T07:15:57.129Z |
-| Version | 1.4.2 |
-| Git SHA | bc4512d |
+| Date | 2026-05-13T22:17:20.242Z |
+| Version | 1.4.3 |
+| Git SHA | c192ef4 |
 
 ## src/github.test.ts
 
@@ -27,6 +27,82 @@
 - **Given** the example workflow source
 - **When** the workflow has a schedule-conditional cleanup job
 - **Then** the workflow must declare a schedule trigger
+
+## src/providers/cloudflare-api.test.ts
+
+### cloudflare-api
+
+### ✅ uses CLOUDFLARE_ACCOUNT_ID without fetching
+
+- **Given** CLOUDFLARE_ACCOUNT_ID is set in the environment
+- **When** resolveAccountId is called
+- **Then** it returns the env var value without making any API calls
+
+### ✅ caches resolved account ids between calls
+
+- **Given** no CLOUDFLARE_ACCOUNT_ID in the environment
+- **And** the API returns an account ID
+- **When** resolveAccountId is called twice
+- **Then** only one API call is made
+
+### ✅ formats API errors from cfApiResult
+
+- **Given** an API response with multiple error codes
+- **When** cfApiResult parses the response
+- **Then** it throws with all error codes and messages formatted
+
+## src/providers/local-cli.test.ts
+
+### local CLI-backed providers
+
+### ✅ returns a typed D1Output with the extracted database id
+
+- **Given** wrangler output containing a D1 database UUID
+- **When** createD1Database is called with a name and cwd
+- **Then** the returned struct contains the extracted id, name, and version
+
+### ✅ returns a typed R2Output with the bucket name
+
+- **Given** wrangler output for an R2 bucket creation
+- **When** createR2Bucket is called with a name and cwd
+- **Then** the returned struct contains the bucket name
+
+### ✅ returns a typed VectorizeOutput with the index metadata
+
+- **Given** wrangler output containing a Vectorize index UUID
+- **When** createVectorizeIndex is called with a name, config, and cwd
+- **Then** the returned struct contains the name, dimensions, and metric
+
+## src/providers/resources.test.ts
+
+### providers
+
+### ✅ adopts an existing KV namespace when create reports conflict
+
+- **Given** the Cloudflare API rejects KV creation with a conflict error
+- **And** a subsequent list call returns the existing namespace
+- **When** createKvNamespace is called
+- **Then** the existing namespace is adopted
+
+### ✅ adopts an existing queue when create returns conflict
+
+- **Given** the Cloudflare API rejects queue creation with a 409 conflict
+- **And** a subsequent list call returns the existing queue
+- **When** createQueue is called
+- **Then** the existing queue is adopted
+
+### ✅ adopts an existing Hyperdrive config when create returns conflict
+
+- **Given** the Cloudflare API rejects Hyperdrive creation with a 409 conflict
+- **And** a subsequent list call returns the existing config
+- **When** createHyperdrive is called
+- **Then** the existing Hyperdrive config is adopted
+
+### ✅ treats worker deletion as idempotent on 404
+
+- **Given** the Cloudflare API returns 404 for a worker deletion
+- **When** deleteWorker is called
+- **Then** it resolves without error
 
 ## src/core/apply.test.ts
 
@@ -117,17 +193,45 @@
 
 ### auth
 
-### ✅ falls back to wrangler config when wrangler whoami fails
+### ✅ falls back to wrangler config when wrangler whoami fails and no API token
 
-- **Given** wrangler whoami throws and a local wrangler config exists
+- **Given** wrangler whoami throws and a local wrangler config exists (OAuth only)
 - **When** resolveAccountId is called
 - **Then** the account id is read from the local config
 
-### ✅ prefers the project context account id when present
+### ✅ prefers CLOUDFLARE_ACCOUNT_ID over project context account id
 
-- **Given** a project context file provides an explicit account id
+- **Given** both CLOUDFLARE_ACCOUNT_ID and project context accountId are set
 - **When** resolveAccountId is called
-- **Then** the account id comes from the project context
+- **Then** the account id comes from CLOUDFLARE_ACCOUNT_ID
+
+### ✅ uses project context account id when CLOUDFLARE_ACCOUNT_ID is unset
+
+- **Given** a project context file provides an explicit account id and env is unset
+- **When** resolveAccountId is called
+- **Then** the account id comes from the project context, normalized to lowercase hex
+
+### ✅ does not fall back to default.toml when CLOUDFLARE_API_TOKEN is set and whoami fails
+
+- **Given** API token auth but whoami fails so OAuth toml must not be used
+- **When** resolveAccountId is called
+- **Then** the error names explicit fixes and default.toml was not consulted
+
+### ✅ treats whitespace-only CLOUDFLARE_ACCOUNT_ID as unset and uses whoami
+
+- **Given** CLOUDFLARE_ACCOUNT_ID is only whitespace and whoami returns an account table row
+- **When** resolveAccountId is called
+- **Then** the account id comes from whoami output
+
+### ✅ rejects invalid CLOUDFLARE_ACCOUNT_ID shape
+
+- **Given** CLOUDFLARE_ACCOUNT_ID is not 32 hex characters
+- **When** resolveAccountId is called
+
+### ✅ rejects invalid accountId in project context
+
+- **Given** project context accountId is present but not 32 hex characters
+- **When** resolveAccountId is called
 
 ## src/core/completions.test.ts
 
@@ -973,6 +1077,19 @@
 - **When** renderWranglerConfig is called with a repo root path
 - **Then** it does not throw
 - **And** main is resolved to an absolute path from the repo root
+- **And** account_id is pinned from resolveAccountId for the worker directory
+
+### ✅ falls back to base wrangler account_id when resolveAccountId throws
+
+- **Given** resolveAccountId fails but base config declares account_id
+- **When** renderWranglerConfig is called with a repo root path
+- **Then** account_id comes from the base config
+
+### ✅ omits account_id when resolveAccountId throws and base has none
+
+- **Given** resolveAccountId fails and base config has no account_id
+- **When** renderWranglerConfig is called with a repo root path
+- **Then** rendered config has no account_id
 
 ## src/core/runtime.test.ts
 
@@ -1262,82 +1379,6 @@
 
 - **Given** a config without verifyLocal
 - **Then** the command fails fast with a configuration check
-
-## src/providers/cloudflare-api.test.ts
-
-### cloudflare-api
-
-### ✅ uses CLOUDFLARE_ACCOUNT_ID without fetching
-
-- **Given** CLOUDFLARE_ACCOUNT_ID is set in the environment
-- **When** resolveAccountId is called
-- **Then** it returns the env var value without making any API calls
-
-### ✅ caches resolved account ids between calls
-
-- **Given** no CLOUDFLARE_ACCOUNT_ID in the environment
-- **And** the API returns an account ID
-- **When** resolveAccountId is called twice
-- **Then** only one API call is made
-
-### ✅ formats API errors from cfApiResult
-
-- **Given** an API response with multiple error codes
-- **When** cfApiResult parses the response
-- **Then** it throws with all error codes and messages formatted
-
-## src/providers/local-cli.test.ts
-
-### local CLI-backed providers
-
-### ✅ returns a typed D1Output with the extracted database id
-
-- **Given** wrangler output containing a D1 database UUID
-- **When** createD1Database is called with a name and cwd
-- **Then** the returned struct contains the extracted id, name, and version
-
-### ✅ returns a typed R2Output with the bucket name
-
-- **Given** wrangler output for an R2 bucket creation
-- **When** createR2Bucket is called with a name and cwd
-- **Then** the returned struct contains the bucket name
-
-### ✅ returns a typed VectorizeOutput with the index metadata
-
-- **Given** wrangler output containing a Vectorize index UUID
-- **When** createVectorizeIndex is called with a name, config, and cwd
-- **Then** the returned struct contains the name, dimensions, and metric
-
-## src/providers/resources.test.ts
-
-### providers
-
-### ✅ adopts an existing KV namespace when create reports conflict
-
-- **Given** the Cloudflare API rejects KV creation with a conflict error
-- **And** a subsequent list call returns the existing namespace
-- **When** createKvNamespace is called
-- **Then** the existing namespace is adopted
-
-### ✅ adopts an existing queue when create returns conflict
-
-- **Given** the Cloudflare API rejects queue creation with a 409 conflict
-- **And** a subsequent list call returns the existing queue
-- **When** createQueue is called
-- **Then** the existing queue is adopted
-
-### ✅ adopts an existing Hyperdrive config when create returns conflict
-
-- **Given** the Cloudflare API rejects Hyperdrive creation with a 409 conflict
-- **And** a subsequent list call returns the existing config
-- **When** createHyperdrive is called
-- **Then** the existing Hyperdrive config is adopted
-
-### ✅ treats worker deletion as idempotent on 404
-
-- **Given** the Cloudflare API returns 404 for a worker deletion
-- **When** deleteWorker is called
-- **Then** it resolves without error
 
 ## src/core/ci/check.test.ts
 
