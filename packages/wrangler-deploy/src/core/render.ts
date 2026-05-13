@@ -2,12 +2,23 @@ import { writeFileSync, mkdirSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import type { CfStageConfig, StageState, WranglerConfig, QueueBinding } from "../types.js";
 import { resourceId, resourceStagedName } from "../types.js";
+import { resolveAccountId } from "./auth.js";
 import { resourceName, workerName } from "./naming.js";
 
 /**
  * Generate a rendered wrangler config for a worker at a given stage.
  * This is a complete, self-contained config that can be passed to
  * `wrangler deploy -c <path>`.
+ *
+ * When `rootDir` is set:
+ * - `main` is resolved to an absolute path from the repo root.
+ * - `account_id` is set via `resolveAccountId` for the worker directory (`rootDir` +
+ *   `workerPath`), matching the account injected by `getWranglerEnv` so deploys do not
+ *   hit Cloudflare API error 10000 from mixing an API token with a different account than the
+ *   rendered file implies.
+ * If resolution throws, `account_id` falls back to a non-empty `baseConfig.account_id` when
+ * present. When `rootDir` is omitted, or resolution fails and the base config has no
+ * `account_id`, the rendered object has no `account_id` field (unless copied from `baseConfig`).
  */
 export function renderWranglerConfig(
   baseConfig: WranglerConfig,
@@ -188,6 +199,20 @@ export function renderWranglerConfig(
     rendered.r2_buckets = rendered.r2_buckets.filter((bucket) => bucket.bucket_name && !bucket.bucket_name.includes("placeholder"));
     if (rendered.r2_buckets.length === 0) {
       delete rendered.r2_buckets;
+    }
+  }
+
+  // Pin account on the rendered config so `wrangler deploy -c …` targets the same account
+  // as `getWranglerEnv()` (API token vs OAuth default.toml mismatch caused API error 10000).
+  if (rootDir) {
+    const workerDir = resolve(rootDir, workerPath);
+    try {
+      rendered.account_id = resolveAccountId(workerDir);
+    } catch {
+      const fromBase = baseConfig.account_id;
+      if (typeof fromBase === "string" && fromBase.trim()) {
+        rendered.account_id = fromBase.trim();
+      }
     }
   }
 

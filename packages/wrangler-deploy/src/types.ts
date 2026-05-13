@@ -560,6 +560,8 @@ export type WorkerRef = string; // e.g. "apps/api"
 
 export interface WranglerConfig {
   name: string;
+  /** Cloudflare account ID (32-char hex). Filled on rendered configs when resolvable. */
+  account_id?: string;
   main?: string;
   compatibility_date?: string;
   compatibility_flags?: string[];

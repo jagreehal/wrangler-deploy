@@ -4,6 +4,24 @@ import { loadProjectContext } from "./project-context.js";
 
 const resolvedAccountIds = new Map<string, string>();
 
+const ACCOUNT_ID_HEX = /^[a-f0-9]{32}$/i;
+
+function assertAccountId32Hex(value: string, sourceLabel: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    throw new Error(
+      `${sourceLabel} is set but empty after trimming. Use a 32-character hexadecimal Cloudflare account id.`,
+    );
+  }
+  if (!ACCOUNT_ID_HEX.test(trimmed)) {
+    throw new Error(
+      `${sourceLabel} must be a 32-character hexadecimal Cloudflare account id (Workers & Pages → account overview). ` +
+        `Got ${JSON.stringify(trimmed)}.`,
+    );
+  }
+  return trimmed.toLowerCase();
+}
+
 export function resetResolvedAccountId(): void {
   resolvedAccountIds.clear();
 }
@@ -12,33 +30,38 @@ export function resetResolvedAccountId(): void {
  * Resolve the Cloudflare account ID for all wrangler commands.
  *
  * Resolution order:
- * 1. CLOUDFLARE_ACCOUNT_ID env var (explicit, used in CI)
- * 2. Parse from `wrangler whoami` output (local OAuth login)
+ * 1. `CLOUDFLARE_ACCOUNT_ID` env var (explicit override, commonly in CI)
+ * 2. `accountId` from project context (`.wdrc` / `.wdrc.json`) when present
+ * 3. Parse from `wrangler whoami` (OAuth or API token — inherits current `process.env`)
+ * 4. If **`CLOUDFLARE_API_TOKEN` is not set**: read `account_id` from `~/.wrangler/config/default.toml` when that file exists (OAuth login)
  *
- * The resolved ID is cached for the process lifetime and injected
- * into the env for all subsequent wrangler calls via `getWranglerEnv()`.
+ * When **`CLOUDFLARE_API_TOKEN`** is set, step 4 is skipped: `default.toml` reflects `wrangler login` (OAuth) and is often a *personal* account while the
+ * token is for *work*, which produces Cloudflare API error 10000 (token vs account mismatch).
  *
- * This is needed because wrangler's OAuth flow doesn't always auto-detect
- * the account ID for write operations, even when `wrangler whoami` succeeds.
+ * The resolved ID is cached for the process lifetime and injected into the env for all
+ * subsequent wrangler calls via `getWranglerEnv()`.
  */
 export function resolveAccountId(cwd: string): string {
   const cached = resolvedAccountIds.get(cwd);
   if (cached) return cached;
 
-  const projectContextAccountId = loadProjectContext(cwd).accountId;
-  if (projectContextAccountId) {
-    resolvedAccountIds.set(cwd, projectContextAccountId);
-    return projectContextAccountId;
-  }
-
-  // 1. Check env var (CI/CD flow)
-  const envId = process.env.CLOUDFLARE_ACCOUNT_ID;
-  if (envId) {
+  // 1. CLOUDFLARE_ACCOUNT_ID (CI/CD and explicit local override)
+  const rawEnvId = process.env.CLOUDFLARE_ACCOUNT_ID;
+  if (typeof rawEnvId === "string" && rawEnvId.trim()) {
+    const envId = assertAccountId32Hex(rawEnvId, "CLOUDFLARE_ACCOUNT_ID");
     resolvedAccountIds.set(cwd, envId);
     return envId;
   }
 
-  // 2. Parse from wrangler whoami
+  // 2. accountId from .wdrc / .wdrc.json
+  const rawContextId = loadProjectContext(cwd).accountId;
+  if (typeof rawContextId === "string" && rawContextId.trim()) {
+    const projectContextAccountId = assertAccountId32Hex(rawContextId, ".wdrc / .wdrc.json accountId");
+    resolvedAccountIds.set(cwd, projectContextAccountId);
+    return projectContextAccountId;
+  }
+
+  // 3. Parse from wrangler whoami
   try {
     const output = execFileSync("npx", ["wrangler", "whoami"], {
       encoding: "utf-8",
@@ -50,21 +73,36 @@ export function resolveAccountId(cwd: string): string {
     const match = output.match(/│\s+\S.*?\s+│\s+([a-f0-9]{32})\s+│/);
     const matchedId = match?.[1];
     if (matchedId) {
-      resolvedAccountIds.set(cwd, matchedId);
-      return matchedId;
+      const id = matchedId.toLowerCase();
+      resolvedAccountIds.set(cwd, id);
+      return id;
     }
 
     // Fallback: any 32-char hex that's not a common hash
     const hexMatch = output.match(/\b([a-f0-9]{32})\b/);
     const hexId = hexMatch?.[1];
     if (hexId) {
-      resolvedAccountIds.set(cwd, hexId);
-      return hexId;
+      const id = hexId.toLowerCase();
+      resolvedAccountIds.set(cwd, id);
+      return id;
     }
   } catch {
     // whoami failed — not logged in
   }
 
+  if (process.env.CLOUDFLARE_API_TOKEN) {
+    throw new Error(
+      "CLOUDFLARE_API_TOKEN is set but the Cloudflare account ID could not be resolved.\n\n" +
+        "  Set the account explicitly to avoid Cloudflare API error 10000 (token vs wrong account):\n" +
+        "    • `CLOUDFLARE_ACCOUNT_ID` (32-character hex, Workers & Pages → account overview), or\n" +
+        "    • `accountId` in `.wdrc` or `.wdrc.json` at the repo root, or\n" +
+        "    • fix `wrangler whoami` with the same environment (token scopes / network).\n\n" +
+        "  OAuth `~/.wrangler/config/default.toml` is not used when an API token is set,\n" +
+        "  because it often reflects a different account than the token.\n",
+    );
+  }
+
+  // 4. OAuth default.toml (only when no API token — see module JSDoc)
   const fallbackPath = process.env.HOME
     ? `${process.env.HOME}/.wrangler/config/default.toml`
     : undefined;
@@ -73,8 +111,9 @@ export function resolveAccountId(cwd: string): string {
       const content = readFileSync(fallbackPath, "utf-8");
       const match = content.match(/account_id\s*=\s*["']([a-f0-9]{32})["']/i);
       if (match?.[1]) {
-        resolvedAccountIds.set(cwd, match[1]);
-        return match[1];
+        const id = match[1].toLowerCase();
+        resolvedAccountIds.set(cwd, id);
+        return id;
       }
     } catch {
       // Ignore config parse failures and continue to the hard error below.
@@ -83,8 +122,8 @@ export function resolveAccountId(cwd: string): string {
 
   throw new Error(
     "Could not resolve Cloudflare account ID.\n\n" +
-    "  For local development: run `wrangler login`\n" +
-    "  For CI/CD: set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID\n"
+      "  For local development: run `wrangler login`\n" +
+      "  For CI/CD: set `CLOUDFLARE_API_TOKEN` plus an account id via `CLOUDFLARE_ACCOUNT_ID` or `accountId` in `.wdrc` / `.wdrc.json`\n",
   );
 }
 

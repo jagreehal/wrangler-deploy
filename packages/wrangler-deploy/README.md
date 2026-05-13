@@ -217,11 +217,13 @@ Declare required secrets per worker. `wd deploy` blocks if any are missing. Sync
 
 ## Auth
 
-Uses wrangler's auth. Locally: `wrangler login`. In CI: `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` environment variables.
+Uses Wrangler’s auth the same way the CLI does. Locally, run `wrangler login` (OAuth). In CI, set **`CLOUDFLARE_API_TOKEN`** and provide the account explicitly with **`CLOUDFLARE_ACCOUNT_ID`** (32-character hex from Workers & Pages → your account) **or** with **`accountId`** in **`.wdrc`** / **`.wdrc.json`** at the repo root.
+
+OAuth stores a default account in `~/.wrangler/config/default.toml`. An API token is often tied to a *different* account (for example a team vs a personal login). Mixing them commonly surfaces as **Cloudflare API error 10000**. When a token is set, wrangler-deploy does **not** read that OAuth `default.toml` for account resolution, so you must set the account id as above or ensure `wrangler whoami` succeeds with the same token and environment.
 
 ## Docs
 
-[Full documentation](https://jagreehal.github.io/wrangler-deploy/) with guides for PR previews, CI/CD, each resource type, and config reference.
+[Full documentation](https://jagreehal.github.io/wrangler-deploy/) — authentication and account resolution order, PR previews, CI/CD, each resource type, and the config reference.
 
 ## License
 
