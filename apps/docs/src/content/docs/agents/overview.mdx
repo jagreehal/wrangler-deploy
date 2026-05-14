@@ -1,0 +1,112 @@
+---
+title: Agent-native CLI
+description: How wrangler-deploy is designed to be driven by AI agents, not just humans
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+`wrangler-deploy` is designed to be a first-class tool for AI agents, not just an
+afterthought. Every command supports machine-readable output, every error returns
+a structured envelope with retryability and a fix string, and the binary itself
+is the source of truth for what it can do — agents query the CLI at runtime
+rather than relying on a stale doc or a pre-loaded prompt.
+
+This section explains the agent-facing surface. If you are a human reading the
+[CLI reference](/wrangler-deploy/reference/commands) is probably what you want.
+
+## Bootstrap (run these first)
+
+The first thing an agent should do is ask the CLI what it can do. These five
+commands are the entire discovery surface — everything else is reachable from them.
+
+```bash
+wd schema --json                 # full CLI manifest (all commands, flags, metadata)
+wd schema --versioned --json     # versioned envelope incl. output schemas + config schema
+wd schema outputs --json         # output schemas for every command that emits JSON
+wd schema outputs --command deploy   # output schema for one command
+wd schema config --json          # JSON Schema for wrangler-deploy.config.ts
+wd schema errors --json          # error envelope schema + every WD_E_* code
+wd tools --json                  # tool metadata derived from the manifest
+wd version --json                # installed binary, node, platform, sandbox flag
+wd examples --json               # list every command that has examples
+wd examples --command deploy --json  # copy-pasteable examples for one command
+wd doctor --json --codes         # environment validation with WD_DOC_* codes
+wd sandbox info --json           # detect available OS-level sandbox
+```
+
+<Aside type="tip">
+  These commands work regardless of whether you have a `wrangler-deploy.config.ts`
+  in scope. They are pure introspection.
+</Aside>
+
+## Global agent flags
+
+These flags work on every command:
+
+| Flag / env | Purpose |
+| --- | --- |
+| `--json` / `--ndjson` | Machine-readable output |
+| `--fields a,b.c` | Project JSON output to specific dot-paths |
+| `--quiet`, `-q` | Suppress non-error human output |
+| `--no-color` (or `NO_COLOR=1`) | Strip ANSI colour codes |
+| `--no-interactive` | Refuse all prompts (auto-on under CI / non-TTY / sandbox) |
+| `--no-secrets-in-output` (or `WD_NO_SECRETS=1`) | Strip secret-shaped values from JSON output |
+| `--sandbox` (or `AGENT_SANDBOX=1`) | Refuse mutating commands without `--dry-run` |
+| `--output-file <path>` | Persist the first JSON result to disk (any JSON-emitting command) |
+| `--input <path \| ->` | Read JSON from a file or stdin (currently honoured by plan/apply/deploy) |
+| `--dry-run` | Preview a write without performing it (every mutating command) |
+| `--cwd <path>` | Run as if from a different project directory |
+| `--env-file <path>` | Load env vars from file (auto-detects `.env` otherwise) |
+| `--profile <name>` | Use a specific auth profile |
+
+## Environment variables for agents
+
+| Variable | Purpose |
+| --- | --- |
+| `AGENT_SANDBOX=1` | Mutating commands without `--dry-run` are refused with `WD_E_SANDBOX_BLOCKED` |
+| `WD_NO_INTERACTIVE=1` | Equivalent to `--no-interactive`; disables all prompts |
+| `WD_NO_SECRETS=1` | Equivalent to `--no-secrets-in-output`; strips secret-shaped values |
+| `NO_COLOR=1` | Standard no-color signal; honoured |
+| `CI=1` or `CI=true` | Auto-enables `--no-interactive` |
+| `CLOUDFLARE_API_TOKEN` | API token (required for `requiresAuth` commands) |
+| `CLOUDFLARE_ACCOUNT_ID` | Account ID (required for `requiresAuth` commands) |
+| `WD_STAGE` | Default stage when `--stage` is omitted |
+| `WD_PROFILE` | Default profile when `--profile` is omitted |
+| `WD_STATE_PASSWORD` | Password for encrypted state |
+
+## What you get for free
+
+By passing `--json` you get:
+
+1. **Stable JSON output** with a documented schema (see [Output and input](/wrangler-deploy/agents/io))
+2. **Structured errors** with `type`, `code`, `retryable`, `fix`, and `expected` fields (see [Structured errors](/wrangler-deploy/agents/structured-errors))
+3. **Exit codes** that distinguish runtime failures from validation/sandbox refusals: `0` success, `1` runtime, `2` validation/sandbox
+4. **Field projection** via `--fields a,b.c` to keep output small
+5. **NDJSON streaming** via `--ndjson` for list-style commands and the dev event stream
+6. **Last-error capture** in `.wrangler-deploy/last-error.json`, recoverable via `wd explain --from-last-error`
+
+## Manifest-driven prerequisites
+
+The CLI manifest declares per-command metadata such as `requiresAuth`,
+`requiresStage`, `mutating`, `network`, and `writesFiles`. The CLI reads its
+own manifest at startup and enforces the prereqs:
+
+- `requiresAuth: true` commands fail-fast with `WD_E_AUTH_FAILED` when
+  `CLOUDFLARE_API_TOKEN`/`CLOUDFLARE_ACCOUNT_ID` are missing — before any
+  network call. Read-only subcommands (`rollback list`, `route verify`,
+  `secrets`, `guard status`/`breaches`/`report`/`approvals`) skip this check.
+- `mutating: true` commands are gated by `AGENT_SANDBOX=1` (see [Sandbox](/wrangler-deploy/agents/sandbox)).
+- `requiresStage: true` commands warn (in human mode) when falling back to `$USER`.
+
+Agents can read the manifest via `wd schema --json` and decide which prereqs
+to satisfy before invoking a command — no need to parse error messages.
+
+## Recommended agent loop
+
+1. **Discover.** `wd schema --json` once per session to learn the surface.
+2. **Plan.** Use `--dry-run` on every mutating command first.
+3. **Persist.** Pass `--output-file` to keep an audit trail of every JSON result.
+4. **Sandbox.** Set `AGENT_SANDBOX=1` for declarative refusal, or wrap in
+   `wd sandbox run --` for OS-level isolation.
+5. **Recover.** On non-zero exit, parse the error envelope and branch on
+   `error.type` and `error.retryable`. If unsure, `wd explain --from-last-error --json`.

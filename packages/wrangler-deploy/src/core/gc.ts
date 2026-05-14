@@ -3,13 +3,14 @@ import type { StateProvider } from "./state.js";
 import { stageMatchesPattern } from "./naming.js";
 import { destroy } from "./destroy.js";
 import type { WranglerRunner } from "./wrangler-runner.js";
+import { AgentErrors } from "./cli-output.js";
 
 /**
  * Parse a TTL string like "7d", "24h", "30m" to milliseconds.
  */
 function parseTtl(ttl: string): number {
   const match = ttl.match(/^(\d+)([dhm])$/);
-  if (!match) throw new Error(`Invalid TTL format: "${ttl}". Use "7d", "24h", or "30m".`);
+  if (!match) throw AgentErrors.validation(`Invalid TTL format: "${ttl}". Use "7d", "24h", or "30m".`, "Pass a TTL like 7d, 24h, or 30m.");
   const value = parseInt(match[1] ?? "0");
   switch (match[2]) {
     case "d":

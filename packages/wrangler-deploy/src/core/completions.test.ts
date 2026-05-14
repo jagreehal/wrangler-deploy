@@ -17,8 +17,14 @@ describe("generateCompletions", () => {
     expect(result).toContain("graph");
     expect(result).toContain("dev");
     expect(result).toContain("doctor");
+    expect(result).toContain("explain");
     expect(result).toContain("ci");
     expect(result).toContain("completions");
+    expect(result).toContain("telemetry");
+    expect(result).toContain("release-note");
+    expect(result).toContain("history");
+    expect(result).toContain("--stage");
+    expect(result).toContain("--worker");
   });
 
   it("bash output contains complete -F and command names", ({ task }) => {
@@ -35,7 +41,13 @@ describe("generateCompletions", () => {
     expect(result).toContain("graph");
     expect(result).toContain("dev");
     expect(result).toContain("doctor");
+    expect(result).toContain("explain");
+    expect(result).toContain("telemetry");
+    expect(result).toContain("history");
+    expect(result).toContain("--plan-only");
     expect(result).toContain("COMPREPLY");
+    expect(result).toContain("--stage");
+    expect(result).toContain("--worker");
   });
 
   it("fish output contains complete -c wd lines and command names", ({ task }) => {
@@ -52,6 +64,11 @@ describe("generateCompletions", () => {
     expect(result).toContain("graph");
     expect(result).toContain("dev");
     expect(result).toContain("doctor");
+    expect(result).toContain("explain");
     expect(result).toContain("ci");
+    expect(result).toContain("telemetry");
+    expect(result).toContain("release-note");
+    expect(result).toContain("history");
+    expect(result).toContain("-l stage");
   });
 });

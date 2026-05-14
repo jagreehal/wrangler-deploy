@@ -1,3 +1,5 @@
+import { AgentErrors } from "../core/cli-output.js";
+
 const CF_API_BASE = "https://api.cloudflare.com/client/v4";
 
 export interface CloudflareApiOptions {
@@ -31,12 +33,26 @@ export async function resolveAccountId(apiToken: string, fetchFn: FetchFn = fetc
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Failed to resolve Cloudflare account ID: ${res.status} ${body}`);
+    if (res.status === 401 || res.status === 403) {
+      throw AgentErrors.auth(
+        `Failed to resolve Cloudflare account ID: ${res.status} ${body}`,
+        "Check CLOUDFLARE_API_TOKEN is valid and has Account:Read permission.",
+        { env: ["CLOUDFLARE_API_TOKEN"] },
+      );
+    }
+    throw AgentErrors.network(
+      `Failed to resolve Cloudflare account ID: ${res.status} ${body}`,
+      "Retry. If persistent, check api.cloudflare.com reachability.",
+    );
   }
 
   const data = await res.json() as { result: Array<{ id: string }> };
   if (!data.result?.[0]?.id) {
-    throw new Error("No Cloudflare accounts found for this API token");
+    throw AgentErrors.auth(
+      "No Cloudflare accounts found for this API token",
+      "Verify CLOUDFLARE_API_TOKEN belongs to an account with at least one workspace.",
+      { env: ["CLOUDFLARE_API_TOKEN"] },
+    );
   }
 
   cachedAccountId = data.result[0].id;
@@ -72,7 +88,19 @@ export async function cfApiResult<T>(res: Response): Promise<T> {
 
   if (!body.success) {
     const errors = body.errors?.map((e) => `[${e.code}] ${e.message}`).join(", ") ?? "Unknown error";
-    throw new Error(`Cloudflare API error: ${errors}`);
+    // Code 10000 specifically means account/token mismatch — auth, not network.
+    const isAuth = body.errors?.some((e) => e.code === 10000 || e.code === 9109);
+    if (isAuth) {
+      throw AgentErrors.auth(
+        `Cloudflare API error: ${errors}`,
+        "Set CLOUDFLARE_ACCOUNT_ID to match the account that owns CLOUDFLARE_API_TOKEN.",
+        { env: ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN"] },
+      );
+    }
+    throw AgentErrors.network(
+      `Cloudflare API error: ${errors}`,
+      "Inspect the error code via `wd explain` and retry if transient.",
+    );
   }
 
   return body.result;

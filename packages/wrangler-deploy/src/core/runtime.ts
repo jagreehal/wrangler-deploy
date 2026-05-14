@@ -9,6 +9,7 @@ import type {
 import { buildDevPlan } from "./dev.js";
 import { readActiveDevState } from "./dev-runtime-state.js";
 import type { WranglerRunner } from "./wrangler-runner.js";
+import { AgentErrors } from "./cli-output.js";
 
 export interface QueueRoute {
   logicalName: string;
@@ -212,7 +213,7 @@ export async function resolvePlannedWorkerPort(
     : plan.workers.find((worker) => worker.workerPath === workerPath)?.port;
 
   if (!plannedPort) {
-    throw new Error(`Unable to resolve a planned dev port for "${workerPath}"`);
+    throw AgentErrors.state(`Unable to resolve a planned dev port for "${workerPath}"`, "Start `wd dev` so the worker has a planned port.");
   }
 
   return plannedPort;
@@ -225,12 +226,12 @@ export function resolveQueueTailLogFiles(
 ): Array<{ workerPath: string; logFile: string }> {
   const route = getQueueRoute(config, options.queue);
   if (!route) {
-    throw new Error(`Unknown queue "${options.queue}"`);
+    throw AgentErrors.notFound(`Unknown queue "${options.queue}"`, "Check that the queue is declared in your config.");
   }
 
   const activeState = readActiveDevState(rootDir);
   if (!activeState) {
-    throw new Error("No active dev runtime state found. Start `wd dev` first.");
+    throw AgentErrors.state("No active dev runtime state found. Start `wd dev` first.", "Run `wd dev` to start a local session.");
   }
 
   const relatedWorkers = options.worker
@@ -240,13 +241,13 @@ export function resolveQueueTailLogFiles(
       ...route.consumers.map((consumer) => consumer.workerPath),
     ])];
   if (relatedWorkers.length === 0) {
-    throw new Error(`Queue "${options.queue}" has no related workers to tail.`);
+    throw AgentErrors.config(`Queue "${options.queue}" has no related workers to tail.`, "Add producers or consumers for the queue in your config.");
   }
 
   return relatedWorkers.map((workerPath) => {
     const logFile = activeState.logFiles[workerPath];
     if (!logFile) {
-      throw new Error(`No active log file found for "${workerPath}". Start \`wd dev\` first.`);
+      throw AgentErrors.state(`No active log file found for "${workerPath}". Start \`wd dev\` first.`, "Run `wd dev` to start a local session.");
     }
     return { workerPath, logFile };
   });
@@ -259,7 +260,7 @@ export async function resolveQueueSendTarget(
 ): Promise<QueueSendTarget> {
   const route = getQueueRoute(config, options.queue);
   if (!route) {
-    throw new Error(`Unknown queue "${options.queue}"`);
+    throw AgentErrors.notFound(`Unknown queue "${options.queue}"`, "Check that the queue is declared in your config.");
   }
 
   const configuredRoute = config.dev?.queues?.[options.queue];
@@ -268,15 +269,16 @@ export async function resolveQueueSendTarget(
   let workerPath = options.worker ?? configuredRoute?.worker;
   if (!workerPath) {
     if (producerWorkers.size !== 1) {
-      throw new Error(
+      throw AgentErrors.config(
         `Queue "${options.queue}" has multiple producers. Configure dev.queues["${options.queue}"] or pass --worker.`,
+        `Configure dev.queues["${options.queue}"].worker or pass --worker <name>.`,
       );
     }
     workerPath = route.producers[0]!.workerPath;
   }
 
   if (!producerWorkers.has(workerPath)) {
-    throw new Error(`Worker "${workerPath}" is not a producer for queue "${options.queue}"`);
+    throw AgentErrors.config(`Worker "${workerPath}" is not a producer for queue "${options.queue}"`, "Pick a worker that produces to this queue, or update your config.");
   }
 
   const port = options.port ?? await resolvePlannedWorkerPort(config, rootDir, workerPath);
@@ -300,12 +302,13 @@ export async function resolveWorkerCallTarget(
   const configuredEndpoint = options.endpoint ? config.dev?.endpoints?.[options.endpoint] : undefined;
   const worker = configuredEndpoint?.worker ?? options.worker;
   if (!config.workers.includes(worker)) {
-    throw new Error(`Unknown worker "${worker}"`);
+    throw AgentErrors.notFound(`Unknown worker "${worker}"`, "Check `config.workers` for the correct worker path.");
   }
 
   if (configuredEndpoint && options.worker !== worker) {
-    throw new Error(
+    throw AgentErrors.config(
       `Endpoint "${options.endpoint}" belongs to "${worker}", not "${options.worker}"`,
+      "Pass --worker matching the endpoint owner, or update dev.endpoints in your config.",
     );
   }
 
@@ -447,15 +450,16 @@ export function resolveD1CommandTarget(
 ): D1CommandTarget {
   const database = getD1Database(config, options.database);
   if (!database) {
-    throw new Error(`Unknown D1 database "${options.database}"`);
+    throw AgentErrors.notFound(`Unknown D1 database "${options.database}"`, "Check that the D1 binding exists in a worker's wrangler config.");
   }
 
   const configuredWorker = config.dev?.d1?.[options.database]?.worker;
   let workerPath = options.worker ?? configuredWorker;
   if (!workerPath) {
     if (database.bindings.length !== 1) {
-      throw new Error(
+      throw AgentErrors.config(
         `D1 database "${options.database}" is bound in multiple workers. Configure dev.d1["${options.database}"].worker or pass --worker.`,
+        `Configure dev.d1["${options.database}"].worker or pass --worker <name>.`,
       );
     }
     workerPath = database.bindings[0]!.workerPath;
@@ -463,7 +467,7 @@ export function resolveD1CommandTarget(
 
   const binding = database.bindings.find((entry) => entry.workerPath === workerPath)?.binding;
   if (!binding) {
-    throw new Error(`Worker "${workerPath}" does not bind D1 database "${options.database}"`);
+    throw AgentErrors.config(`Worker "${workerPath}" does not bind D1 database "${options.database}"`, "Pick a worker that binds the database, or add the binding in wrangler.jsonc.");
   }
 
   return {
@@ -489,7 +493,7 @@ export function executeLocalD1(
   } else if (options.file) {
     commandArgs.push("--file", resolve(rootDir, options.file));
   } else {
-    throw new Error("D1 execution requires --sql or --file.");
+    throw AgentErrors.validation("D1 execution requires --sql or --file.", "Pass --sql <query> or --file <path>.", { flag: "--sql" });
   }
 
   return {
@@ -558,19 +562,19 @@ export function readDevLogSnapshot(
 ): Array<{ workerPath: string; logFile: string; content: string }> {
   const activeState = readActiveDevState(rootDir);
   if (!activeState) {
-    throw new Error("No active dev runtime state found. Start `wd dev` first.");
+    throw AgentErrors.state("No active dev runtime state found. Start `wd dev` first.", "Run `wd dev` to start a local session.");
   }
 
   const workerPaths = options.worker ? [options.worker] : activeState.workers;
   if (options.worker && !config.workers.includes(options.worker)) {
-    throw new Error(`Unknown worker "${options.worker}"`);
+    throw AgentErrors.notFound(`Unknown worker "${options.worker}"`, "Check `config.workers` for the correct worker path.");
   }
   const grep = options.grep ? new RegExp(options.grep, "i") : undefined;
 
   return workerPaths.map((workerPath) => {
     const logFile = activeState.logFiles[workerPath];
     if (!logFile) {
-      throw new Error(`No active log file found for "${workerPath}". Start \`wd dev\` first.`);
+      throw AgentErrors.state(`No active log file found for "${workerPath}". Start \`wd dev\` first.`, "Run `wd dev` to start a local session.");
     }
     const raw = existsSync(logFile) ? readFileSync(logFile, "utf-8") : "";
     const content = grep
@@ -588,7 +592,7 @@ export function readDevLogSnapshot(
 export function parseInterval(input: string): number {
   const match = /^(\d+)(ms|s|m)?$/.exec(input.trim());
   if (!match) {
-    throw new Error(`Invalid interval "${input}". Use values like 500ms, 5s, or 1m.`);
+    throw AgentErrors.validation(`Invalid interval "${input}". Use values like 500ms, 5s, or 1m.`, "Pass an interval like 500ms, 5s, or 1m.");
   }
 
   const value = Number.parseInt(match[1]!, 10);

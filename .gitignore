@@ -11,3 +11,9 @@ ___temp
 ___temp
 .playwright-cli
 .claude
+
+# Stage-specific rendered worker configs (per-developer artifacts).
+# Canonical `wrangler.jsonc` files are tracked; anything like
+# `wrangler.<stage>.jsonc` is local-only output.
+**/wrangler.*.jsonc
+!**/wrangler.jsonc

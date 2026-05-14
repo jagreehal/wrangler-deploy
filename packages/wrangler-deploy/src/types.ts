@@ -21,6 +21,8 @@ export interface ProjectContext {
   databaseUrl?: string;
   /** Default state password for encrypted state. */
   statePassword?: string;
+  /** Opt-in local CLI telemetry. */
+  telemetry?: boolean;
 }
 
 export type ResourceType = "kv" | "queue" | "hyperdrive" | "d1" | "r2" | "vectorize" | "dns";
@@ -411,6 +413,8 @@ export interface DevSnapshotConfig {
 
 export interface CfStageConfig {
   version: 1;
+  /** Default stage name. Overridable via --stage flag or .wdrc. */
+  stage?: string;
   workers: string[];
   /** Explicit deploy order. If omitted, inferred from serviceBindings (dependencies first). */
   deployOrder?: string[];
@@ -516,6 +520,9 @@ export function isActive(state: ResourceState): boolean {
 export interface WorkerState {
   name: string;
   url?: string;
+  urls?: string[];
+  routes?: string[];
+  versionId?: string;
   deployed?: boolean;
 }
 
@@ -529,6 +536,16 @@ export interface StageState {
   updatedAt: string;
   resources: Record<string, ResourceState>;
   workers: Record<string, WorkerState>;
+  lastDeployedWorker?: string;
+  deploymentHistory?: Array<{
+    at: string;
+    action: "deploy" | "rollback";
+    workerPath: string;
+    workerName: string;
+    versionId?: string;
+    urls: string[];
+    routes: string[];
+  }>;
   secrets: Record<string, SecretState>;
   storedSecrets?: Record<string, Record<string, string>>;
 }

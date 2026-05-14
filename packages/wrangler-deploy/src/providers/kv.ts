@@ -1,4 +1,5 @@
 import { cfApi as defaultCfApi, cfApiResult, type CloudflareApiOptions } from "./cloudflare-api.js";
+import { AgentErrors } from "../core/cli-output.js";
 
 export type CfApiFn = typeof defaultCfApi;
 
@@ -24,7 +25,7 @@ export async function createKvNamespace(
       // Namespace already exists — find by title
       return await findKvNamespaceByTitle(title, options, cfApiFn);
     }
-    throw new Error(`Failed to create KV namespace "${title}": ${res.status}`);
+    throw AgentErrors.network(`Failed to create KV namespace "${title}": ${res.status}`, "Inspect the error and retry if transient.");
   }
 
   return cfApiResult<KvNamespace>(res);
@@ -38,7 +39,7 @@ export async function findKvNamespaceByTitle(
   const res = await cfApiFn(`/storage/kv/namespaces?per_page=100`, options);
   const namespaces = await cfApiResult<KvNamespace[]>(res);
   const found = namespaces.find((ns) => ns.title === title);
-  if (!found) throw new Error(`KV namespace "${title}" not found`);
+  if (!found) throw AgentErrors.notFound(`KV namespace "${title}" not found`, "Run `wd state list` to see provisioned KV namespaces for this stage.");
   return found;
 }
 
@@ -61,6 +62,6 @@ export async function deleteKvNamespace(
     method: "DELETE",
   });
   if (!res.ok && res.status !== 404) {
-    throw new Error(`Failed to delete KV namespace ${id}: ${res.status}`);
+    throw AgentErrors.network(`Failed to delete KV namespace ${id}: ${res.status}`, "Inspect the error and retry if transient.");
   }
 }

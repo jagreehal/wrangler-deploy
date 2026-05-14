@@ -72,6 +72,16 @@ export default defineConfig({
           ],
         },
         {
+          label: "Agents",
+          items: [
+            { label: "Agent-native CLI", slug: "agents/overview" },
+            { label: "Structured Errors", slug: "agents/structured-errors" },
+            { label: "Sandbox", slug: "agents/sandbox" },
+            { label: "Local Dev Event Stream", slug: "agents/dev-events" },
+            { label: "I/O and Schemas", slug: "agents/io" },
+          ],
+        },
+        {
           label: "CLI Reference",
           items: [
             { label: "Commands", slug: "reference/commands" },

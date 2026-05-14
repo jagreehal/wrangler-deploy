@@ -2,6 +2,7 @@ import { readdirSync } from "node:fs";
 import { join, relative } from "node:path";
 import { readWranglerConfig } from "./wrangler.js";
 import type { WranglerConfig } from "../types.js";
+import { AgentErrors } from "./cli-output.js";
 
 interface DiscoveredWorker {
   path: string;
@@ -64,7 +65,11 @@ export function generateConfig(rootDir: string): string {
   const allWorkers = findWranglerConfigs(rootDir, rootDir);
 
   if (allWorkers.length === 0) {
-    throw new Error("No wrangler.jsonc or wrangler.json files found.");
+    throw AgentErrors.notFound(
+      "No wrangler.jsonc or wrangler.json files found in this directory. " +
+        "Run `wd create vite <name>` to scaffold a new project, or add a `wrangler.jsonc` to an existing worker first.",
+      "Run `wd create vite <name>` to scaffold a new project, or add a `wrangler.jsonc` to an existing worker.",
+    );
   }
 
   // Deduplicate by worker name — keep first occurrence

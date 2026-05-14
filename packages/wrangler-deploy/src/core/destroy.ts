@@ -8,6 +8,7 @@ import { deleteD1Database } from "../providers/d1.js";
 import { deleteR2Bucket } from "../providers/r2.js";
 import { deleteVectorizeIndex } from "../providers/vectorize.js";
 import { deleteDnsRecord } from "../providers/dns.js";
+import { AgentErrors } from "./cli-output.js";
 
 export type DestroyArgs = {
   stage: string;
@@ -56,7 +57,7 @@ export async function destroy(args: DestroyArgs, deps: DestroyDeps): Promise<Des
   const { rootDir, config, state: provider, wrangler, logger = console } = deps;
 
   if (isStageProtected(stage, config.stages) && !force) {
-    throw new Error(`Stage "${stage}" is protected. Use --force to destroy it.`);
+    throw AgentErrors.validation(`Stage "${stage}" is protected. Use --force to destroy it.`, "Pass --force to override stage protection.", { flag: "--force" });
   }
 
   const state = await provider.read(stage);
@@ -242,7 +243,7 @@ export async function destroy(args: DestroyArgs, deps: DestroyDeps): Promise<Des
         case "dns": {
           const apiToken = process.env.CLOUDFLARE_API_TOKEN;
           if (!apiToken) {
-            throw new Error("CLOUDFLARE_API_TOKEN is required to delete DNS records");
+            throw AgentErrors.auth("CLOUDFLARE_API_TOKEN is required to delete DNS records", "Set CLOUDFLARE_API_TOKEN or run `wd login`.", { env: ["CLOUDFLARE_API_TOKEN"] });
           }
           const dnsOutput = resource.output as { zoneId?: string; records?: Array<{ id: string }> } | undefined;
           if (dnsOutput?.zoneId && dnsOutput.records) {

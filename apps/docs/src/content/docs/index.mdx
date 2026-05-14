@@ -294,13 +294,14 @@ hero:
 
 <div>
   <span class="section-label">Get started</span>
-  <h2 class="section-title">Start a new app or adopt the Wrangler project you already have.</h2>
+  <h2 class="section-title">One command. 30 seconds. A working Worker.</h2>
   <div class="install-cmd">
-    <span class="dollar">$</span> npm install -D wrangler-deploy
+    <span class="dollar">$</span> npm create wrangler-deploy@latest my-app
   </div>
   <div class="gap-4">
-    <p><strong>Repo already has <code>wrangler.jsonc</code>?</strong> Run <code>wd init</code> to generate project config from local files without changing your JSONC.</p>
-    <p><strong>Already deployed in Cloudflare?</strong> Run <code>wd introspect</code> to generate config from the live account.<br/></p>
-    <p>Then run <code>wd apply --stage staging</code> and <code>wd deploy --stage staging</code>. Local dev stays on Wrangler and your checked-in JSONC stays the authoring source. Stage deploys get rendered JSONC with the right IDs.</p>
+    <p>Scaffolds a hello-world Worker, installs dependencies, and prints the dev command. No Cloudflare account required to start — you can deploy when you're ready.</p>
+    <p><strong>Already have <code>wrangler.jsonc</code> files?</strong> Run <code>wd init</code> in your repo to generate project config from them. Your Wrangler files are not modified.</p>
+    <p><strong>Already deployed to Cloudflare?</strong> Run <code>wd introspect</code> to generate config from the live account.</p>
+    <p>Then <code>wd apply --stage staging</code> and <code>wd deploy --stage staging</code> when you want a separate environment. Local dev stays on Wrangler; stage deploys use rendered JSONC with the right IDs.</p>
   </div>
 </div>

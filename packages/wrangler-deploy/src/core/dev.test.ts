@@ -594,7 +594,7 @@ describe("buildDevPlan", () => {
       read: vi.fn().mockResolvedValue(null),
       write: vi.fn(),
       delete: vi.fn(),
-      list: vi.fn(),
+      list: vi.fn().mockResolvedValue([]),
     };
 
     const config = makeConfig({
@@ -613,7 +613,7 @@ describe("buildDevPlan", () => {
         fallbackStage: "staging",
         stateProvider: mockProvider,
       }),
-    ).rejects.toThrow(/fallback stage "staging" not found/i);
+    ).rejects.toThrow(/No stages exist yet/i);
   });
 
   it("filter without fallback stage still expands transitive deps (existing behavior unchanged)", async ({ task }) => {

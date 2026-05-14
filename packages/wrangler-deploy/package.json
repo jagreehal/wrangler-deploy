@@ -19,7 +19,10 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "prebuild": "node scripts/generate-template-manifest.mjs",
     "generate:agent-context": "node scripts/generate-agent-context.mjs",
+    "generate:template-manifest": "node scripts/generate-template-manifest.mjs",
+    "verify:template-manifest": "node scripts/verify-template-manifest.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "dev": "tsc -p tsconfig.build.json --watch",
@@ -29,7 +32,9 @@
     "wrangler": ">=4.88.0"
   },
   "dependencies": {
+    "@clack/prompts": "^1.4.0",
     "@cloudflare/workers-types": "^4.20260510.1",
+    "giget": "^3.2.0",
     "workers-usage-guard-shared": "workspace:^"
   },
   "devDependencies": {

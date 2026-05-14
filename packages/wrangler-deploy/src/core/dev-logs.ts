@@ -25,6 +25,12 @@ export interface LogMultiplexer {
 
 export interface LogMultiplexerOptions {
   logDir?: string;
+  /**
+   * Called once per non-empty line, with the workerPath that emitted it. Used by
+   * `wd dev --json` to forward worker output as NDJSON `worker.log` events.
+   * Failures are swallowed so the dev process is never killed by a tap.
+   */
+  onLine?: (workerPath: string, line: string) => void;
 }
 
 export function logFilePathForTarget(logDir: string, target: string): string {
@@ -62,6 +68,13 @@ export function createLogMultiplexer(
           output(`${prefix}${line}`);
           if (logFile) {
             appendFileSync(logFile, `${line}\n`);
+          }
+          if (options?.onLine && line.length > 0) {
+            try {
+              options.onLine(workerPath, line);
+            } catch {
+              // never let a tap kill the dev process
+            }
           }
         }
       };

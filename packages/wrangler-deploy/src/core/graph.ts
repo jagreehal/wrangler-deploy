@@ -1,4 +1,5 @@
 import type { CfStageConfig } from "../types.js";
+import { AgentErrors } from "./cli-output.js";
 
 export interface GraphNode {
   id: string;
@@ -65,9 +66,10 @@ export function validateGraph(nodes: GraphNode[]): void {
   for (const node of nodes) {
     for (const dep of node.dependsOn) {
       if (!nodeIds.has(dep)) {
-        throw new Error(
+        throw AgentErrors.config(
           `Invalid dependency: "${node.id}" depends on "${dep}" which is not declared in the config. ` +
-          `Check that "${dep}" exists in workers or resources.`
+          `Check that "${dep}" exists in workers or resources.`,
+          `Add "${dep}" to config.workers or config.resources, or remove the reference from "${node.id}".`,
         );
       }
     }
@@ -87,9 +89,10 @@ export function topologicalSort(nodes: GraphNode[]): GraphNode[] {
   function visit(id: string, path: string[]) {
     if (inStack.has(id)) {
       const cycle = [...path.slice(path.indexOf(id)), id];
-      throw new Error(
+      throw AgentErrors.config(
         `Circular dependency detected: ${cycle.join(" -> ")}. ` +
-        `Break the cycle by removing a service binding or restructuring the dependency.`
+        `Break the cycle by removing a service binding or restructuring the dependency.`,
+        "Break the cycle by removing a service binding or restructuring dependencies.",
       );
     }
 
@@ -133,10 +136,11 @@ export function validateDeployOrder(order: string[], config: CfStageConfig): voi
       if (targetPos === undefined) continue;
 
       if (targetPos > workerPos) {
-        throw new Error(
+        throw AgentErrors.config(
           `Invalid deployOrder: "${workerPath}" is scheduled before "${targetWorker}" ` +
           `but depends on it via service binding "${bindingName}". ` +
-          `Move "${targetWorker}" earlier in deployOrder, or remove deployOrder to auto-infer.`
+          `Move "${targetWorker}" earlier in deployOrder, or remove deployOrder to auto-infer.`,
+          `Move "${targetWorker}" earlier in deployOrder, or remove deployOrder to auto-infer.`,
         );
       }
     }
@@ -162,17 +166,19 @@ export function resolveDeployOrder(config: CfStageConfig): string[] {
 
     const missing = config.workers.filter((w) => !ordered.has(w));
     if (missing.length > 0) {
-      throw new Error(
+      throw AgentErrors.config(
         `deployOrder is missing workers: ${missing.join(", ")}. ` +
-        `All workers in config.workers must be listed, or remove deployOrder to auto-infer.`
+        `All workers in config.workers must be listed, or remove deployOrder to auto-infer.`,
+        "Add the missing workers to deployOrder, or remove deployOrder to auto-infer.",
       );
     }
 
     const extras = config.deployOrder.filter((w) => !declared.has(w));
     if (extras.length > 0) {
-      throw new Error(
+      throw AgentErrors.config(
         `deployOrder contains unknown workers: ${extras.join(", ")}. ` +
-        `Every entry must be declared in config.workers.`
+        `Every entry must be declared in config.workers.`,
+        "Remove the unknown entries from deployOrder, or add them to config.workers.",
       );
     }
 

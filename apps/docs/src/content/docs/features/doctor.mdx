@@ -3,19 +3,20 @@ title: Doctor
 description: Diagnose common setup problems
 ---
 
-Run this when something isn't working and you're not sure where to start. Good first step after upgrading wrangler, onboarding a new team member, or seeing a CI failure you can't explain.
+Run this when something isn't working and you're not sure where to start. It's also the safest first command in a new directory — `wd doctor` does not require a `wrangler-deploy.config.ts`, so it can verify your environment before you have a project.
 
 ## Usage
 
 ```bash
 $ wd doctor
+
   wrangler-deploy doctor
 
-  ✓ wrangler installed: wrangler 4.80.0
-  ✓ wrangler auth: logged in as jag.reehal@gmail.com
-  ✓ worker path: workers/api exists
-  ✓ worker path: workers/batch-workflow exists
-  ✓ worker path: workers/event-router exists
+  ✓ wrangler installed: wrangler 4.88.0
+  ✓ wrangler auth: you@example.com (account Your Account)
+  ✓ worker path: workers/api: workers/api exists
+  ✓ worker path: workers/batch-workflow: workers/batch-workflow exists
+  ✓ worker path: workers/event-router: workers/event-router exists
   ✓ config valid: No config errors
 ```
 
@@ -23,22 +24,45 @@ When something is wrong, you'll see it:
 
 ```bash
 $ wd doctor
+
   wrangler-deploy doctor
 
-  ✓ wrangler installed: wrangler 4.80.0
-  ✗ wrangler auth: not logged in
-  ✓ worker path: workers/api exists
-  ✗ worker path: workers/events: no wrangler.jsonc or wrangler.json
-  ✗ config valid: 2 errors
-    Resource "dlq" has deadLetterFor referencing "cache-kv" which is type "kv", not a queue
-    serviceBindings has unknown target worker "workers/missing"
+  ✓ wrangler installed: wrangler 4.88.0
+  ✗ wrangler auth: not authenticated
+  ✓ worker path: workers/api: workers/api exists
+  ✗ worker path: workers/events: workers/events not found
+  ✗ config error: Resource "dlq" deadLetterFor references "cache-kv" which is type "kv", not a queue
+  ✗ config error: serviceBindings has unknown target worker "workers/missing"
+```
+
+In an empty directory with no config, doctor surfaces the missing config as a warning rather than failing:
+
+```bash
+$ wd doctor
+
+  wrangler-deploy doctor
+
+  ✓ wrangler installed: wrangler 4.88.0
+  ✓ wrangler auth: you@example.com (account Your Account)
+  ✓ config valid: No config errors
+  ⚠ wrangler-deploy config: no wrangler-deploy.config.ts found in this directory
+    Run `wd create vite <name>` to scaffold a starter, or `wd init` if you already have wrangler.jsonc files.
 ```
 
 ## What it checks
 
 | Check | What it verifies |
 | ----- | --------------- |
-| wrangler version | `wrangler` is installed and reachable |
-| wrangler auth | `wrangler whoami` succeeds (catches expired tokens) |
-| worker paths | each declared worker has a `wrangler.jsonc` or `wrangler.json` on disk |
+| wrangler installed | `wrangler` is installed and reachable |
+| wrangler auth | `wrangler whoami` succeeds — surfaces the logged-in email and account |
+| wrangler-deploy config | Reports a warning if `wrangler-deploy.config.ts` is missing |
+| worker paths | Each declared worker has a `wrangler.jsonc` or `wrangler.json` on disk |
 | config validation | `wrangler-deploy.config.ts` has no errors — dead-letter refs, unknown workers, invalid bindings |
+
+## Flags
+
+- `--codes` — adds a `WD_DOC_*` code to each check (useful with `--json` for agents)
+- `--strict` — exits non-zero if any check is `warn` or `fail`
+- `--fix` — writes safe defaults: `accountId` from `CLOUDFLARE_ACCOUNT_ID`, default stage in `.wdrc`, generated config from existing wrangler files
+- `--fix-dry-run` — preview what `--fix` would write without changing the filesystem
+- `--json` — full check list as a structured envelope

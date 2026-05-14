@@ -1,4 +1,5 @@
 import { cfApi as defaultCfApi, type CloudflareApiOptions } from "./cloudflare-api.js";
+import { AgentErrors } from "../core/cli-output.js";
 
 export type CfApiFn = typeof defaultCfApi;
 
@@ -11,6 +12,6 @@ export async function deleteWorker(
     method: "DELETE",
   });
   if (!res.ok && res.status !== 404) {
-    throw new Error(`Failed to delete worker "${name}": ${res.status}`);
+    throw AgentErrors.network(`Failed to delete worker "${name}": ${res.status}`, "Inspect the error and retry if transient.");
   }
 }

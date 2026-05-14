@@ -701,6 +701,14 @@ body {
   font-family: var(--font-mono);
 }
 
+.outcome-tag {
+  background: var(--status-fail-bg, color-mix(in srgb, var(--destructive, #ef4444) 12%, transparent));
+  color: var(--destructive, #b91c1c);
+  border-color: color-mix(in srgb, var(--destructive, #ef4444) 35%, transparent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .scenario-duration {
   font-size: 0.75rem;
   color: var(--muted-foreground);
@@ -1465,6 +1473,63 @@ body {
 }
 
 /* ============================================================================
+   Documentation Entries - Visual Check
+   ============================================================================ */
+.doc-visual {
+  margin-bottom: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--muted, transparent);
+}
+
+.doc-visual:last-child {
+  margin-bottom: 0;
+}
+
+.doc-visual-header {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.doc-visual-status {
+  font-size: 0.6875rem;
+  font-family: var(--font-mono);
+  font-weight: 500;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  background: var(--tag-bg);
+  color: var(--tag-color);
+  border: 1px solid var(--tag-border);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.doc-visual-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.5rem;
+}
+
+.doc-visual-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.doc-visual-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ============================================================================
    Documentation Entries - Custom
    ============================================================================ */
 .doc-custom {
@@ -2204,6 +2269,10 @@ a.toc-title:hover {
           <span class="toc-status status-passed">✓</span>
           throws on resource creation failure and preserves partial state
         </a>
+<a class="toc-scenario" href="#scenario-66d18d12e30f">
+          <span class="toc-status status-passed">✓</span>
+          preserves prior deployment metadata on re-apply
+        </a>
 <a class="toc-scenario" href="#scenario-af8ac0440c20">
           <span class="toc-status status-passed">✓</span>
           removes workers from state that are no longer declared in the manifest
@@ -2311,6 +2380,14 @@ a.toc-title:hover {
         <a class="toc-scenario" href="#scenario-127cb858d8b8">
           <span class="toc-status status-passed">✓</span>
           deploys each worker from its own directory
+        </a>
+<a class="toc-scenario" href="#scenario-a64454ab4c78">
+          <span class="toc-status status-passed">✓</span>
+          parses deploy output URLs/routes/version and persists them to state
+        </a>
+<a class="toc-scenario" href="#scenario-979dce7a68d0">
+          <span class="toc-status status-passed">✓</span>
+          parses alternate wrangler output variants
         </a>
 <a class="toc-scenario" href="#scenario-44d7007e50bd">
           <span class="toc-status status-passed">✓</span>
@@ -3358,16 +3435,16 @@ a.toc-title:hover {
             <button type="button" class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme"></button>
           </div>
         </header>
-        <dl class="meta-info"><dt>Started:</dt><dd>2026-05-13T22:17:20.242Z</dd><dt>Duration:</dt><dd>2.65s</dd><dt>Version:</dt><dd>1.4.3</dd><dt>Git:</dt><dd>c192ef4</dd></dl>
+        <dl class="meta-info"><dt>Started:</dt><dd>2026-05-14T21:40:39.476Z</dd><dt>Duration:</dt><dd>5.16s</dd><dt>Version:</dt><dd>1.4.4</dd><dt>Git:</dt><dd>9cc672f</dd></dl>
 
 <div class="summary">
   <div class="summary-card">
     <div class="label">Total</div>
-    <div class="value">247</div>
+    <div class="value">250</div>
   </div>
   <div class="summary-card passed">
     <div class="label">Passed</div>
-    <div class="value">247</div>
+    <div class="value">250</div>
   </div>
   <div class="summary-card failed">
     <div class="label">Failed</div>
@@ -3987,7 +4064,7 @@ a.toc-title:hover {
       <div class="feature-path">src/core/apply.test.ts</div>
     </div>
     <div class="feature-stats">
-      <span class="stat passed">✓ 13</span>
+      <span class="stat passed">✓ 14</span>
       <span class="stat failed">✗ 0</span>
       <span class="stat skipped">○ 0</span>
       <span class="chevron">▼</span>
@@ -4343,6 +4420,45 @@ a.toc-title:hover {
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Then</span>
   <span class="step-text">the KV resource should still be persisted in state as created</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-66d18d12e30f">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">preserves prior deployment metadata on re-apply</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <div class="scenario-actions">
+      <button class="copy-scenario-btn" onclick="copyScenarioAsMarkdown('scenario-66d18d12e30f')" aria-label="Copy scenario as markdown" title="Copy as Markdown"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+      <button class="permalink-anchor" onclick="copyPermalink('scenario-66d18d12e30f')" aria-label="Copy link to scenario" title="Copy link">#</button>
+      <span class="scenario-duration"></span>
+    </div>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step" data-keyword="Given" data-text="state where the worker has already been deployed (url + deployed=true + versionId)">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">state where the worker has already been deployed (url + deployed=true + versionId)</span>
+  <span class="step-duration"></span>
+</div><div class="step" data-keyword="When" data-text="apply is re-run">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">apply is re-run</span>
+  <span class="step-duration"></span>
+</div><div class="step" data-keyword="Then" data-text="deployment metadata is retained, not stripped">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">deployment metadata is retained, not stripped</span>
   <span class="step-duration"></span>
 </div></div>
     
@@ -5151,7 +5267,7 @@ a.toc-title:hover {
       <div class="feature-path">src/core/deploy.test.ts</div>
     </div>
     <div class="feature-stats">
-      <span class="stat passed">✓ 2</span>
+      <span class="stat passed">✓ 4</span>
       <span class="stat failed">✗ 0</span>
       <span class="stat skipped">○ 0</span>
       <span class="chevron">▼</span>
@@ -5192,6 +5308,54 @@ a.toc-title:hover {
   <span class="step-text">workers are deployed using wrangler</span>
   <span class="step-duration"></span>
 </div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-a64454ab4c78">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">parses deploy output URLs/routes/version and persists them to state</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <div class="scenario-actions">
+      <button class="copy-scenario-btn" onclick="copyScenarioAsMarkdown('scenario-a64454ab4c78')" aria-label="Copy scenario as markdown" title="Copy as Markdown"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+      <button class="permalink-anchor" onclick="copyPermalink('scenario-a64454ab4c78')" aria-label="Copy link to scenario" title="Copy link">#</button>
+      <span class="scenario-duration"></span>
+    </div>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-979dce7a68d0">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">parses alternate wrangler output variants</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <div class="scenario-actions">
+      <button class="copy-scenario-btn" onclick="copyScenarioAsMarkdown('scenario-979dce7a68d0')" aria-label="Copy scenario as markdown" title="Copy as Markdown"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+      <button class="permalink-anchor" onclick="copyPermalink('scenario-979dce7a68d0')" aria-label="Copy link to scenario" title="Copy link">#</button>
+      <span class="scenario-duration"></span>
+    </div>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"></div>
     
     
     

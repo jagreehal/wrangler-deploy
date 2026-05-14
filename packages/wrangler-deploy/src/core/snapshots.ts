@@ -2,6 +2,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statS
 import { basename, dirname, isAbsolute, relative, resolve } from "node:path";
 import type { CfStageConfig } from "../types.js";
 import { resolveDevLogDir, resolveDevStatePath } from "./dev-runtime-state.js";
+import { AgentErrors } from "./cli-output.js";
 
 export interface SnapshotSource {
   relativePath: string;
@@ -35,7 +36,7 @@ export function resolveSnapshotPath(rootDir: string, name: string): string {
 function sanitizeSnapshotName(name: string): string {
   const value = name.trim();
   if (!value || value.includes("..") || value.includes("/") || value.includes("\\")) {
-    throw new Error(`Invalid snapshot name "${name}"`);
+    throw AgentErrors.validation(`Invalid snapshot name "${name}"`, "Use a snapshot name without slashes, backslashes, or `..`.");
   }
   return value;
 }
@@ -81,7 +82,7 @@ export function saveSnapshot(
 
   const sources = resolveSnapshotSources(config, rootDir).filter((source) => source.exists);
   if (sources.length === 0) {
-    throw new Error("No local state paths found to snapshot.");
+    throw AgentErrors.notFound("No local state paths found to snapshot.", "Run `wd dev` to create local state, or configure dev.snapshots.paths.");
   }
 
   const manifest: SnapshotManifest = {
@@ -113,7 +114,7 @@ export function loadSnapshot(rootDir: string, name: string): SnapshotSummary {
   const snapshotDir = resolveSnapshotPath(rootDir, snapshotName);
   const manifestPath = resolve(snapshotDir, "manifest.json");
   if (!existsSync(manifestPath)) {
-    throw new Error(`Unknown snapshot "${snapshotName}"`);
+    throw AgentErrors.notFound(`Unknown snapshot "${snapshotName}"`, "Run `wd snapshot list` to see saved snapshots.");
   }
 
   const manifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as SnapshotManifest;

@@ -30,30 +30,54 @@ $ wd create vite my-app
 - `--force` allows overwriting existing files in the target directory
 - `--json` returns the scaffold summary as machine-readable output
 
-## `wd context [get|set|unset|clear]`
+## `wd context [get|set|unset|clear|doctor|export|import]`
 
 Manage project-level defaults in a `.wdrc` or `.wdrc.json` file at or above the repo root. This is useful when you want to stop repeating the same stage, account, or dev settings on every command.
 
 ```bash
+# Show everything (also runs as plain `wd context`)
+$ wd context get
+
+  wrangler-deploy context
+
+  file: /repo/.wdrc
+  stage: "staging"
+  accountId: "1234567890abcdef1234567890abcdef"
+
+# Read a single value
 $ wd context get stage
-  staging
 
+  wrangler-deploy context get
+
+  stage: "staging"
+
+# Set defaults — merges into the nearest existing file or creates one
 $ wd context set --stage staging --account-id 1234567890abcdef1234567890abcdef
-  file: /repo/.wdrc
 
+  wrangler-deploy context set
+
+  file: /repo/.wdrc
+  stage: "staging"
+  accountId: "1234567890abcdef1234567890abcdef"
+
+# Remove specific keys
 $ wd context unset --account-id
-  file: /repo/.wdrc
 
+# Remove the file entirely
 $ wd context clear
-  file: /repo/.wdrc
-  defaults cleared
 ```
 
-- `wd context get <key>` reads a single resolved default value
-- `wd context set` merges new defaults into the nearest existing context file or creates `.wdrc` at the repo root
-- `wd context unset` removes one or more keys from the file without touching the rest
+Subcommands:
+
+- `wd context get [<key>]` reads everything (no key) or a single value
+- `wd context set --<key> <value>` merges new defaults into `.wdrc`
+- `wd context unset --<key>` removes one or more keys
 - `wd context clear` removes the file entirely
-- `--json` works for all four subcommands when you want machine-readable output
+- `wd context doctor` shows the resolved values and where each came from (flag, env, `.wdrc`, default)
+- `wd context export` / `wd context import --file <path>` round-trip the config across machines
+- `--json` works for all subcommands
+
+Valid keys: `stage`, `fallbackStage`, `basePort`, `filter`, `session`, `persistTo`, `accountId`, `databaseUrl`, `statePassword`, `telemetry`.
 
 ## `wd init`
 
@@ -61,13 +85,19 @@ Scan your local Wrangler configs and generate `wrangler-deploy.config.ts`. Run t
 
 ```bash
 $ wd init
-  ✓ Found workers/api/wrangler.jsonc
-  ✓ Found workers/batch-workflow/wrangler.jsonc
-  ✓ Found workers/event-router/wrangler.jsonc
-  ✓ Generated wrangler-deploy.config.ts
+
+  Generated wrangler-deploy.config.ts from /repo
+
+  Next:
+
+    wd context set --stage <name>   Set default stage
+    wd plan                         Preview what will be created
+    wd apply                        Provision resources
+    wd deploy                       Deploy workers
+    wd status                       Verify everything is live
 ```
 
-Your checked-in Wrangler files are not modified.
+If no `wrangler.jsonc` files are found, the error suggests `wd create vite <name>` instead. Your checked-in Wrangler files are not modified.
 
 ## `wd introspect [--filter <prefix>] [--dry-run]`
 
@@ -111,16 +141,44 @@ Provision resources in Cloudflare. This step is idempotent, so it is safe to run
 
 ```bash
 $ wd apply --stage pr-42
-  + payments-db-pr-42 (d1) created
-  + token-kv-pr-42 (kv) created
-  + cache-kv-pr-42 (kv) created
-  + payment-outbox-pr-42 (queue) created
-  + payment-outbox-dlq-pr-42 (queue) created
 
-  ✓ 5 resources applied
+  + creating payments-db-pr-42 (d1)...
+    created (id: ad7171e9-118a-409c-8a0f-7383e823a098)
+  + creating token-kv-pr-42 (kv)...
+    created (id: a83b9d510419478fbd9f99c8ccca7388)
+  + creating cache-kv-pr-42 (kv)...
+    created (id: d5ce65080cd44fe196ffcd6a222ff9a0)
+  + creating payment-outbox-pr-42 (queue)...
+    created
+  + creating payment-outbox-dlq-pr-42 (queue)...
+    created
+
+  ─── pr-42 apply summary ───
+
+  Created (5):
+    + payments-db-pr-42 (d1, id: ad7171e9-…)
+    + token-kv-pr-42 (kv, id: a83b9d…)
+    + cache-kv-pr-42 (kv, id: d5ce65…)
+    + payment-outbox-pr-42 (queue)
+    + payment-outbox-dlq-pr-42 (queue)
+
+  Workers ready for deploy (3):
+    workers/api-pr-42
+    workers/batch-workflow-pr-42
+    workers/event-router-pr-42
+
+  Rendered configs:
+    .wrangler-deploy/pr-42/workers/api/wrangler.rendered.jsonc
+    .wrangler-deploy/pr-42/workers/batch-workflow/wrangler.rendered.jsonc
+    .wrangler-deploy/pr-42/workers/event-router/wrangler.rendered.jsonc
+  State: .wrangler-deploy/pr-42/state.json
+
+  Next:
+    - wd deploy --stage pr-42
+    - wd status --stage pr-42
 ```
 
-`--database-url` is required for Hyperdrive on first apply (it needs a Postgres connection string).
+`--database-url` is required for Hyperdrive on first apply (it needs a Postgres connection string). Re-running `apply` against an already-deployed stage preserves the per-worker `deployed`/`url` state recorded by the last `wd deploy`.
 
 ## `wd deploy --stage <name> [--verify]`
 
@@ -128,21 +186,52 @@ Deploy workers using rendered configs with real resource IDs. Workers are deploy
 
 ```bash
 $ wd deploy --stage pr-42
-  Deploying workers/batch-workflow...
-  ✓ payment-batch-workflow-pr-42 deployed
-  Deploying workers/event-router...
-  ✓ payment-event-router-pr-42 deployed
-  Deploying workers/api...
-  ✓ payment-api-pr-42 deployed
+
+  deploying payment-batch-workflow-pr-42...
+    Uploaded payment-batch-workflow-pr-42 (5.2 sec)
+    Deployed payment-batch-workflow-pr-42 triggers (3.1 sec)
+      https://payment-batch-workflow-pr-42.you.workers.dev
+    Current Version ID: 3519f525-…
+
+  deploying payment-api-pr-42...
+    Uploaded payment-api-pr-42 (9.2 sec)
+    Deployed payment-api-pr-42 triggers (5.6 sec)
+      https://payment-api-pr-42.you.workers.dev
+    Current Version ID: 32f94f3c-…
+
+  deploying payment-event-router-pr-42...
+    Uploaded payment-event-router-pr-42 (8.1 sec)
+    Deployed payment-event-router-pr-42 triggers (11.4 sec)
+      https://payment-event-router-pr-42.you.workers.dev
+    Current Version ID: b401672b-…
+
+  ─── pr-42 deployment summary ───
+
+  payment-batch-workflow-pr-42
+    Status: deployed
+    Version: 3519f525-…
+    URL:  https://payment-batch-workflow-pr-42.you.workers.dev
+    Dashboard: https://dash.cloudflare.com/<acct>/workers/services/view/payment-batch-workflow-pr-42
+
+  payment-api-pr-42
+    Status: deployed
+    Version: 32f94f3c-…
+    URL:  https://payment-api-pr-42.you.workers.dev
+    Dashboard: https://dash.cloudflare.com/<acct>/workers/services/view/payment-api-pr-42
+
+  payment-event-router-pr-42
+    Status: deployed
+    Version: b401672b-…
+    URL:  https://payment-event-router-pr-42.you.workers.dev
+    Dashboard: https://dash.cloudflare.com/<acct>/workers/services/view/payment-event-router-pr-42
+
+  Next:
+    - wd status --stage pr-42
+    - wd open --stage pr-42 --worker workers/api
+    - wd dashboard --stage pr-42 --worker workers/api
 ```
 
-`--verify` runs post-deploy coherence checks and fails the pipeline if anything is wrong:
-
-```bash
-$ wd deploy --stage pr-42 --verify
-  ...deployed...
-  Verification: 8 passed, 0 failed
-```
+`--verify` runs post-deploy coherence checks and fails the pipeline if anything is wrong. `--changed` scopes deploy to git-changed workers; `--latest` is the default-worker hint for `open`/`dashboard`.
 
 ## `wd destroy --stage <name> [--force]`
 
@@ -158,25 +247,52 @@ $ wd destroy --stage pr-42
 
 ## `wd status [--stage <name>]`
 
-Without `--stage`: list all known stages. With `--stage`: show resources, workers, and drift for that stage.
+Show resources, workers, and deployment URLs for a stage. With no `--stage` it falls back to your `$USER` default.
 
 ```bash
-$ wd status
-  Stages:
-    staging    (3 resources, 3 workers)
-    pr-42      (5 resources, 3 workers)
-    production (5 resources, 3 workers) [protected]
-
 $ wd status --stage staging
+
+  Stage: staging
+  Created: 2026-05-14T19:14:48.621Z
+  Updated: 2026-05-14T19:16:49.581Z
+
   Resources:
-    payments-db-staging (d1) — in-sync
-    cache-kv-staging (kv) — in-sync
-    outbox-staging (queue) — drifted
+    + payments-db-staging (d1) — created
+    + token-kv-staging (kv) — created
+    + outbox-staging (queue) — created
 
   Workers:
-    payment-api-staging — deployed
-    payment-batch-workflow-staging — deployed
+    payment-api-staging — https://payment-api-staging.you.workers.dev
+    payment-batch-workflow-staging — https://payment-batch-workflow-staging.you.workers.dev
 ```
+
+Flags:
+
+- `--json` / `--output json|ndjson` for machine consumers (full state shape including `deploymentHistory`)
+- `--summary` for one-line `stage workers=N deployed=N resources=N` format
+- `--watch [--interval-ms <ms>]` to poll for changes
+- `--fail-on-drift` to exit non-zero when state and live resources diverge
+- `--web` to open the stage in `wd dev ui`
+
+## `wd open --stage <name> [--worker <path>]`
+
+Resolve and open the deployed URL for a worker. With more than one worker, prompts interactively (or pass `--latest` to use the last-deployed one).
+
+```bash
+$ wd open --stage staging --worker workers/api
+
+  Opening https://payment-api-staging.you.workers.dev...
+
+$ wd open --stage staging --worker workers/api --print-url
+https://payment-api-staging.you.workers.dev
+
+$ wd open --stage staging --worker workers/api --copy
+  Copied https://payment-api-staging.you.workers.dev
+```
+
+## `wd dashboard --stage <name> [--worker <path>]`
+
+Like `wd open`, but jumps to the worker's Cloudflare dashboard page. Same `--print-url` / `--copy` / `--latest` flags.
 
 ## `wd guard ...`
 
@@ -373,16 +489,27 @@ Generate `x-guard-timestamp` and `x-guard-signature` headers for a manual `curl`
 
 ## `wd verify --stage <name>`
 
-Read-only coherence check. Validates state against live resources, rendered configs, workers, secrets, and service bindings. Use this in CI after deploy, or manually to check if everything is still consistent.
+Read-only coherence check. Validates state against live resources, rendered configs, workers, secrets, and service bindings. Use this in CI after deploy, or manually to check if everything is still consistent. Each check appears on its own line so failures point at the specific resource:
 
 ```bash
 $ wd verify --stage staging
-  ✓ State file exists
-  ✓ All resources in sync
-  ✓ All workers deployed
-  ✓ All secrets set
-  ✓ Service bindings valid
-  Verification: 5 passed, 0 failed
+
+  wrangler-deploy verify --stage staging
+
+  + State file exists
+  + Rendered config: workers/api
+  + Rendered config: workers/batch-workflow
+  + Resource: payments-db-staging
+  + Resource: token-kv-staging
+  + Resource: outbox-staging
+  + Manifest resource in state: payments-db
+  + Manifest resource in state: token-kv
+  + Manifest resource in state: outbox
+  + Worker registered: workers/api — payment-api-staging
+  + Worker registered: workers/batch-workflow — payment-batch-workflow-staging
+  + Service binding: workers/api.WORKFLOWS -> workers/batch-workflow
+
+  12 passed, 0 failed
 ```
 
 ## `wd verify local`
@@ -971,19 +1098,63 @@ Post a GitHub check run with success/failure status. If no state exists for the 
 
 ## `wd doctor`
 
-Run diagnostic checks. Use when setting up a new project, after upgrading wrangler, or when CI fails unexpectedly.
+Run diagnostic checks. Use when setting up a new project, after upgrading wrangler, or when CI fails unexpectedly. Safe to run in a directory without a `wrangler-deploy.config.ts` — it just reports what's missing.
 
 ```bash
 $ wd doctor
+
   wrangler-deploy doctor
 
-  ✓ wrangler installed: wrangler 4.80.0
-  ✓ wrangler auth: logged in as jag.reehal@gmail.com
-  ✓ worker path: workers/api exists
-  ✓ worker path: workers/batch-workflow exists
-  ✓ worker path: workers/event-router exists
+  ✓ wrangler installed: wrangler 4.88.0
+  ✓ wrangler auth: you@example.com (account Your Account)
+  ✓ worker path: workers/api: workers/api exists
+  ✓ worker path: workers/batch-workflow: workers/batch-workflow exists
+  ✓ worker path: workers/event-router: workers/event-router exists
   ✓ config valid: No config errors
 ```
+
+In an empty directory, doctor surfaces the missing config with a warning rather than failing:
+
+```bash
+$ wd doctor
+
+  ✓ wrangler installed: wrangler 4.88.0
+  ✓ wrangler auth: you@example.com (account Your Account)
+  ⚠ wrangler-deploy config: no wrangler-deploy.config.ts found in this directory
+    Run `wd create vite <name>` to scaffold a starter, or `wd init` if you already have wrangler.jsonc files.
+```
+
+Flags:
+
+- `--codes` adds a `WD_DOC_*` code alongside each check (useful in `--json` for agents)
+- `--strict` exits non-zero on any warning
+- `--fix` writes safe defaults (`accountId` from env, default stage in `.wdrc`)
+- `--fix-dry-run` shows what `--fix` would do without writing
+- `--json` returns the full check list as a structured envelope
+
+## `wd explain [<code-or-message>]`
+
+Guided remediation for `WD_E_*` codes and common error messages. Run with no argument to see the full catalogue.
+
+```bash
+$ wd explain WD_E_STATE_MISSING
+
+  explain: WD_E_STATE_MISSING
+
+  The target stage has not been provisioned yet.
+
+  - Run `wd apply --stage <name>` to create stage resources and rendered configs.
+  - Run `wd status` to list available stages.
+  - Set a default via `wd context set --stage <name>` to avoid repeats.
+```
+
+Flags:
+
+- `--from-last-error` explains the most recent failure (`.wrangler-deploy/last-error.json`)
+- `--error-code <code>` is an alias for passing a code positionally
+- `--json` returns the explanation as a structured envelope
+
+Every command failure prints a hint like *Run `wd explain WD_E_STATE_MISSING` for more detail*, so you can jump straight here.
 
 ## `wd configure / login / logout / profile`
 
@@ -1048,15 +1219,160 @@ wd create vibe-rules all                  # everything (claude-code, cursor,
 
 Pass `--force` to overwrite existing files.
 
+## `wd version [--json]`
+
+Print the installed version. With `--json`, returns full binary metadata for
+agents:
+
+```json
+{
+  "package": "wrangler-deploy",
+  "version": "1.4.4",
+  "manifestVersion": 1,
+  "binaryPath": "/usr/local/bin/wd",
+  "node": "v24.12.0",
+  "platform": "darwin",
+  "arch": "arm64",
+  "sandbox": false,
+  "timestamp": "2026-05-14T20:33:59.526Z"
+}
+```
+
+## `wd schema [outputs|config|errors] [--versioned] [--command <name>]`
+
+The agent discovery surface — see [I/O and schemas](/wrangler-deploy/agents/io)
+for the full agent-facing story.
+
+```bash
+wd schema --json                              # full CLI manifest
+wd schema --versioned --json                  # manifest + outputs + config in one envelope
+wd schema outputs --json                      # output schemas for every JSON-emitting command
+wd schema outputs --command deploy --json     # output schema for one command
+wd schema outputs --command devEvent --json   # NDJSON event schema for `wd dev --json`
+wd schema config --json                       # JSON Schema for wrangler-deploy.config.ts
+wd schema errors --json                       # error envelope schema + WD_E_* codes
+```
+
+## `wd tools [--json]`
+
+Compact metadata view derived from the manifest. One entry per command with
+`name`, `description`, `mutating`, `output`, `flags`, `subcommands`. Designed
+for agents that want to register every command as a tool without parsing the
+full manifest.
+
+## `wd examples [--command <name>] [--json]`
+
+Copy-pasteable example invocations for a command. Without `--command`, lists
+every command that has examples.
+
+```bash
+wd examples --json
+wd examples --command deploy --json
+```
+
+Each set has a `summary` and an array of `{ description, command, notes? }`.
+
+## `wd sandbox [info|run] [--allow-host <pattern>] [--no-network-filter] [--json]`
+
+Detect or invoke an OS-level sandbox. See [Sandbox](/wrangler-deploy/agents/sandbox).
+
+```bash
+wd sandbox info --json                                   # what sandbox kind is available?
+wd sandbox run -- wd apply --stage staging               # run a command sandboxed
+wd sandbox run --allow-host my-cdn.com -- wd deploy ...  # extend the network allowlist
+wd sandbox run --no-network-filter -- ...                # disable proxy filtering
+```
+
+On macOS uses `sandbox-exec` (ships with the OS). On Linux uses `bwrap`
+(install via `apt install bubblewrap`). Windows returns `WD_E_SANDBOX_BLOCKED`.
+
+Outbound HTTP(S) is funneled through a local proxy that enforces a hostname
+allowlist (Cloudflare, npm, GitHub, loopback by default). Use `--allow-host`
+(repeatable) to extend it; pass `*` or `--no-network-filter` to disable
+filtering entirely. Pattern syntax: `.cloudflare.com` matches any subdomain;
+exact strings match exactly.
+
+## `wd macro [list|save|run|validate]`
+
+Save and run reusable command sequences.
+
+```bash
+wd macro save smoke "wd check --stage staging && wd verify --stage staging"
+wd macro save smoke "..." --dry-run --json   # preview the save
+wd macro list --json
+wd macro run smoke
+wd macro run smoke --dry-run --json          # show what it would run
+wd macro validate --json                     # check macros reference real commands
+```
+
+Macros are stored in `.wrangler-deploy/macros.json`.
+
 ## Global options
 
-- `--profile <name>` — pick a profile (also reads `WD_PROFILE`/`CLOUDFLARE_PROFILE`)
-- `--cwd <path>` — run against a different project directory
-- `--env-file <path>` — load `.env`-style file before resolving env vars
-- `--quiet`, `-q` — suppress non-error output
-- `--stage <name>` — defaults to `$USER` (or `WD_STAGE` if set)
-- `--force` — apply: re-run lifecycle even when state shows in-sync
-- `--watch` — apply/deploy: re-run when config files change
+The CLI accepts these flags everywhere. Several are also driven by environment
+variables for non-interactive / agent use.
+
+### Output
+
+| Flag | Notes |
+| --- | --- |
+| `--json` / `--ndjson` | Machine-readable output |
+| `--fields a,b.c` | Project JSON output to dot-paths |
+| `--output-file <path>` | Persist the first JSON payload to disk (any JSON-emitting command) |
+| `--quiet`, `-q` | Suppress non-error human output |
+| `--no-color` (or `NO_COLOR=1`) | Strip ANSI colour codes |
+
+### Input
+
+| Flag | Notes |
+| --- | --- |
+| `--input <path \| ->` | Read JSON from a file or stdin (currently honoured by `plan`/`apply`/`deploy`) |
+
+### Safety
+
+| Flag / env | Notes |
+| --- | --- |
+| `--dry-run` | Preview a write without performing it (every mutating command) |
+| `--sandbox` (or `AGENT_SANDBOX=1`) | Refuse mutating commands without `--dry-run` |
+| `--no-secrets-in-output` (or `WD_NO_SECRETS=1`) | Strip secret-shaped values from JSON output |
+| `--no-interactive` (or `WD_NO_INTERACTIVE=1`) | Refuse all prompts (auto-on under CI / non-TTY / sandbox) |
+| `--force` | Apply: re-run lifecycle even when state shows in-sync; destroy: bypass stage protection |
+
+### Targeting
+
+| Flag | Notes |
+| --- | --- |
+| `--stage <name>` | Required for stage-scoped commands; falls back to `$WD_STAGE` then `$USER` |
+| `--profile <name>` | Pick an auth profile (also reads `WD_PROFILE`/`CLOUDFLARE_PROFILE`) |
+| `--cwd <path>` | Run as if from a different project directory |
+| `--env-file <path>` | Load `.env`-style file before resolving env vars |
+| `--watch` | Apply/deploy: re-run when config files change |
+
+### Exit codes
+
+| Exit code | Meaning |
+| --- | --- |
+| `0` | Success |
+| `1` | Runtime failure |
+| `2` | Validation or sandbox refusal |
+
+### Agent environment variables
+
+| Variable | Effect |
+| --- | --- |
+| `AGENT_SANDBOX=1` | Refuse mutating commands without `--dry-run`. Auto-enables `--no-interactive` and `--no-secrets-in-output`. |
+| `WD_NO_INTERACTIVE=1` | Refuse all prompts. |
+| `WD_NO_SECRETS=1` | Strip secret-shaped values from JSON. |
+| `NO_COLOR=1` | Standard no-color signal. |
+| `CI=1` / `CI=true` | Auto-enables `--no-interactive`. |
+| `CLOUDFLARE_API_TOKEN` | API token (required for `requiresAuth` commands). |
+| `CLOUDFLARE_ACCOUNT_ID` | Account ID (required for `requiresAuth` commands). |
+| `WD_STAGE` | Default stage when `--stage` is omitted. |
+| `WD_PROFILE` | Default profile when `--profile` is omitted. |
+| `WD_STATE_PASSWORD` | Password for encrypted state. |
+
+For the full agent surface (structured errors, NDJSON event streams, schemas)
+see the [Agents](/wrangler-deploy/agents/overview) section.
 
 ## `wd completions --shell zsh|bash|fish`
 

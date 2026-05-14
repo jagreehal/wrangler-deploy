@@ -1,6 +1,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { WranglerConfig } from "../types.js";
+import { AgentErrors } from "./cli-output.js";
 
 /**
  * Read and parse a wrangler.jsonc file, stripping comments.
@@ -16,11 +17,12 @@ export function readWranglerConfig(workerDir: string): WranglerConfig {
   } else if (existsSync(jsonPathAlt)) {
     filePath = jsonPathAlt;
   } else if (existsSync(tomlPath)) {
-    throw new Error(
+    throw AgentErrors.config(
       `wrangler-deploy does not support wrangler.toml. Convert to wrangler.jsonc: ${tomlPath}`,
+      "Convert wrangler.toml to wrangler.jsonc.",
     );
   } else {
-    throw new Error(`No wrangler config found in ${workerDir}`);
+    throw AgentErrors.notFound(`No wrangler config found in ${workerDir}`, "Add a wrangler.jsonc (or wrangler.json) file in the worker directory.");
   }
 
   const raw = readFileSync(filePath, "utf-8");

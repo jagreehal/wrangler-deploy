@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { AgentErrors } from "./cli-output.js";
 
 /**
  * Generate AI-agent guidance files so a fresh project gets the same
@@ -105,8 +106,9 @@ export function parseVibeTargets(value: string): VibeTarget[] {
     .filter(Boolean) as VibeTarget[];
   for (const target of targets) {
     if (!(target in TARGET_PATHS)) {
-      throw new Error(
+      throw AgentErrors.validation(
         `Unknown vibe target "${target}". Available: ${Object.keys(TARGET_PATHS).join(", ")}, all`,
+        `Use one of: ${Object.keys(TARGET_PATHS).join(", ")}, all.`,
       );
     }
   }

@@ -102,6 +102,77 @@ wd secrets  --stage <name>                 # check/set/sync secrets
 wd gc                                      # destroy expired stages
 ```
 
+### Productivity workflows
+
+```bash
+# Combined preflight (doctor + plan)
+wd check --stage staging
+wd check --stage staging --pack doctor-only
+
+# Scope deploy to changed workers in git
+wd deploy --stage staging --changed
+wd deploy --stage staging --plan-only
+
+# Scope by explicit workers/resources
+wd deploy --stage staging --only workers/api --only workers/router
+wd apply --stage staging --only-resources kv --only-resources payments-db
+
+# Safer destructive/mutating flows
+wd apply --stage staging --interactive
+wd destroy --stage pr-123 --interactive
+
+# Better open/dashboard ergonomics
+wd open --stage staging --latest
+wd open --stage staging --worker workers/api --copy
+wd dashboard --stage staging --latest --print-url
+
+# Live status and compact summary
+wd status --stage staging --watch --diff --interval-ms 3000
+wd status --stage staging --summary
+
+# Logs for automation/humans
+wd logs workers/api --since 10m --once
+wd logs workers/api --json --since 15m
+wd logs workers/api --json --tail 200 --grep-json level
+
+# Explain failures from the latest run
+wd explain --from-last-error
+wd explain --error-code WD_E_STATE_MISSING
+
+# Rollback
+wd rollback list --stage staging --worker workers/api
+wd rollback --stage staging --worker workers/api --version <version-id>
+wd rollback --stage staging --worker workers/api --version <version-id> --dry-run
+wd rollback --stage staging --worker workers/api --latest --verify
+
+# Deployment/rollback history
+wd history --stage staging
+wd history --stage staging --worker workers/api
+
+# Reusable command macros
+wd macro save smoke "wd check --stage staging && wd verify --stage staging"
+wd macro list
+wd macro run smoke
+wd macro run smoke --dry-run
+wd macro validate
+
+# First-run scaffolding and quick flow
+wd init --preset monorepo
+wd quickstart --stage dev
+wd context export --json > context.json
+wd context import --file context.json
+wd release-note --stage staging
+wd release-note --stage staging --mark-success
+
+# Profile/account diagnostics
+wd profile test --profile default
+
+# Versioned machine schema
+wd schema --versioned
+wd schema outputs
+wd schema outputs --command open
+```
+
 Local runtime workflows are first-class too:
 
 ```bash
@@ -123,6 +194,14 @@ wd queue send --fixture payment-outbox-dispatch
 wd queue replay payment-outbox --file fixtures/payment-outbox.json
 wd queue tail payment-outbox
 wd verify local --pack smoke
+```
+
+Telemetry is opt-in and local-only:
+
+```bash
+wd telemetry on
+wd telemetry status
+wd telemetry off
 ```
 
 ## Guard commands
@@ -224,6 +303,8 @@ OAuth stores a default account in `~/.wrangler/config/default.toml`. An API toke
 ## Docs
 
 [Full documentation](https://jagreehal.github.io/wrangler-deploy/) — authentication and account resolution order, PR previews, CI/CD, each resource type, and the config reference.
+
+For upgrade guidance on the latest command/flag additions, see [`docs/MIGRATION-1.5.0.md`](./docs/MIGRATION-1.5.0.md).
 
 ## License
 

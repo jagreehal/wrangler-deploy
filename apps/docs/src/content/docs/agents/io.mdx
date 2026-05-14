@@ -1,0 +1,199 @@
+---
+title: I/O and schemas
+description: --json, --ndjson, --fields, --output-file, --input, and the schema introspection surface
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+This page covers everything an agent needs to read and write data with
+`wrangler-deploy`.
+
+## Output: `--json` and `--ndjson`
+
+Every command that has a structured result supports `--json`. The output is
+written to stdout as a single JSON document:
+
+```bash
+wd plan --stage staging --json
+```
+
+For list-style commands (and the [dev event stream](/wrangler-deploy/agents/dev-events)),
+use `--ndjson` to get one object per line:
+
+```bash
+wd status --ndjson
+wd dev --ndjson
+```
+
+The schema for any command's output is queryable:
+
+```bash
+wd schema outputs --json                       # every command
+wd schema outputs --command apply --json       # one command
+wd schema outputs --command devEvent --json    # dev event stream
+```
+
+## Field projection: `--fields`
+
+Pass a comma-separated list of dot-paths to project the output. Useful for
+keeping JSON small when only a few keys matter:
+
+```bash
+wd status --stage staging --json --fields stage,workers.api.url
+```
+
+Nested objects and arrays are honoured. Missing paths are silently dropped.
+
+## Persisting output: `--output-file`
+
+Pass `--output-file <path>` and the first JSON payload emitted by the command
+will also be written to that path:
+
+```bash
+wd plan --stage staging --json --output-file .wrangler-deploy/plans/staging.json
+wd deploy --stage staging --json --output-file .wrangler-deploy/deploys/staging.json
+```
+
+Works on every JSON-emitting command — it's wired into `printJson` itself,
+not per-command code. For commands that emit multiple ticks (like
+`status --watch`), only the first tick is persisted to avoid churn.
+
+The directory is created if missing. Existing files are overwritten.
+
+<Aside type="tip">
+  Use this to build a deterministic audit trail. Pair it with `--no-secrets-in-output`
+  to keep the on-disk artifacts safe to commit or share.
+</Aside>
+
+## Reading input: `--input`
+
+Pass `--input <path>` to read JSON from a file, or `--input -` to read from stdin:
+
+```bash
+echo '{"only":["workers/api"],"onlyResources":["kv"]}' | \
+  wd plan --stage staging --input - --json
+
+wd deploy --stage staging --input deploy-targets.json --json
+```
+
+Currently honoured by `plan`, `apply`, and `deploy`. Recognised keys merge
+with CLI flags:
+
+| Key | Equivalent flag |
+| --- | --- |
+| `only` (string[]) | `--only` (repeatable) |
+| `onlyResources` (string[]) | `--only-resources` (repeatable) |
+| `stage` (string) | `--stage` (CLI flag still wins) |
+
+Invalid JSON returns a structured error:
+
+```json
+{
+  "ok": false,
+  "command": "wd plan",
+  "error": {
+    "type": "validation",
+    "code": "WD_E_VALIDATION",
+    "message": "--input file ... is not valid JSON: ...",
+    "retryable": false,
+    "fix": "Validate the JSON file."
+  }
+}
+```
+
+## Secret redaction: `--no-secrets-in-output`
+
+Pass `--no-secrets-in-output` (or set `WD_NO_SECRETS=1`, or `AGENT_SANDBOX=1`)
+to strip secret-shaped values from JSON output before it goes to stdout *and*
+to disk:
+
+- Any object key matching `*SECRET*`, `*TOKEN*`, `*PASSWORD*`, `*KEY*`, `*API_KEY*`, `*PRIVATE*` (case-insensitive) becomes `[REDACTED]`
+- Any standalone string of 40+ alphanumeric characters becomes `[REDACTED]`
+
+This redaction happens in `printJson` so it covers both stdout and `--output-file`
+artifacts.
+
+## Schema introspection
+
+The CLI publishes four kinds of schema:
+
+### CLI manifest
+
+```bash
+wd schema --json                  # full manifest
+wd schema --versioned --json      # with schemaVersion + outputs + config bundled
+wd tools --json                   # tool metadata view (one entry per command)
+```
+
+The manifest declares per-command `flags`, `subcommands`, `mutating`,
+`requiresAuth`, `requiresStage`, `network`, `writesFiles`, `supportsDryRun`,
+and the global `agentEnvVars`/`globalFlags` lists.
+
+### Output schemas
+
+```bash
+wd schema outputs --json
+wd schema outputs --command apply --json
+wd schema outputs --command devEvent --json
+```
+
+Schemas exist for: `error`, `version`, `examples`, `plan`, `apply`, `deploy`,
+`destroy`, `status`, `verify`, `check`, `gc`, `secrets`, `doctor`, `open`,
+`dashboard`, `statusWatch`, `explain`, `history`, `rollbackList`, `devEvent`.
+
+### Config schema
+
+```bash
+wd schema config --json
+```
+
+Returns a Draft-07 JSON Schema for `wrangler-deploy.config.ts`. Use this in
+agent-generated configs to validate before writing the file.
+
+### Error schema
+
+```bash
+wd schema errors --json
+```
+
+Returns the error envelope schema plus the full list of `WD_E_*` codes and
+`error.type` enum values. See [Structured errors](/wrangler-deploy/agents/structured-errors).
+
+## Examples
+
+```bash
+wd examples --json                          # list every command that has examples
+wd examples --command deploy --json         # copy-pasteable snippets for one command
+```
+
+Each set has a `summary` and an array of `{ description, command, notes? }`.
+Useful for an agent that wants a verified canonical invocation rather than
+inventing one from `--help`.
+
+## End-to-end example
+
+```bash
+# 1. Discover what the binary can do
+wd schema --json --output-file .wrangler-deploy/manifest.json
+wd schema config --json --output-file .wrangler-deploy/config-schema.json
+
+# 2. Plan with a structured input, persist the plan
+echo '{"only":["workers/api"]}' | \
+  wd plan --stage staging --input - --json \
+  --output-file .wrangler-deploy/plans/staging-api.json
+
+# 3. Dry-run apply, persist the preview
+wd apply --stage staging --dry-run --json \
+  --output-file .wrangler-deploy/plans/staging-apply-dry.json
+
+# 4. Real deploy, persist the result
+wd deploy --stage staging --json \
+  --output-file .wrangler-deploy/deploys/staging.json
+
+# 5. Verify
+wd verify --stage staging --json \
+  --output-file .wrangler-deploy/verify/staging.json
+```
+
+Every step writes a JSON artifact you can diff, review, or feed to the next
+step.

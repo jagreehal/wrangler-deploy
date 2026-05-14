@@ -5,177 +5,215 @@ sidebar:
 description: Get wrangler-deploy running in 2 minutes
 ---
 
-If your project already has `wrangler.jsonc` files, this is the path. You do not rewrite them, migrate them, or stop using them. wrangler-deploy reads them, generates one project-level config, and uses rendered JSONC files only when it is time to deploy or run stage-aware local dev.
-
-At the end of this guide you will have:
-
-- Your existing `wrangler.jsonc` files untouched
-- A generated `wrangler-deploy.config.ts`
-- A stage you can plan, apply, deploy, and destroy
-- The option to run all workers locally with `wd dev`
-- The option to run `wd dev --stage <stage>` against rendered stage bindings
-- The option to switch Queue-heavy local development into a shared Wrangler session
-- If you are starting from scratch, a ready-made Vite starter via `wd create vite`
-
-## Install
+One command. 30 seconds. A working Cloudflare Worker on your machine. No Cloudflare account needed to start.
 
 ```bash
-npm install -D wrangler-deploy
-# or
-pnpm add -D wrangler-deploy
+npm create wrangler-deploy@latest my-app
 ```
 
-## Start fresh
-
-If you are starting a new project, scaffold the starter first:
-
-```bash
-$ wd create vite my-app
-  Created vite starter in /repo/my-app
-```
-
-Then install dependencies and start the local frontend plus worker pair:
+That scaffolds a hello-world Worker, installs dependencies, and prints the dev command. After it finishes:
 
 ```bash
 cd my-app
-pnpm install
 pnpm dev
 ```
 
-## Initialize
+Open `http://localhost:8787` — you'll see JSON. That's the entire day-1 path.
 
-Run this in any project that already has `wrangler.jsonc` or `wrangler.json` files:
+Deploying to Cloudflare is a second step, on your terms. We get there in [Step 4](#step-4--deploy-to-the-edge).
+
+## Step 1 — Scaffold
+
+```bash
+$ npm create wrangler-deploy@latest my-app
+
+  Created hello starter in /now/my-app
+    ✓ package.json
+    ✓ tsconfig.json
+    ✓ src/index.ts
+    ✓ wrangler.jsonc
+    ✓ wrangler-deploy.config.ts
+    ✓ README.md
+    ✓ .gitignore
+
+  Installing dependencies with pnpm...
+  …
+  ✓ Ready.
+
+  Start dev:
+    cd my-app && pnpm dev
+
+  Then open http://localhost:8787 — you should see JSON.
+
+  When you're ready to put it on the edge:
+    cd my-app && pnpm deploy
+```
+
+`pnpm`, `yarn`, and `bun` all work too — same line, swap `npm` for your tool. The scaffolder detects which one you used and installs dependencies with it.
+
+Pass `--no-install` if you'd rather install dependencies yourself.
+
+## Step 2 — Local dev
+
+```bash
+$ cd my-app
+$ pnpm dev
+
+ ⛅️ wrangler 4.91.0
+───────────────────
+⎔ Starting local server...
+[wrangler:info] Ready on http://localhost:8787
+```
+
+Open the URL. You should see:
+
+```json
+{
+  "message": "Hello from Cloudflare Workers!",
+  "path": "/",
+  "now": "2026-05-14T20:00:00.000Z"
+}
+```
+
+Edit `src/index.ts`, save — `wrangler dev` hot-reloads on every save.
+
+## Step 3 — When you need more
+
+The scaffolder gives you the bare minimum on purpose. Add things as you need them:
+
+| Want | Do |
+| --- | --- |
+| A KV namespace, D1 database, or queue | Add it to `wrangler-deploy.config.ts` — see [Resources](/wrangler-deploy/resources/) |
+| A frontend (Hono API + Vite) | `npm create wrangler-deploy@latest my-app -- --template vite` |
+| Any Cloudflare template from GitHub | `npm create wrangler-deploy@latest my-app -- --example github:user/repo/path` |
+| Multiple workers in one repo | Add more paths to `workers` in the config |
+| Editor / agent hints | `wd create vibe-rules claude-code,cursor` |
+
+### Interactive picker
+
+Run without a template name on a TTY and you'll get an arrow-key picker:
+
+```bash
+$ npm create wrangler-deploy@latest
+
+✨ wrangler-deploy — scaffold a new Cloudflare Workers project
+
+◇  Project name (used as the directory)
+│  my-worker
+│
+◆  Pick a template
+│  ● hello — Bare hello-world Worker (fastest, recommended for beginners)
+│  ○ vite — Hono API + Vite frontend + typed KV binding
+│
+└  Scaffolding hello into ./my-worker…
+```
+
+In CI / non-TTY contexts the picker is automatically skipped and defaults are used. Pass `--yes` to force-skip prompts anywhere.
+
+## Step 4 — Deploy to the edge
+
+This is the Cloudflare moment. You'll need an account; if you don't have one yet, sign up at [dash.cloudflare.com/sign-up](https://dash.cloudflare.com/sign-up).
+
+```bash
+$ pnpm run deploy
+# or: npm run deploy, yarn run deploy, bun run deploy
+```
+
+The first time you run it, Wrangler opens a browser tab to authenticate you. After that it's just a deploy — your Worker is live on `*.workers.dev` in a few seconds. For the hello-world template, `pnpm run deploy` is a thin alias for `wrangler deploy`; no stages, no apply step, no extra concepts.
+
+:::caution[pnpm gotcha]
+Use `pnpm run deploy`, not `pnpm deploy`. `pnpm deploy` is a built-in pnpm workspace command and won't run the script.
+:::
+
+### When you outgrow a single deploy
+
+As soon as you add a KV namespace, D1 database, or queue to `wrangler-deploy.config.ts`, you'll want stages — separate copies of your stack for `staging`, `pr-123`, etc. That's where the `wd` workflow shines:
+
+```bash
+$ wd plan --stage staging      # see what would be created
+$ wd apply --stage staging     # provision resources (KV, D1, queues)
+$ wd deploy --stage staging    # deploy workers in dependency order
+$ wd status --stage staging    # confirm everything is live
+$ wd destroy --stage staging   # tear it all down
+```
+
+Stages get suffixed automatically: `payments-db` becomes `payments-db-staging`, your Worker becomes `my-app-staging`. Production stays untouched.
+
+## Already have a Wrangler project?
+
+If your repo already has `wrangler.jsonc` files, skip the scaffold and generate the wrangler-deploy config from what you have. Your Wrangler files are not modified.
 
 ```bash
 $ wd init
-  ✓ Found workers/api/wrangler.jsonc
-  ✓ Found workers/batch-workflow/wrangler.jsonc
-  ✓ Found workers/event-router/wrangler.jsonc
-  ✓ Generated wrangler-deploy.config.ts
+
+  Generated wrangler-deploy.config.ts from /repo
+
+  Next:
+
+    wd context set --stage <name>   Set default stage
+    wd plan                         Preview what will be created
+    wd apply                        Provision resources
+    wd deploy                       Deploy workers
+    wd status                       Verify everything is live
 ```
 
-`wd init` is built around existing Wrangler projects. It scans your `wrangler.jsonc` files and generates a matching `wrangler-deploy.config.ts`. Your Wrangler files stay untouched.
+If your resources already exist in your Cloudflare account, use [`wd introspect`](/wrangler-deploy/reference/commands/#wd-introspect) instead — it generates config from the live account.
 
-That is the trust boundary: `wrangler.jsonc` is still the thing you author and keep in the repo. `wrangler-deploy` adds stage orchestration around it instead of replacing it.
+From here the four-step staged-deploy flow (`plan` → `apply` → `deploy` → `destroy`) is the same as the fresh-scaffold path above. See [Step 4](#step-4--deploy-to-the-edge) for the one-liners and the [CLI reference](/wrangler-deploy/reference/commands/) for the full output of each command.
 
-## Plan
+## Going further with `wd dev`
 
-See what would be created before touching anything:
-
-```bash
-$ wd plan --stage staging
-  + payments-db-staging (d1) create
-  + token-kv-staging (kv) create
-  + cache-kv-staging (kv) create
-  + payment-outbox-staging (queue) create
-  + payment-outbox-dlq-staging (queue) create
-
-  5 to create, 0 in sync, 0 drifted, 0 orphaned
-```
-
-## Apply
-
-Provision the resources in Cloudflare and record their IDs in state:
-
-```bash
-$ wd apply --stage staging
-  + payments-db-staging (d1) created
-  + token-kv-staging (kv) created
-  + cache-kv-staging (kv) created
-  + payment-outbox-staging (queue) created
-  + payment-outbox-dlq-staging (queue) created
-
-  ✓ 5 resources applied
-```
-
-This is the step where wrangler-deploy turns your stage name into real infrastructure. It also renders per-worker `wrangler.rendered.jsonc` files with the correct IDs and stage-specific names.
-
-## Deploy
-
-Deploy workers using those rendered configs:
-
-```bash
-$ wd deploy --stage staging
-  Deploying workers/batch-workflow...
-  ✓ payment-batch-workflow-staging deployed
-  Deploying workers/event-router...
-  ✓ payment-event-router-staging deployed
-  Deploying workers/api...
-  ✓ payment-api-staging deployed
-```
-
-Workers deploy in dependency order, so service-binding targets go first. You still get Wrangler underneath. wrangler-deploy is deciding order and wiring, then calling `wrangler deploy` with the rendered JSONC for that stage.
-
-## Destroy
-
-Tear everything down when you're done:
-
-```bash
-$ wd destroy --stage staging --force
-  Removing queue consumers...
-  Deleting workers...
-  Deleting resources...
-  ✓ Stage "staging" destroyed
-```
-
-## Local dev
-
-Local development is still a Wrangler workflow. Your checked-in `wrangler.jsonc` files have not changed, so `wrangler dev` still works exactly the way it did before:
-
-```bash
-$ wrangler dev
-```
-
-If you have multiple workers, `wd dev` starts them together and handles port assignment:
+For multi-worker repos, `wd dev` starts every worker together, resolves ports automatically, and supports dependency-aware filtering and Queue local-dev sessions. The hello-world scaffold uses plain `wrangler dev` because there's only one worker; once you add more, swap to `wd dev`.
 
 ```bash
 $ wd dev
-Starting dev servers:
-  workers/batch-workflow -> http://localhost:8787
-  workers/event-router   -> http://localhost:8788
-  workers/api            -> http://localhost:8789
+
+  wd dev — 3 workers
+  workers/api            → http://localhost:8787
+  workers/batch-workflow → http://localhost:8788
+  workers/event-router   → http://localhost:8789
 ```
 
-If you want Wrangler's shared local Queue session, switch it on explicitly:
+For Queue local-dev (producer + consumer sharing one Miniflare environment):
 
 ```bash
 $ wd dev --session --persist-to .wrangler/state
-Starting local dev session:
-  workers/api -> http://localhost:8787
-  includes: workers/batch-workflow, workers/event-router
 ```
 
-If you already applied a stage, `wd dev --stage staging` uses the rendered stage configs directly so local bindings match deploy-time state instead of the raw placeholders in checked-in `wrangler.jsonc` files.
-
-For local runtime workflows on top of that:
+For broader local workflows (dashboard, fixtures, queue sends, D1 exec, cron triggers, verify packs), see the [CLI reference](/wrangler-deploy/reference/commands/) and the [Dev UI](/wrangler-deploy/features/dev-mode/) guide. A few highlights:
 
 ```bash
-$ wd dev doctor
-$ wd dev ui --port 8899
-$ wd fixture list
-$ wd snapshot save local-baseline
-$ wd snapshot load local-baseline
-$ wd logs workers/api --once
-$ wd worker routes workers/api
+$ wd dev doctor                      # preflight checks
+$ wd dev ui --port 8899              # local runtime dashboard
 $ wd worker call workers/api --path /health
-$ wd worker call --fixture echo-ping
-$ wd d1 list
-$ wd d1 exec payments-db --sql 'SELECT COUNT(*) FROM batches;'
-$ wd d1 exec --fixture payments-batch-count
-$ wd queue list
 $ wd queue send payment-outbox --json '{"type":"batch.dispatched"}'
-$ wd queue send --fixture payment-outbox-dispatch
-$ wd queue send payment-outbox --json '{"type":"batch.dispatched"}' --watch --count 10 --every 5s
-$ wd queue replay payment-outbox --file fixtures/payment-outbox.json
-$ wd queue tail payment-outbox --once
 $ wd cron trigger workers/batch-workflow --port 8787
-$ wd verify local
 $ wd verify local --pack smoke
 ```
 
-That is the core model of the tool:
+## The core model
 
-- Keep `wrangler.jsonc` for development.
+- Keep `wrangler.jsonc` for development — Wrangler stays your authoring surface.
 - Add `wd dev --session` when you need one shared Miniflare environment for Queues.
-- Generate stage-aware rendered JSONC for deploys.
-- Use one project-level config to connect the two.
+- Generate stage-aware rendered JSONC for deploys — never edit those files by hand.
+- One project-level config (`wrangler-deploy.config.ts`) connects the two.
+
+## Troubleshooting
+
+| Problem | Fix |
+| --- | --- |
+| `wd <anything>` fails with `WD_E_CONFIG_MISSING` | Run `wd init` (existing repo) or `npm create wrangler-deploy@latest <name>` (fresh). |
+| `Cannot find package 'wrangler-deploy'` after scaffold | Run `pnpm install` (or `npm install`) in the new directory. The scaffolder normally does this for you — pass `--no-install` to skip it. |
+| `WD_E_AUTH_FAILED` on apply/deploy | Run `wd login`, or set `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`. |
+| `WD_E_ACCOUNT_MISMATCH` (Cloudflare error 10000) | Your API token does not belong to `CLOUDFLARE_ACCOUNT_ID`. Fix one of them. |
+| `WD_E_STATE_MISSING` on deploy/status | Run `wd apply --stage <name>` first. |
+| Default stage warning on every command | Pin it with `wd context set --stage <name>`. |
+
+Every error code is described by `wd explain <code>`. To explain the most recent failure: `wd explain --from-last-error`.
+
+## Next steps
+
+- [How it works](/wrangler-deploy/getting-started/how-it-works/) — the architecture in one page
+- [CLI reference](/wrangler-deploy/reference/commands/) — every command with example output
+- [Config reference](/wrangler-deploy/reference/config/) — the full `wrangler-deploy.config.ts` schema
+- [PR preview environments](/wrangler-deploy/workflows/pr-previews/) — one-command-per-PR stage lifecycle

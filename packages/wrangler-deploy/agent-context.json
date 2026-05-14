@@ -48,6 +48,12 @@
       "supportsDryRun": true
     },
     {
+      "name": "rollback",
+      "kind": "mutating",
+      "output": "json",
+      "supportsDryRun": true
+    },
+    {
       "name": "destroy",
       "kind": "mutating",
       "output": "json",
@@ -60,6 +66,11 @@
     },
     {
       "name": "status",
+      "kind": "inspection",
+      "output": "json"
+    },
+    {
+      "name": "check",
       "kind": "inspection",
       "output": "json"
     },
@@ -89,6 +100,35 @@
       "output": "json"
     },
     {
+      "name": "open",
+      "kind": "workflow",
+      "output": "json"
+    },
+    {
+      "name": "dashboard",
+      "kind": "workflow",
+      "output": "json"
+    },
+    {
+      "name": "explain",
+      "kind": "inspection",
+      "output": "json"
+    },
+    {
+      "name": "examples",
+      "kind": "inspection",
+      "output": "json"
+    },
+    {
+      "name": "sandbox",
+      "kind": "utility",
+      "output": "json",
+      "subcommands": [
+        "info",
+        "run"
+      ]
+    },
+    {
       "name": "schema",
       "kind": "inspection",
       "output": "json"
@@ -101,8 +141,64 @@
         "get",
         "set",
         "unset",
-        "clear"
+        "clear",
+        "doctor",
+        "export",
+        "import"
       ]
+    },
+    {
+      "name": "macro",
+      "kind": "workflow",
+      "output": "json",
+      "subcommands": [
+        "list",
+        "save",
+        "run",
+        "validate"
+      ]
+    },
+    {
+      "name": "history",
+      "kind": "inspection",
+      "output": "json"
+    },
+    {
+      "name": "env",
+      "kind": "inspection",
+      "output": "json",
+      "subcommands": [
+        "diff"
+      ]
+    },
+    {
+      "name": "lock",
+      "kind": "workflow",
+      "output": "json",
+      "subcommands": [
+        "status",
+        "acquire",
+        "release"
+      ]
+    },
+    {
+      "name": "replay",
+      "kind": "workflow",
+      "output": "json"
+    },
+    {
+      "name": "route",
+      "kind": "inspection",
+      "output": "json",
+      "subcommands": [
+        "verify",
+        "apply"
+      ]
+    },
+    {
+      "name": "onboard",
+      "kind": "utility",
+      "output": "json"
     },
     {
       "name": "tools",
@@ -186,6 +282,135 @@
       "output": "text"
     },
     {
+      "name": "configure",
+      "kind": "workflow",
+      "output": "json",
+      "mutating": true
+    },
+    {
+      "name": "login",
+      "kind": "workflow",
+      "output": "json",
+      "mutating": true
+    },
+    {
+      "name": "logout",
+      "kind": "workflow",
+      "output": "json",
+      "mutating": true
+    },
+    {
+      "name": "profile",
+      "kind": "inspection",
+      "output": "json",
+      "subcommands": [
+        "list",
+        "remove",
+        "test"
+      ]
+    },
+    {
+      "name": "quickstart",
+      "kind": "utility",
+      "output": "json"
+    },
+    {
+      "name": "release-note",
+      "kind": "utility",
+      "output": "json"
+    },
+    {
+      "name": "telemetry",
+      "kind": "workflow",
+      "output": "json",
+      "subcommands": [
+        "on",
+        "off",
+        "status"
+      ]
+    },
+    {
+      "name": "version",
+      "kind": "utility",
+      "output": "json"
+    },
+    {
+      "name": "dev",
+      "kind": "workflow",
+      "output": "text",
+      "subcommands": [
+        "doctor",
+        "ui"
+      ]
+    },
+    {
+      "name": "logs",
+      "kind": "inspection",
+      "output": "json"
+    },
+    {
+      "name": "guard",
+      "kind": "workflow",
+      "output": "json",
+      "subcommands": [
+        "init",
+        "deploy",
+        "migrate",
+        "status",
+        "breaches",
+        "report",
+        "disarm",
+        "arm",
+        "approvals",
+        "approve",
+        "reject"
+      ],
+      "mutating": true
+    },
+    {
+      "name": "state",
+      "kind": "inspection",
+      "output": "json",
+      "subcommands": [
+        "list",
+        "get",
+        "tree"
+      ]
+    },
+    {
+      "name": "output",
+      "kind": "inspection",
+      "output": "json"
+    },
+    {
+      "name": "run",
+      "kind": "inspection",
+      "output": "json"
+    },
+    {
+      "name": "rotate-password",
+      "kind": "workflow",
+      "output": "json",
+      "mutating": true
+    },
+    {
+      "name": "cron",
+      "kind": "workflow",
+      "output": "json",
+      "subcommands": [
+        "trigger",
+        "loop"
+      ]
+    },
+    {
+      "name": "util",
+      "kind": "utility",
+      "output": "json",
+      "subcommands": [
+        "create-cf-token"
+      ]
+    },
+    {
       "name": "help",
       "kind": "utility",
       "output": "json"
@@ -230,6 +455,12 @@
             "name": "version",
             "type": "1",
             "required": true
+          },
+          {
+            "name": "stage",
+            "type": "string",
+            "required": false,
+            "description": "Default stage name. Overridable via --stage flag or .wdrc."
           },
           {
             "name": "workers",
@@ -577,6 +808,12 @@
             "type": "string",
             "required": false,
             "description": "Default state password for encrypted state."
+          },
+          {
+            "name": "telemetry",
+            "type": "boolean",
+            "required": false,
+            "description": "Opt-in local CLI telemetry."
           }
         ]
       },
@@ -792,6 +1029,12 @@
       "impact",
       "diff",
       "doctor",
+      "history",
+      "env",
+      "lock",
+      "replay",
+      "route",
+      "onboard",
       "snapshot",
       "fixture",
       "worker",
