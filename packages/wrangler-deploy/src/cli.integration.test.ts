@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -89,8 +89,11 @@ function runCli(repoDir: string, args: string[]): { status: number; stdout: stri
 }
 
 beforeAll(() => {
-  execFileSync("pnpm", ["-C", packageRoot, "build"], { stdio: "pipe" });
-});
+  // In CI, Turbo usually runs package builds before tests. Rebuild only when dist is missing.
+  if (!existsSync(distCli)) {
+    execFileSync("pnpm", ["-C", packageRoot, "build"], { stdio: "pipe" });
+  }
+}, 60_000);
 
 afterAll(() => {
   for (const dir of tempDirs) {
