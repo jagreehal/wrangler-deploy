@@ -1,0 +1,157 @@
+---
+title: Structured errors
+description: Every JSON-mode failure returns a typed envelope with retryability and a fix string
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+In `--json` mode, every failure returns a structured envelope instead of a
+free-form error message. Agents can branch on `error.type`, `error.code`, and
+`error.retryable` without parsing English text.
+
+## Envelope shape
+
+```json
+{
+  "ok": false,
+  "command": "wd deploy",
+  "error": {
+    "type": "auth",
+    "code": "WD_E_ACCOUNT_MISMATCH",
+    "message": "Cloudflare API error 10000: account mismatch",
+    "retryable": false,
+    "fix": "Set CLOUDFLARE_ACCOUNT_ID to match the account that owns your CLOUDFLARE_API_TOKEN.",
+    "expected": { "env": ["CLOUDFLARE_ACCOUNT_ID"] },
+    "suggestions": [
+      "Set CLOUDFLARE_ACCOUNT_ID to match the account that owns your CLOUDFLARE_API_TOKEN.",
+      "Run `wd doctor --json --codes` to verify auth."
+    ]
+  }
+}
+```
+
+Get the schema directly:
+
+```bash
+wd schema errors --json
+```
+
+## Field reference
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `ok` | `false` | Always false on errors. Lets agents branch with one check. |
+| `command` | string | The command name, e.g., `"wd deploy"`. |
+| `error.type` | enum | One of `auth`, `validation`, `network`, `config`, `state`, `not_found`, `permission`, `sandbox`, `unknown`. |
+| `error.code` | string | Stable identifier prefixed with `WD_E_`. Safe to switch on. |
+| `error.message` | string | Human-readable summary. May contain `[REDACTED]` if `--no-secrets-in-output` is on. |
+| `error.retryable` | boolean | If `true`, the same call is worth retrying (e.g., transient network). |
+| `error.fix` | string? | One concrete remediation step. |
+| `error.expected` | unknown? | Structured "what was expected" — e.g., `{ env: ["CLOUDFLARE_API_TOKEN"] }` or `{ command: ["apply", "deploy", ...] }`. |
+| `error.suggestions` | string[]? | Additional remediation hints, including "run `wd explain WD_E_X`". |
+
+## Stable codes
+
+| Code | Type | Retryable | When |
+| --- | --- | --- | --- |
+| `WD_E_STATE_MISSING` | `state` | no | Stage has no state. Run `wd apply --stage <name>`. |
+| `WD_E_ACCOUNT_MISMATCH` | `auth` | no | API token / account ID mismatch. |
+| `WD_E_AUTH_FAILED` | `auth` | no | Token rejected, or required env vars missing. |
+| `WD_E_CONFIG_MISSING` | `config` | no | No `wrangler-deploy.config.ts` in scope. |
+| `WD_E_DEPS_MISSING` | `config` | no | The config imports a package that isn't installed. |
+| `WD_E_NOT_FOUND` | `not_found` | no | Path or named resource not found. |
+| `WD_E_NETWORK` | `network` | yes | Transient network error. Retry safe. |
+| `WD_E_VALIDATION` | `validation` | no | Bad/missing flag or argument. |
+| `WD_E_PERMISSION` | `permission` | no | Filesystem permission denied. |
+| `WD_E_SANDBOX_BLOCKED` | `sandbox` | no | Mutating command refused under `AGENT_SANDBOX=1` without `--dry-run`. |
+| `WD_E_UNKNOWN` | `unknown` | no | Unclassified — use `wd explain --from-last-error`. |
+
+The full live list is at `wd schema errors --json`.
+
+## Exit codes
+
+| Exit code | Meaning |
+| --- | --- |
+| `0` | Success |
+| `1` | Runtime failure (network, state, config, auth, unknown) |
+| `2` | Validation or sandbox refusal — your inputs/environment are wrong, not the system |
+
+Agents can branch on exit code first, then read the envelope only when needed.
+
+## Branching example
+
+```ts
+const proc = spawnSync("wd", ["deploy", "--stage", "staging", "--json"], {
+  encoding: "utf-8",
+});
+
+if (proc.status === 0) {
+  const result = JSON.parse(proc.stdout);
+  return result;
+}
+
+const envelope = JSON.parse(proc.stdout);
+
+if (envelope.error.retryable) {
+  await sleep(2000);
+  return retry();
+}
+
+switch (envelope.error.type) {
+  case "auth":
+    // surface a re-auth prompt
+    break;
+  case "state":
+    // chain `wd apply --stage staging --json` first, then retry deploy
+    break;
+  case "validation":
+    // your call was malformed — inspect error.expected
+    throw new Error(envelope.error.fix);
+  case "sandbox":
+    // running under AGENT_SANDBOX without --dry-run; either drop sandbox or add --dry-run
+    break;
+}
+```
+
+## Last-error capture
+
+Every failure is also written to `.wrangler-deploy/last-error.json` (best-effort).
+You can ask the CLI for guided remediation without needing to keep the original
+error in scope:
+
+```bash
+wd explain --from-last-error --json
+wd explain --error-code WD_E_STATE_MISSING --json
+```
+
+## Where errors come from
+
+Almost every failure path in `wrangler-deploy` throws an `AgentErrorException`
+carrying the structured payload directly — the catch handler skips
+classification and emits the envelope verbatim. The few remaining un-migrated
+sites are wrappers around downstream library errors (Wrangler subprocess
+output, encryption errors, file system errors); those still classify
+correctly via message-pattern regex.
+
+If you're contributing code, prefer the typed helpers over `throw new Error`:
+
+```ts
+import { AgentErrors, assertStage, assertStageState, assertUsage } from "./cli-output.js";
+
+assertStage(stage);                                  // missing --stage
+assertStageState(state, stage);                      // null state
+assertUsage(workerPath, "Usage: wd foo --worker X"); // missing required arg
+
+throw AgentErrors.notFound("File not found: x.json", "Check the path.");
+throw AgentErrors.auth("Token rejected", "Run `wd login`.", { env: ["CLOUDFLARE_API_TOKEN"] });
+throw AgentErrors.network("ECONNREFUSED talking to api.cloudflare.com");
+```
+
+Each helper returns `never` and the `assertX` variants narrow types via
+TypeScript's `asserts` so the surrounding code doesn't need null checks.
+
+<Aside type="caution">
+  If you see `error.code: "WD_E_UNKNOWN"`, that's a code path the maintainers
+  haven't classified yet. Please open an issue with the `error.message` so we
+  can promote it to a stable code.
+</Aside>

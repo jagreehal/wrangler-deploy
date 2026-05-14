@@ -1,0 +1,12 @@
+{
+  "$comment": "Manifest of templates available to `wd create` (and `npm create wrangler-deploy`). The CLI reads this to populate the interactive picker. `hello` lives inline in the CLI (zero network, instant scaffold) and is intentionally absent here.",
+  "version": 1,
+  "templates": [
+    {
+      "name": "vite",
+      "title": "Vite + Hono + KV",
+      "description": "Full-stack starter: Vite frontend, Hono worker API, typed KV binding",
+      "tags": ["frontend", "fullstack", "kv"]
+    }
+  ]
+}

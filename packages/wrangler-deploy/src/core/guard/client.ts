@@ -1,4 +1,5 @@
 import { signRequest } from "workers-usage-guard-shared";
+import { AgentErrors } from "../cli-output.js";
 
 export type GuardClientConfig = {
   endpoint: string;
@@ -31,7 +32,9 @@ export function createGuardClient(config: GuardClientConfig): GuardClient {
       });
       if (!res.ok) {
         const body = await res.text().catch(() => "");
-        throw new Error(`Guard API GET ${path} failed: ${res.status} ${body.slice(0, 500)}`);
+        throw (res.status === 401 || res.status === 403)
+          ? AgentErrors.auth(`Guard API GET ${path} failed: ${res.status} ${body.slice(0, 500)}`, "Verify the guard signing key matches the deployed worker.")
+          : AgentErrors.network(`Guard API GET ${path} failed: ${res.status} ${body.slice(0, 500)}`, "Inspect the response and retry if transient.");
       }
       return (await res.json()) as T;
     },
@@ -49,7 +52,9 @@ export function createGuardClient(config: GuardClientConfig): GuardClient {
       });
       if (!res.ok) {
         const b = await res.text().catch(() => "");
-        throw new Error(`Guard API POST ${path} failed: ${res.status} ${b.slice(0, 500)}`);
+        throw (res.status === 401 || res.status === 403)
+          ? AgentErrors.auth(`Guard API POST ${path} failed: ${res.status} ${b.slice(0, 500)}`, "Verify the guard signing key matches the deployed worker.")
+          : AgentErrors.network(`Guard API POST ${path} failed: ${res.status} ${b.slice(0, 500)}`, "Inspect the response and retry if transient.");
       }
       return (await res.json()) as T;
     },
@@ -67,7 +72,9 @@ export function createGuardClient(config: GuardClientConfig): GuardClient {
       });
       if (!res.ok) {
         const b = await res.text().catch(() => "");
-        throw new Error(`Guard API DELETE ${path} failed: ${res.status} ${b.slice(0, 500)}`);
+        throw (res.status === 401 || res.status === 403)
+          ? AgentErrors.auth(`Guard API DELETE ${path} failed: ${res.status} ${b.slice(0, 500)}`, "Verify the guard signing key matches the deployed worker.")
+          : AgentErrors.network(`Guard API DELETE ${path} failed: ${res.status} ${b.slice(0, 500)}`, "Inspect the response and retry if transient.");
       }
       return (await res.json()) as T;
     },

@@ -3,6 +3,7 @@ import type { StateProvider } from "./state.js";
 import type { CfStageConfig, StageState } from "../types.js";
 import { isSecretRef, secretName } from "../types.js";
 import type { WranglerRunner } from "./wrangler-runner.js";
+import { AgentErrors } from "./cli-output.js";
 
 export interface SecretStatus {
   worker: string;
@@ -33,7 +34,7 @@ export async function checkSecrets(args: CheckSecretsArgs, deps: CheckSecretsDep
   const { stage } = args;
   const { rootDir, config, state: provider, wrangler } = deps;
   const state = await provider.read(stage);
-  if (!state) throw new Error(`No state for stage "${stage}". Run apply first.`);
+  if (!state) throw AgentErrors.state(`No state for stage "${stage}". Run apply first.`, `Run \`wd apply --stage ${stage}\` first.`);
 
   const results: SecretStatus[] = [];
 
@@ -190,7 +191,7 @@ export async function syncSecretsFromEnvFile(
   const { rootDir, config, state: provider, wrangler } = deps;
   const setSecretFn = deps.setSecretFn ?? setSecret;
   const state = await provider.read(stage);
-  if (!state) throw new Error(`No state for stage "${stage}". Run apply first.`);
+  if (!state) throw AgentErrors.state(`No state for stage "${stage}". Run apply first.`, `Run \`wd apply --stage ${stage}\` first.`);
 
   // Parse env file
   const content = readFileSync(envFilePath, "utf-8");

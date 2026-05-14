@@ -1,4 +1,5 @@
 import type { DnsRecordType } from "../types.js";
+import { AgentErrors } from "../core/cli-output.js";
 
 /**
  * Provider for Cloudflare DNS records. Zone-scoped (not account-scoped),
@@ -36,7 +37,7 @@ async function unwrap<T>(res: Response): Promise<T> {
   const body = (await res.json()) as CfEnvelope<T>;
   if (!body.success) {
     const errors = body.errors?.map((e) => `[${e.code}] ${e.message}`).join(", ") ?? "unknown error";
-    throw new Error(`Cloudflare DNS API error: ${errors}`);
+    throw AgentErrors.network(`Cloudflare DNS API error: ${errors}`, "Inspect the error and retry if transient.");
   }
   return body.result;
 }
@@ -62,7 +63,7 @@ export async function findZoneId(
   );
   const zones = await unwrap<Array<{ id: string; name: string }>>(res);
   const found = zones.find((z) => z.name === zoneName);
-  if (!found) throw new Error(`Cloudflare zone not found: ${zoneName}`);
+  if (!found) throw AgentErrors.notFound(`Cloudflare zone not found: ${zoneName}`, "Verify the zone exists in your account and the API token has Zone:Read permission.");
   return found.id;
 }
 
@@ -128,7 +129,7 @@ export async function deleteDnsRecord(
   });
   if (!res.ok && res.status !== 404) {
     const body = await res.text();
-    throw new Error(`Failed to delete DNS record ${recordId}: ${res.status} ${body}`);
+    throw AgentErrors.network(`Failed to delete DNS record ${recordId}: ${res.status} ${body}`, "Inspect the error and retry if transient.");
   }
 }
 

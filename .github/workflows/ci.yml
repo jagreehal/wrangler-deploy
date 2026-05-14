@@ -38,3 +38,10 @@ jobs:
 
       - name: Quality
         run: pnpm quality
+
+      - name: Verify generated template manifest is in sync
+        # `prebuild` regenerates `template-manifest.generated.ts` from
+        # `templates/_index.json`. If the committed file drifts from the
+        # canonical source, fail so contributors are reminded to commit
+        # the regenerated file.
+        run: pnpm --filter wrangler-deploy verify:template-manifest

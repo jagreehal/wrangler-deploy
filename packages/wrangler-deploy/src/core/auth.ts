@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { loadProjectContext } from "./project-context.js";
+import { AgentErrors } from "./cli-output.js";
 
 const resolvedAccountIds = new Map<string, string>();
 
@@ -9,14 +10,16 @@ const ACCOUNT_ID_HEX = /^[a-f0-9]{32}$/i;
 function assertAccountId32Hex(value: string, sourceLabel: string): string {
   const trimmed = value.trim();
   if (!trimmed) {
-    throw new Error(
+    throw AgentErrors.config(
       `${sourceLabel} is set but empty after trimming. Use a 32-character hexadecimal Cloudflare account id.`,
+      "Set a 32-character hexadecimal Cloudflare account id (Workers & Pages → account overview).",
     );
   }
   if (!ACCOUNT_ID_HEX.test(trimmed)) {
-    throw new Error(
+    throw AgentErrors.config(
       `${sourceLabel} must be a 32-character hexadecimal Cloudflare account id (Workers & Pages → account overview). ` +
         `Got ${JSON.stringify(trimmed)}.`,
+      "Set a 32-character hexadecimal Cloudflare account id (Workers & Pages → account overview).",
     );
   }
   return trimmed.toLowerCase();
@@ -91,7 +94,7 @@ export function resolveAccountId(cwd: string): string {
   }
 
   if (process.env.CLOUDFLARE_API_TOKEN) {
-    throw new Error(
+    throw AgentErrors.auth(
       "CLOUDFLARE_API_TOKEN is set but the Cloudflare account ID could not be resolved.\n\n" +
         "  Set the account explicitly to avoid Cloudflare API error 10000 (token vs wrong account):\n" +
         "    • `CLOUDFLARE_ACCOUNT_ID` (32-character hex, Workers & Pages → account overview), or\n" +
@@ -99,6 +102,8 @@ export function resolveAccountId(cwd: string): string {
         "    • fix `wrangler whoami` with the same environment (token scopes / network).\n\n" +
         "  OAuth `~/.wrangler/config/default.toml` is not used when an API token is set,\n" +
         "  because it often reflects a different account than the token.\n",
+      "Set CLOUDFLARE_ACCOUNT_ID or accountId in .wdrc to a 32-character hex Cloudflare account id.",
+      { env: ["CLOUDFLARE_ACCOUNT_ID"] },
     );
   }
 
@@ -120,10 +125,12 @@ export function resolveAccountId(cwd: string): string {
     }
   }
 
-  throw new Error(
+  throw AgentErrors.auth(
     "Could not resolve Cloudflare account ID.\n\n" +
       "  For local development: run `wrangler login`\n" +
       "  For CI/CD: set `CLOUDFLARE_API_TOKEN` plus an account id via `CLOUDFLARE_ACCOUNT_ID` or `accountId` in `.wdrc` / `.wdrc.json`\n",
+    "Run `wrangler login` for local dev, or set CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID for CI.",
+    { env: ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"] },
   );
 }
 

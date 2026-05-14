@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { AgentErrors } from "./cli-output.js";
 import type {
   CfStageConfig,
   StageState,
@@ -199,8 +200,9 @@ function wranglerWithIdempotency(
   runner: WranglerRunner,
   args: string[],
   cwd: string,
-  options: { adopt?: boolean } = {},
+  options: { adopt?: boolean; logger?: Pick<Console, "log"> } = {},
 ): string {
+  const log = options.logger ?? console;
   try {
     return runner.run(args, cwd);
   } catch (err: unknown) {
@@ -221,7 +223,7 @@ function wranglerWithIdempotency(
         { cause: err },
       );
     }
-    console.log(`    (already exists — adopting)`);
+    log.log(`    (already exists — adopting)`);
     return message;
   }
 }
@@ -304,8 +306,9 @@ export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<ApplyResu
 
     try {
       if (resource.adopt !== undefined && !supportsAdopt(resource.type)) {
-        throw new Error(
+        throw AgentErrors.config(
           `${adoptUnsupportedMessage(resource.type)} Remove adopt from "${logicalName}" or use a supported resource type.`,
+          `Remove the adopt field from resource "${logicalName}" in your config.`,
         );
       }
       // Build props snapshot — common fields plus type-specific extras
@@ -350,7 +353,7 @@ export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<ApplyResu
             wrangler,
             ["kv", "namespace", "create", stagedName],
             rootDir,
-            { adopt },
+            { adopt, logger },
           );
           let id = extractId(output);
           // If "already exists" didn't give us an ID, look it up
@@ -371,7 +374,7 @@ export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<ApplyResu
             wrangler,
             ["queues", "create", stagedName],
             rootDir,
-            { adopt },
+            { adopt, logger },
           );
           let id = extractId(output);
           // If "already exists" didn't give us an ID, look it up
@@ -389,15 +392,17 @@ export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<ApplyResu
         }
         case "hyperdrive": {
           if (!databaseUrl) {
-            throw new Error(
+            throw AgentErrors.validation(
               `--database-url is required to create Hyperdrive config "${logicalName}"`,
+              "Pass --database-url <url> or set databaseUrl in project context.",
+              { flag: "--database-url" },
             );
           }
           const output = wranglerWithIdempotency(
             wrangler,
             ["hyperdrive", "create", stagedName, "--database-url", databaseUrl],
             rootDir,
-            { adopt },
+            { adopt, logger },
           );
           const id = extractId(output);
           resourceOutput = { id: id!, name: stagedName, origin: databaseUrl };
@@ -450,7 +455,7 @@ export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<ApplyResu
           const dnsConfig = resource as import("../types.js").DnsResourceConfig;
           const apiToken = process.env.CLOUDFLARE_API_TOKEN;
           if (!apiToken) {
-            throw new Error("CLOUDFLARE_API_TOKEN is required to manage DNS records");
+            throw AgentErrors.auth("CLOUDFLARE_API_TOKEN is required to manage DNS records", "Set CLOUDFLARE_API_TOKEN or run `wd login`.", { env: ["CLOUDFLARE_API_TOKEN"] });
           }
           const desired = dnsConfig.records.map((record) => ({
             ...record,
@@ -500,11 +505,15 @@ export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<ApplyResu
 
   const renderedWorkers = config.workers.slice();
 
-  // Record worker names in state and remove stale workers no longer in config
+  // Record worker names in state and remove stale workers no longer in config.
+  // Preserve existing deployment metadata (url/deployed/versionId/etc.) — `apply`
+  // never changes deployment status, so prior deploys must remain visible.
   const declaredWorkers = new Set(config.workers);
   for (const workerPath of config.workers) {
     const wranglerConfig = readConfig(resolve(rootDir, workerPath));
+    const previous = state.workers[workerPath];
     state.workers[workerPath] = {
+      ...previous,
       name: workerName(wranglerConfig.name, stage),
     };
   }
@@ -534,10 +543,51 @@ export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<ApplyResu
   }
   writeConfigs(rootDir, stage, renderedConfigs);
 
-  logger.log(
-    `\n  State written to ${config.state?.backend === "kv" ? "KV" : ".wrangler-deploy"}/${stage}/state.json`,
-  );
-  logger.log(`  Rendered configs written for ${config.workers.length} workers\n`);
+  // Summary
+  const renderedConfigPaths = renderedWorkers.map((workerPath) => resolve(rootDir, ".wrangler-deploy", stage, workerPath, "wrangler.rendered.jsonc"));
+  const createdResources = resourceSummaries.filter((r) => r.lifecycleStatus === "created");
+  const updatedResources = resourceSummaries.filter((r) => r.lifecycleStatus === "updated");
+  const inSyncResources = resourceSummaries.filter((r) => r.lifecycleStatus === "in-sync");
+
+  logger.log(`\n  ─── ${stage} apply summary ───\n`);
+
+  if (createdResources.length > 0) {
+    logger.log(`  Created (${createdResources.length}):`);
+    for (const r of createdResources) {
+      const idSuffix = r.id ? `, id: ${r.id}` : "";
+      logger.log(`    + ${r.stagedName} (${r.type}${idSuffix})`);
+    }
+    logger.log(``);
+  }
+
+  if (updatedResources.length > 0) {
+    logger.log(`  Updated (${updatedResources.length}):`);
+    for (const r of updatedResources) {
+      logger.log(`    ~ ${r.stagedName} (${r.type})`);
+    }
+    logger.log(``);
+  }
+
+  if (inSyncResources.length > 0) {
+    logger.log(`  In sync (${inSyncResources.length}):`);
+    for (const r of inSyncResources) {
+      logger.log(`    = ${r.stagedName} (${r.type})`);
+    }
+    logger.log(``);
+  }
+
+  logger.log(`  Workers ready for deploy (${renderedWorkers.length}):`);
+  for (const w of renderedWorkers) {
+    logger.log(`    ${workerName(w, stage)}`);
+  }
+  logger.log(``);
+  logger.log(`  Rendered configs:`);
+  for (const p of renderedConfigPaths) {
+    logger.log(`    ${p}`);
+  }
+
+  const stateBackend = config.state?.backend === "kv" ? "KV" : `.wrangler-deploy/${stage}`;
+  logger.log(`  State: ${stateBackend}/state.json\n`);
 
   // Callers may call enrichMarkers(markers, state) to attach output to typed markers.
   // See src/core/enrich.ts.
@@ -546,7 +596,7 @@ export async function apply(args: ApplyArgs, deps: ApplyDeps): Promise<ApplyResu
       stage,
       resources: resourceSummaries,
       workers: renderedWorkers,
-      renderedConfigs: renderedWorkers.map((workerPath) => resolve(rootDir, ".wrangler-deploy", stage, workerPath, "wrangler.rendered.jsonc")),
+      renderedConfigs: renderedConfigPaths,
       storedSecrets: config.storedSecrets ? Object.keys(config.storedSecrets).flatMap((workerPath) => Object.keys(config.storedSecrets?.[workerPath] ?? {}).map((secret) => `${workerPath}/${secret}`)) : [],
     },
   }) as ApplyResult;

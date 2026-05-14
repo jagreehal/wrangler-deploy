@@ -1,4 +1,5 @@
 import { cfApi as defaultCfApi, cfApiResult, type CloudflareApiOptions } from "./cloudflare-api.js";
+import { AgentErrors } from "../core/cli-output.js";
 
 export type CfApiFn = typeof defaultCfApi;
 
@@ -47,7 +48,7 @@ export async function createHyperdrive(
     if (body.includes("already exists") || res.status === 409) {
       return await findHyperdriveByName(name, options, cfApiFn);
     }
-    throw new Error(`Failed to create Hyperdrive "${name}": ${res.status} ${body}`);
+    throw AgentErrors.network(`Failed to create Hyperdrive "${name}": ${res.status} ${body}`, "Verify --database-url is reachable from Cloudflare and retry.");
   }
 
   return cfApiResult<HyperdriveConfig>(res);
@@ -61,7 +62,7 @@ export async function findHyperdriveByName(
   const res = await cfApiFn("/hyperdrive/configs", options);
   const configs = await cfApiResult<HyperdriveConfig[]>(res);
   const found = configs.find((c) => c.name === name);
-  if (!found) throw new Error(`Hyperdrive config "${name}" not found`);
+  if (!found) throw AgentErrors.notFound(`Hyperdrive config "${name}" not found`, "List hyperdrive configs in the dashboard or `wd state list`.");
   return found;
 }
 
@@ -84,6 +85,6 @@ export async function deleteHyperdrive(
     method: "DELETE",
   });
   if (!res.ok && res.status !== 404) {
-    throw new Error(`Failed to delete Hyperdrive ${id}: ${res.status}`);
+    throw AgentErrors.network(`Failed to delete Hyperdrive ${id}: ${res.status}`, "Inspect the error and retry if transient.");
   }
 }

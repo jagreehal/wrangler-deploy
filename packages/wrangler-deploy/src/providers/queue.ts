@@ -1,4 +1,5 @@
 import { cfApi as defaultCfApi, cfApiResult, type CloudflareApiOptions } from "./cloudflare-api.js";
+import { AgentErrors } from "../core/cli-output.js";
 
 export type CfApiFn = typeof defaultCfApi;
 
@@ -23,7 +24,7 @@ export async function createQueue(
     if (body.includes("already exists") || res.status === 409) {
       return await findQueueByName(name, options, cfApiFn);
     }
-    throw new Error(`Failed to create queue "${name}": ${res.status} ${body}`);
+    throw AgentErrors.network(`Failed to create queue "${name}": ${res.status} ${body}`, "Inspect the error and retry if transient.");
   }
 
   return cfApiResult<QueueInfo>(res);
@@ -37,7 +38,7 @@ export async function findQueueByName(
   const res = await cfApiFn("/queues", options);
   const queues = await cfApiResult<QueueInfo[]>(res);
   const found = queues.find((q) => q.queue_name === name);
-  if (!found) throw new Error(`Queue "${name}" not found`);
+  if (!found) throw AgentErrors.notFound(`Queue "${name}" not found`, "Run `wd state list` to see provisioned queues for this stage.");
   return found;
 }
 
@@ -60,6 +61,6 @@ export async function deleteQueue(
     method: "DELETE",
   });
   if (!res.ok && res.status !== 404) {
-    throw new Error(`Failed to delete queue ${id}: ${res.status}`);
+    throw AgentErrors.network(`Failed to delete queue ${id}: ${res.status}`, "Inspect the error and retry if transient.");
   }
 }

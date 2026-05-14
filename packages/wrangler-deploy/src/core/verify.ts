@@ -6,6 +6,7 @@ import type { StateProvider } from "./state.js";
 import { getD1Fixture, getQueueFixture, getWorkerFixture } from "./fixtures.js";
 import { callWorker, executeLocalD1, resolvePlannedWorkerPort, sendQueueMessage, triggerCron } from "./runtime.js";
 import { createWranglerRunner, type WranglerRunner } from "./wrangler-runner.js";
+import { AgentErrors } from "./cli-output.js";
 
 export interface VerifyResult {
   passed: boolean;
@@ -269,7 +270,7 @@ export async function verifyLocal(deps: LocalVerifyDeps): Promise<LocalVerifyRes
       if (check.type === "worker") {
         const fixture = check.fixture ? getWorkerFixture(config, check.fixture) : undefined;
         if (check.fixture && !fixture) {
-          throw new Error(`Unknown worker fixture "${check.fixture}"`);
+          throw AgentErrors.notFound(`Unknown worker fixture "${check.fixture}"`, "Check `dev.fixtures.workers` in your config.");
         }
         const result = await callWorkerFn(config, rootDir, {
           worker: fixture?.worker ?? check.worker,
@@ -311,11 +312,11 @@ export async function verifyLocal(deps: LocalVerifyDeps): Promise<LocalVerifyRes
       if (check.type === "queue") {
         const fixture = check.fixture ? getQueueFixture(config, check.fixture) : undefined;
         if (check.fixture && !fixture) {
-          throw new Error(`Unknown queue fixture "${check.fixture}"`);
+          throw AgentErrors.notFound(`Unknown queue fixture "${check.fixture}"`, "Check `dev.fixtures.queues` in your config.");
         }
         const payload = check.payload ?? fixture?.payload;
         if (!payload) {
-          throw new Error(`Queue check "${name}" requires payload or fixture.`);
+          throw AgentErrors.validation(`Queue check "${name}" requires payload or fixture.`, "Add a payload or fixture field to the queue check.");
         }
         const result = await sendQueueMessageFn(config, rootDir, {
           queue: fixture?.queue ?? check.queue,
@@ -337,7 +338,7 @@ export async function verifyLocal(deps: LocalVerifyDeps): Promise<LocalVerifyRes
       if (check.type === "d1") {
         const fixture = check.fixture ? getD1Fixture(config, check.fixture) : undefined;
         if (check.fixture && !fixture) {
-          throw new Error(`Unknown D1 fixture "${check.fixture}"`);
+          throw AgentErrors.notFound(`Unknown D1 fixture "${check.fixture}"`, "Check `dev.fixtures.d1` in your config.");
         }
         const result = executeLocalD1Fn(config, rootDir, wrangler, {
           database: fixture?.database ?? check.database,
@@ -358,14 +359,14 @@ export async function verifyLocal(deps: LocalVerifyDeps): Promise<LocalVerifyRes
       if (check.type === "d1Seed" || check.type === "d1Reset") {
         const fixture = check.fixture ? getD1Fixture(config, check.fixture) : undefined;
         if (check.fixture && !fixture) {
-          throw new Error(`Unknown D1 fixture "${check.fixture}"`);
+          throw AgentErrors.notFound(`Unknown D1 fixture "${check.fixture}"`, "Check `dev.fixtures.d1` in your config.");
         }
         const configuredFile = check.type === "d1Seed"
           ? config.dev?.d1?.[check.database]?.seedFile
           : config.dev?.d1?.[check.database]?.resetFile;
         const file = check.file ?? fixture?.file ?? configuredFile;
         if (!file) {
-          throw new Error(`No file configured for ${check.type}.`);
+          throw AgentErrors.config(`No file configured for ${check.type}.`, `Add ${check.type === "d1Seed" ? "seedFile" : "resetFile"} under dev.d1.<database> or pass a file in the check.`);
         }
         const result = executeLocalD1Fn(config, rootDir, wrangler, {
           database: fixture?.database ?? check.database,

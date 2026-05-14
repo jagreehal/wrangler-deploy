@@ -1,0 +1,238 @@
+---
+title: Sandbox
+description: Two layers of safety for agent-driven runs — declarative refusal and OS-level isolation
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+Agents make mistakes. `wrangler-deploy` ships two complementary safety layers
+so a misdirected prompt cannot trash your filesystem or push to the wrong
+Cloudflare account.
+
+| Layer | What it does | Trust model |
+| --- | --- | --- |
+| **Declarative refusal** (`AGENT_SANDBOX=1`) | Refuses any mutating command unless `--dry-run` is also passed. Always available. | Trusts the CLI itself. A direct `node`/`fs` call could bypass it. |
+| **OS-level isolation** (`wd sandbox run --`) | Spawns the command inside `sandbox-exec` (macOS) or `bwrap` (Linux). Writes outside the project tree are kernel-blocked. | Trusts the OS sandbox primitives. Defence-in-depth on top of declarative refusal. |
+
+Use both together when you can.
+
+## Declarative refusal
+
+Set `AGENT_SANDBOX=1` (or pass `--sandbox` per-call). Every mutating command
+will then refuse to run unless `--dry-run` is also present:
+
+```bash
+$ AGENT_SANDBOX=1 wd apply --stage staging --json
+{
+  "ok": false,
+  "command": "wd apply",
+  "error": {
+    "type": "sandbox",
+    "code": "WD_E_SANDBOX_BLOCKED",
+    "message": "AGENT_SANDBOX is set: refusing to run mutating command \"wd apply\" without --dry-run.",
+    "retryable": false,
+    "fix": "Re-run with --dry-run, or unset AGENT_SANDBOX (or omit --sandbox) to allow the mutation."
+  }
+}
+$ echo $?
+2
+```
+
+What it covers (manifest `mutating: true` commands):
+
+- `apply`, `deploy`, `destroy`, `gc`, `rollback`
+- `secrets`, `secrets sync`
+- `init`, `create`, `introspect`
+- `ci init`
+- `macro save`, `snapshot save`, `snapshot load`
+- `configure`, `login`, `logout`
+- `context set/unset/clear`, `lock acquire/release`
+- `telemetry on/off`
+- `d1 migrate/seed/reset`
+- `rotate-password`
+
+Side effects of setting `AGENT_SANDBOX=1`:
+
+- `--no-interactive` is auto-enabled (no prompts)
+- `--no-secrets-in-output` is auto-enabled (secret-shaped values stripped from JSON)
+
+## OS-level isolation
+
+For real isolation, wrap the command in `wd sandbox run --`. The CLI auto-detects
+which native sandboxer is available:
+
+```bash
+$ wd sandbox info --json
+{
+  "platform": "darwin",
+  "kind": "sandbox-exec",
+  "available": true,
+  "binary": "/usr/bin/sandbox-exec",
+  "writableRoots": [
+    "/your/project",
+    "/your/project/.wrangler-deploy",
+    "/your/project/node_modules",
+    "/tmp"
+  ],
+  "notes": [
+    "Using macOS sandbox-exec. Profile allows writes under PWD and reads from /; outbound network is restricted to known Cloudflare hosts."
+  ]
+}
+```
+
+Then run:
+
+```bash
+wd sandbox run -- wd apply --stage staging --json
+wd sandbox run -- wd deploy --stage staging --json --output-file deploys/staging.json
+```
+
+Anything after `--` is the inner command. The sandbox enforces that only the
+project tree (and `/tmp`) are writable. Try and you will see the kernel block it:
+
+```bash
+$ wd sandbox run -- bash -c 'touch /etc/wd-sandbox-test'
+touch: /etc/wd-sandbox-test: Operation not permitted
+```
+
+But local writes succeed:
+
+```bash
+$ wd sandbox run -- bash -c 'touch ./.wrangler-deploy/probe && echo ok'
+ok
+```
+
+### macOS
+
+Uses `sandbox-exec`, which ships with macOS. The generated profile:
+
+- Allows broad file reads (so `node`, `wrangler`, `git` work normally)
+- Restricts writes to `$PWD`, `$PWD/.wrangler-deploy`, `$PWD/node_modules`, `/tmp`, `/var/folders`
+- Allows process spawning, signals, IPC, network bind/inbound/outbound at the kernel level
+- Outbound HTTP(S) is funneled through a local proxy (see [Network filtering](#network-filtering) below)
+
+### Linux
+
+Uses `bwrap` (bubblewrap). Install via:
+
+```bash
+sudo apt install bubblewrap   # Debian/Ubuntu
+sudo dnf install bubblewrap   # Fedora/RHEL
+```
+
+The generated profile:
+
+- New mount namespace; everything is read-only except `$PWD` and `/tmp`
+- Shared network (host network), but new PID/UTS/IPC namespaces
+- `--die-with-parent` so the inner command can't outlive the wrapper
+- `AGENT_SANDBOX=1` and `WD_SANDBOX_KIND=bwrap` are set in the env
+- Outbound HTTP(S) is funneled through a local proxy (see [Network filtering](#network-filtering) below)
+
+### Network filtering
+
+Both macOS and Linux flavours start a local HTTP CONNECT + forward proxy on
+`127.0.0.1` and inject `HTTPS_PROXY` / `HTTP_PROXY` env vars into the inner
+command. The proxy enforces a hostname allowlist; everything else is rejected
+with a 403.
+
+**Enforcement strength differs by platform:**
+
+| Platform | What's kernel-blocked | Bypass risk |
+| --- | --- | --- |
+| macOS (`sandbox-exec`) | All outbound TCP except to the proxy port. Raw TCP that ignores `HTTP_PROXY` fails with `Operation not permitted`. | None — kernel blocks every other socket. |
+| Linux (`bwrap` default) | Filesystem writes outside PWD/tmp; PID/UTS/IPC isolation. Network namespace is shared. | Tools that bypass `HTTP_PROXY` (raw TCP, custom protocols) reach the host network directly. |
+| Linux (`bwrap --strict-network`) | Network namespace is unshared — the inner command has **no network at all**. | None — network is gone, including loopback to the proxy. Useful for fully-offline operations. |
+
+```bash
+$ wd sandbox info --json | jq .allowedHosts
+[
+  "api.cloudflare.com",
+  "dash.cloudflare.com",
+  "registry.npmjs.org",
+  "github.com",
+  "objects.githubusercontent.com",
+  "127.0.0.1",
+  "localhost"
+]
+```
+
+The default allowlist is suitable for `wd apply`/`wd deploy` flows. Extend it
+per-call with `--allow-host`:
+
+```bash
+wd sandbox run --allow-host example.com --allow-host .my-cdn.net -- \
+  wd deploy --stage staging
+```
+
+Patterns starting with `.` match by suffix (`.cloudflare.com` matches
+`api.cloudflare.com` and `dash.cloudflare.com`).
+
+To disable filtering entirely (allow direct outbound to any host) pass
+`--no-network-filter` or `--allow-host '*'`. The sandbox's filesystem isolation
+still applies.
+
+```bash
+$ wd sandbox run -- bash -c 'curl -s -o /dev/null -w "%{http_code}\n" https://example.com/'
+000   # blocked by proxy
+
+$ wd sandbox run --allow-host example.com -- bash -c 'curl -s -o /dev/null -w "%{http_code}\n" https://example.com/'
+200
+```
+
+Caveats of the proxy approach:
+
+- On **macOS**: the sandbox-exec profile blocks all outbound TCP except to the proxy port. Raw TCP that ignores `HTTP_PROXY` fails immediately with `Operation not permitted`. The proxy is the only egress.
+- On **Linux** (default `bwrap`): network namespace is shared with the host, so tools that ignore `HTTP_PROXY` reach the host network directly. Use `--strict-network` to drop network entirely (the inner command has no network at all, including loopback to the proxy).
+- The proxy logs every decision via `--json` mode (`proxyDecisions` array in the result).
+- The proxy stops automatically when the inner command exits.
+
+### Windows
+
+Real OS sandbox is not available. `wd sandbox run` returns:
+
+```json
+{
+  "ok": false,
+  "error": {
+    "type": "sandbox",
+    "code": "WD_E_SANDBOX_BLOCKED",
+    "message": "Real sandbox not available on win32 (kind: unsupported).",
+    "retryable": false,
+    "fix": "Real OS-level sandbox is not supported on this platform. Use AGENT_SANDBOX=1 refusal mode."
+  }
+}
+```
+
+Use `AGENT_SANDBOX=1` for declarative refusal instead.
+
+## Recommended posture
+
+For an agent that runs unattended:
+
+```bash
+export AGENT_SANDBOX=1
+wd sandbox run -- wd plan --stage staging --json
+wd sandbox run -- wd apply --stage staging --dry-run --json
+# Human reviews. Then, with AGENT_SANDBOX dropped for the actual mutation:
+AGENT_SANDBOX= wd sandbox run -- wd apply --stage staging --json
+```
+
+That gives you:
+
+- **Layer 1**: declarative refusal blocks accidental writes during planning
+- **Layer 2**: OS sandbox blocks any errant write outside the project tree, even when the mutation is intentional
+- **Audit trail**: `--output-file` persists every JSON result for review
+
+## What the sandbox does *not* do
+
+<Aside type="caution">
+  Be honest about what's enforced vs. declarative.
+
+  - On macOS, the sandbox blocks every outbound TCP except to the local proxy port. The proxy then enforces the hostname allowlist. Raw TCP / `HTTP_PROXY`-bypassing tools fail at the kernel.
+  - On Linux without `--strict-network`, the network namespace is shared with the host. `HTTP_PROXY`-respecting tools are filtered; raw TCP is not. Pass `--strict-network` for full network isolation.
+  - Refusal mode (`AGENT_SANDBOX=1`) is enforced by the CLI itself. Any agent
+    that calls Node directly with `node -e 'require("fs").writeFileSync(...)'`
+    bypasses it. Use `wd sandbox run` if that matters.
+  - Secrets in env vars (`CLOUDFLARE_API_TOKEN` etc.) are visible to the inner
+    process. The sandbox can't strip them.
+</Aside>

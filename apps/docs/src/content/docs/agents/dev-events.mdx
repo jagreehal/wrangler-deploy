@@ -1,0 +1,133 @@
+---
+title: Local dev event stream
+description: wd dev --json emits one structured event per line on stdout instead of human terminal output
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+`wd dev` is a long-running interactive process. For human users it prints a
+persistent summary table and tails colourful logs. For agents that doesn't
+work — they need a structured stream.
+
+`wd dev --json` (or `--ndjson`) switches to one JSON object per line on stdout.
+
+## Event schema
+
+Live schema:
+
+```bash
+wd schema outputs --command devEvent --json
+```
+
+Each event has at minimum:
+
+```json
+{ "ts": "2026-05-14T20:30:00.123Z", "type": "worker.ready" }
+```
+
+Additional fields depend on `type`.
+
+## Event types
+
+| `type` | When it fires | Notable extra fields |
+| --- | --- | --- |
+| `dev.starting` | First event after parsing the dev plan, before any worker spawns. | `mode` (`"workers"` or `"session"`), `workers`, `companions` |
+| `worker.ready` | One per worker, once its dev server is reachable. | `workerPath`, `port`, `url` |
+| `dev.ready` | All planned workers are up. | `workerCount`, `ports` (map), `mode`, `logDir` |
+| `worker.log` | Captured stdout/stderr line from a running worker. ANSI-stripped, trimmed. | `workerPath`, `message` |
+| `worker.error` | Same as `worker.log` but the line matched an error heuristic (case-insensitive `error`, `✗`, or `✘`). | `workerPath`, `message` |
+| `dev.stopping` | Sent on SIGINT/SIGTERM, before teardown. | — |
+| `dev.stopped` | Final event before exit. | — |
+
+<Aside type="note">
+  Human-formatted log output (with worker labels and ANSI colors) is redirected
+  to **stderr** when in event mode, so the NDJSON stream on stdout stays
+  parseable. You can still see colourful logs by reading stderr separately.
+  Subscribers should also handle unknown event types gracefully (forward-compatible).
+</Aside>
+
+## Example transcript
+
+```bash
+$ wd dev --json
+{"ts":"...","type":"dev.starting","mode":"workers","workers":[{"workerPath":"workers/api"},{"workerPath":"workers/auth"}],"companions":[]}
+{"ts":"...","type":"worker.log","workerPath":"workers/api","message":"⛅️ wrangler 4.88.0"}
+{"ts":"...","type":"worker.log","workerPath":"workers/api","message":"[wrangler:info] Ready on http://localhost:8787"}
+{"ts":"...","type":"worker.ready","workerPath":"workers/api","port":8787,"url":"http://127.0.0.1:8787"}
+{"ts":"...","type":"worker.ready","workerPath":"workers/auth","port":8788,"url":"http://127.0.0.1:8788"}
+{"ts":"...","type":"dev.ready","workerCount":2,"ports":{"workers/api":8787,"workers/auth":8788},"mode":"workers","logDir":"/your/project/.wrangler-deploy/dev-logs"}
+{"ts":"...","type":"worker.log","workerPath":"workers/api","message":"[wrangler:info] GET /health 200 OK (3ms)"}
+{"ts":"...","type":"worker.error","workerPath":"workers/api","message":"TypeError: Cannot read properties of undefined (reading 'foo')"}
+^C
+{"ts":"...","type":"dev.stopping"}
+{"ts":"...","type":"dev.stopped"}
+```
+
+## Subscribing from a script
+
+Bash:
+
+```bash
+wd dev --json | while IFS= read -r line; do
+  type=$(echo "$line" | jq -r .type)
+  case "$type" in
+    worker.ready) echo "ready: $(echo "$line" | jq -r .url)";;
+    dev.ready)    echo "all up";;
+    dev.stopped)  echo "done"; break;;
+  esac
+done
+```
+
+Node:
+
+```ts
+import { spawn } from "node:child_process";
+import { createInterface } from "node:readline";
+
+const dev = spawn("wd", ["dev", "--json"], { stdio: ["ignore", "pipe", "inherit"] });
+const rl = createInterface({ input: dev.stdout });
+
+for await (const line of rl) {
+  const event = JSON.parse(line);
+  switch (event.type) {
+    case "dev.starting":
+      console.log("planning", event.workers.length, "workers");
+      break;
+    case "worker.ready":
+      console.log("ready", event.workerPath, "→", event.url);
+      break;
+    case "dev.ready":
+      // all workers up; safe to start probing
+      break;
+    case "dev.stopped":
+      process.exit(0);
+  }
+}
+```
+
+## Errors during start-up
+
+If `wd dev --json` can't even start (missing config, missing deps, port conflict
+that the port-finder couldn't resolve), it falls back to the standard error
+envelope on stdout — not an event line. Always check exit code first:
+
+```bash
+$ wd dev --json
+{
+  "ok": false,
+  "command": "wd dev",
+  "error": {
+    "type": "config",
+    "code": "WD_E_CONFIG_MISSING",
+    "message": "No wrangler-deploy.config.ts or wrangler-deploy.config.js found in the current directory.",
+    "retryable": false,
+    "fix": "Run `wd init` to scaffold a config, or `cd` to a project that has one."
+  }
+}
+```
+
+## Stopping the dev server programmatically
+
+Send `SIGINT` or `SIGTERM` to the `wd dev` process. The CLI emits
+`dev.stopping`, tears down workers and tunnels, then emits `dev.stopped`
+before exiting.

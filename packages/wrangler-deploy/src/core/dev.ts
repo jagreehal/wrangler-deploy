@@ -9,6 +9,7 @@ import { createLogMultiplexer } from "./dev-logs.js";
 import { findAvailablePorts } from "./port-finder.js";
 import { readWranglerConfig } from "./wrangler.js";
 import { renderWranglerConfig } from "./render.js";
+import { AgentErrors } from "./cli-output.js";
 
 export interface WorkerDevPlan {
   workerPath: string;
@@ -79,8 +80,9 @@ function resolveWorkerConfigPath(rootDir: string, workerPath: string): string {
   const jsonPath = resolve(rootDir, workerPath, "wrangler.json");
   if (existsSync(jsonPath)) return jsonPath;
 
-  throw new Error(
+  throw AgentErrors.notFound(
     `No wrangler.jsonc or wrangler.json found for worker "${workerPath}" at ${resolve(rootDir, workerPath)}`,
+    "Add a wrangler.jsonc (or wrangler.json) file in the worker directory.",
   );
 }
 
@@ -177,7 +179,12 @@ function writeRenderedDevConfig(
   state: Awaited<ReturnType<StateProvider["read"]>>,
 ): string {
   if (!state) {
-    throw new Error(`Stage "${stage}" not found in state`);
+    throw AgentErrors.state(
+      `Stage "${stage}" not found in state.\n` +
+      `  Make sure you have run \`wd apply --stage ${stage}\` first, or pass --stage to use a different stage.\n` +
+      `  Run \`wd status\` to see available stages.`,
+      `Run \`wd apply --stage ${stage}\` first.`,
+    );
   }
 
   const baseConfig = readWranglerConfig(resolve(rootDir, workerPath));
@@ -261,15 +268,15 @@ export async function buildDevPlan(
   const { basePort = 8787, filter, stage, workerOptions, fallbackStage, stateProvider } = options;
 
   if ((stage || fallbackStage) && !stateProvider) {
-    throw new Error("stage/fallback-stage dev requires stateProvider — pass a StateProvider via DevOptions.stateProvider");
+    throw AgentErrors.validation("stage/fallback-stage dev requires stateProvider — pass a StateProvider via DevOptions.stateProvider", "Pass a StateProvider via DevOptions.stateProvider when using --stage or --fallback-stage.");
   }
 
   if (stage && fallbackStage) {
-    throw new Error("stage and fallbackStage are not compatible — choose one source of stage state");
+    throw AgentErrors.validation("stage and fallbackStage are not compatible — choose one source of stage state", "Use either --stage or --fallback-stage, not both.");
   }
 
   if (fallbackStage && stateProvider && (options.session ?? config.dev?.session?.enabled)) {
-    throw new Error("read-mode (--fallback-stage) is not compatible with session mode — omit --session or --fallback-stage");
+    throw AgentErrors.validation("read-mode (--fallback-stage) is not compatible with session mode — omit --session or --fallback-stage", "Omit --session or --fallback-stage.");
   }
 
   let workers: string[];
@@ -280,14 +287,23 @@ export async function buildDevPlan(
   if (stage && stateProvider) {
     stageState = await stateProvider.read(stage);
     if (!stageState) {
-      throw new Error(`Stage "${stage}" not found in state`);
+      const existing = await stateProvider.list();
+      const hint = existing.length > 0
+        ? `  Available stages: ${existing.join(", ")}`
+        : `  No stages exist yet. Run \`wd apply --stage ${stage}\` to create one.`;
+      throw AgentErrors.state(
+        `Stage "${stage}" not found in state.\n` +
+        `  ${hint}\n` +
+        `  Use --stage <name> to target a different stage.`,
+        `Run \`wd apply --stage ${stage}\` to create the stage, or pass an existing --stage.`,
+      );
     }
   }
 
   if (filter) {
     const allWorkers = new Set(config.workers);
     if (!allWorkers.has(filter)) {
-      throw new Error(`Unknown worker "${filter}" — not found in config. Available workers: ${[...allWorkers].join(", ")}`);
+      throw AgentErrors.notFound(`Unknown worker "${filter}" — not found in config. Available workers: ${[...allWorkers].join(", ")}`, "Pass a worker path that exists in `config.workers`.");
     }
 
     if (fallbackStage && stateProvider) {
@@ -296,7 +312,16 @@ export async function buildDevPlan(
 
       const fallbackState = await stateProvider.read(fallbackStage);
       if (!fallbackState) {
-        throw new Error(`Fallback stage "${fallbackStage}" not found in state`);
+        const existing = await stateProvider.list();
+        const hint = existing.length > 0
+          ? `  Available stages: ${existing.join(", ")}`
+          : `  No stages exist yet. Run \`wd apply --stage ${fallbackStage}\` first.`;
+        throw AgentErrors.state(
+          `Fallback stage "${fallbackStage}" not found in state.\n` +
+          `  ${hint}\n` +
+          `  Use --fallback-stage <name> or --stage <name> to target a different stage.`,
+          `Run \`wd apply --stage ${fallbackStage}\` to create it, or pass an existing --fallback-stage.`,
+        );
       }
 
       const directBindings = config.serviceBindings?.[filter] ?? {};
@@ -377,14 +402,14 @@ export async function buildDevPlan(
 
   if (sessionEnabled || options.persistTo !== undefined) {
     if (workerPlans.length === 0) {
-      throw new Error("Cannot start a dev session without any workers.");
+      throw AgentErrors.config("Cannot start a dev session without any workers.", "Add workers to your config or remove the session/persistTo settings.");
     }
 
     const entryWorkerPath =
       filter ?? config.dev?.session?.entryWorker ?? workerPlans[workerPlans.length - 1]!.workerPath;
     const entryWorker = workerPlans.find((worker) => worker.workerPath === entryWorkerPath);
     if (!entryWorker) {
-      throw new Error(`Unable to resolve entry worker "${entryWorkerPath}" for local dev session.`);
+      throw AgentErrors.config(`Unable to resolve entry worker "${entryWorkerPath}" for local dev session.`, "Set dev.session.entryWorker to a worker path that exists in `config.workers`.");
     }
 
     const sessionWorkers = [
@@ -461,11 +486,16 @@ function spawnCompanion(
  */
 export async function startDev(
   plan: DevPlan,
-  options?: { output?: (line: string) => void; logDir?: string; rootDir?: string },
+  options?: {
+    output?: (line: string) => void;
+    logDir?: string;
+    rootDir?: string;
+    onLine?: (workerPath: string, line: string) => void;
+  },
 ): Promise<DevHandle> {
   const output = options?.output ?? ((line: string) => process.stdout.write(line + "\n"));
   const rootDir = options?.rootDir;
-  const mux = createLogMultiplexer(output, { logDir: options?.logDir });
+  const mux = createLogMultiplexer(output, { logDir: options?.logDir, onLine: options?.onLine });
   const processes = new Map<string, ReturnType<typeof spawn>>();
   const resolvedPorts: Record<string, number> = {};
   let companionRuntimeEnv: Record<string, string> = {};

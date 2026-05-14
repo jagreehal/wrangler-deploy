@@ -2,9 +2,9 @@
 
 | Key | Value |
 | --- | --- |
-| Date | 2026-05-13T22:17:20.242Z |
-| Version | 1.4.3 |
-| Git SHA | c192ef4 |
+| Date | 2026-05-14T21:55:57.378Z |
+| Version | 1.4.4 |
+| Git SHA | 5966dfe |
 
 ## src/github.test.ts
 
@@ -165,6 +165,12 @@
 - **When** apply is called
 - **Then** the KV resource should still be persisted in state as created
 
+### ✅ preserves prior deployment metadata on re-apply
+
+- **Given** state where the worker has already been deployed (url + deployed=true + versionId)
+- **When** apply is re-run
+- **Then** deployment metadata is retained, not stripped
+
 ### ✅ removes workers from state that are no longer declared in the manifest
 
 - **Given** existing state containing a worker removed from config.workers
@@ -297,6 +303,12 @@
 - **Given** a worker with rendered config
 - **When** deploy is called
 - **Then** workers are deployed using wrangler
+
+### ✅ parses deploy output URLs/routes/version and persists them to state
+
+
+### ✅ parses alternate wrangler output variants
+
 
 ### ✅ blocks deploys when declared secrets are missing
 

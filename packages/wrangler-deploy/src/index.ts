@@ -164,4 +164,12 @@ export {
 
 // Timer
 export { createTimer } from "./core/timer.js";
-export { createViteStarter, type CreateStarterOptions, type CreateStarterResult } from "./core/create.js";
+export { createHelloStarter, type CreateStarterOptions, type CreateStarterResult, type StarterTemplate } from "./core/create.js";
+export {
+  DEFAULT_TEMPLATES_REPO,
+  fetchTemplate,
+  loadTemplateManifest,
+  resolveTemplateSource,
+  type TemplateManifest,
+  type TemplateManifestEntry,
+} from "./core/scaffold.js";

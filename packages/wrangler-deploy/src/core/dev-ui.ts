@@ -23,6 +23,7 @@ import { createWranglerRunner } from "./wrangler-runner.js";
 import { readWranglerConfig } from "./wrangler.js";
 import type { ProjectContext } from "../types.js";
 import { renderGuardPage } from "./dev-ui-guard.js";
+import { AgentErrors } from "./cli-output.js";
 import { runStatus } from "./guard/status.js";
 import { runBreaches } from "./guard/breaches.js";
 import { runReport } from "./guard/report.js";
@@ -785,7 +786,7 @@ async function runAction(config: CfStageConfig, rootDir: string, rawBody: string
     if (action === "endpoint") {
       const worker = form.get("worker");
       const endpoint = form.get("endpoint");
-      if (!worker || !endpoint) throw new Error("Missing worker or endpoint.");
+      if (!worker || !endpoint) throw AgentErrors.validation("Missing worker or endpoint.", "Provide both worker and endpoint fields.");
       const body = form.get("body") || undefined;
       const result = await callWorker(config, rootDir, {
         worker,
@@ -802,9 +803,9 @@ async function runAction(config: CfStageConfig, rootDir: string, rawBody: string
 
     if (action === "worker-fixture") {
       const fixtureName = form.get("fixture");
-      if (!fixtureName) throw new Error("Missing worker fixture.");
+      if (!fixtureName) throw AgentErrors.validation("Missing worker fixture.", "Pass a fixture name in the request body.");
       const fixture = listWorkerFixtures(config).find((entry) => entry.name === fixtureName)?.fixture;
-      if (!fixture) throw new Error(`Unknown worker fixture "${fixtureName}".`);
+      if (!fixture) throw AgentErrors.notFound(`Unknown worker fixture "${fixtureName}".`, "Check `dev.fixtures.workers` in your config.");
       const body = form.get("body") || fixture.body || undefined;
       const result = await callWorker(config, rootDir, {
         worker: fixture.worker,
@@ -825,7 +826,7 @@ async function runAction(config: CfStageConfig, rootDir: string, rawBody: string
     if (action === "queue") {
       const queue = form.get("queue");
       const payload = form.get("payload");
-      if (!queue || !payload) throw new Error("Missing queue or payload.");
+      if (!queue || !payload) throw AgentErrors.validation("Missing queue or payload.", "Provide both queue and payload fields.");
       const result = await sendQueueMessage(config, rootDir, { queue, payload });
       return {
         ok: result.ok,
@@ -836,9 +837,9 @@ async function runAction(config: CfStageConfig, rootDir: string, rawBody: string
 
     if (action === "queue-fixture") {
       const fixtureName = form.get("fixture");
-      if (!fixtureName) throw new Error("Missing queue fixture.");
+      if (!fixtureName) throw AgentErrors.validation("Missing queue fixture.", "Pass a fixture name in the request body.");
       const fixture = listQueueFixtures(config).find((entry) => entry.name === fixtureName)?.fixture;
-      if (!fixture) throw new Error(`Unknown queue fixture "${fixtureName}".`);
+      if (!fixture) throw AgentErrors.notFound(`Unknown queue fixture "${fixtureName}".`, "Check `dev.fixtures.queues` in your config.");
       const payload = form.get("payload") || fixture.payload;
       const result = await sendQueueMessage(config, rootDir, {
         queue: fixture.queue,
@@ -855,9 +856,9 @@ async function runAction(config: CfStageConfig, rootDir: string, rawBody: string
     if (action === "cron") {
       const worker = form.get("worker");
       const cron = form.get("cron") || undefined;
-      if (!worker) throw new Error("Missing cron worker.");
+      if (!worker) throw AgentErrors.validation("Missing cron worker.", "Provide the worker field in the request body.");
       const port = (await listWorkerRoutes(config, rootDir)).find((route) => route.workerPath === worker)?.port;
-      if (!port) throw new Error(`No local port found for ${worker}.`);
+      if (!port) throw AgentErrors.state(`No local port found for ${worker}.`, "Start `wd dev` and ensure the worker is running.");
       const result = await triggerCron({ port, cron });
       return {
         ok: result.ok,
@@ -868,11 +869,11 @@ async function runAction(config: CfStageConfig, rootDir: string, rawBody: string
 
     if (action === "d1-seed" || action === "d1-reset") {
       const database = form.get("database");
-      if (!database) throw new Error("Missing database.");
+      if (!database) throw AgentErrors.validation("Missing database.", "Provide the database field in the request body.");
       const file = action === "d1-seed"
         ? config.dev?.d1?.[database]?.seedFile
         : config.dev?.d1?.[database]?.resetFile;
-      if (!file) throw new Error(`No file configured for ${action}.`);
+      if (!file) throw AgentErrors.config(`No file configured for ${action}.`, `Add ${action === "d1-seed" ? "seedFile" : "resetFile"} under dev.d1.${database} in your config.`);
       const result = executeLocalD1(config, rootDir, wrangler, { database, file });
       return {
         ok: true,
@@ -884,7 +885,7 @@ async function runAction(config: CfStageConfig, rootDir: string, rawBody: string
     if (action === "d1-exec") {
       const database = form.get("database");
       const sql = form.get("sql");
-      if (!database || !sql) throw new Error("Missing database or SQL.");
+      if (!database || !sql) throw AgentErrors.validation("Missing database or SQL.", "Provide both database and sql fields.");
       const result = executeLocalD1(config, rootDir, wrangler, { database, sql });
       return {
         ok: true,
@@ -895,9 +896,9 @@ async function runAction(config: CfStageConfig, rootDir: string, rawBody: string
 
     if (action === "d1-fixture") {
       const fixtureName = form.get("fixture");
-      if (!fixtureName) throw new Error("Missing D1 fixture.");
+      if (!fixtureName) throw AgentErrors.validation("Missing D1 fixture.", "Pass a fixture name in the request body.");
       const fixture = listD1Fixtures(config).find((entry) => entry.name === fixtureName)?.fixture;
-      if (!fixture) throw new Error(`Unknown D1 fixture "${fixtureName}".`);
+      if (!fixture) throw AgentErrors.notFound(`Unknown D1 fixture "${fixtureName}".`, "Check `dev.fixtures.d1` in your config.");
       const sql = form.get("sql") || fixture.sql || undefined;
       const file = form.get("file") || fixture.file || undefined;
       const result = executeLocalD1(config, rootDir, wrangler, {
@@ -915,7 +916,7 @@ async function runAction(config: CfStageConfig, rootDir: string, rawBody: string
 
     if (action === "verify-pack") {
       const pack = form.get("pack");
-      if (!pack) throw new Error("Missing verify pack.");
+      if (!pack) throw AgentErrors.validation("Missing verify pack.", "Provide the pack field in the request body.");
       const result = await verifyLocal({ rootDir, config, pack, wrangler });
       return {
         ok: result.passed,
@@ -929,7 +930,7 @@ async function runAction(config: CfStageConfig, rootDir: string, rawBody: string
 
     if (action === "snapshot-save") {
       const name = form.get("name");
-      if (!name) throw new Error("Missing snapshot name.");
+      if (!name) throw AgentErrors.validation("Missing snapshot name.", "Provide the name field in the request body.");
       const snapshot = saveSnapshot(config, rootDir, name);
       return {
         ok: true,
@@ -940,7 +941,7 @@ async function runAction(config: CfStageConfig, rootDir: string, rawBody: string
 
     if (action === "snapshot-load") {
       const name = form.get("name");
-      if (!name) throw new Error("Missing snapshot name.");
+      if (!name) throw AgentErrors.validation("Missing snapshot name.", "Provide the name field in the request body.");
       const snapshot = loadSnapshot(rootDir, name);
       return {
         ok: true,
@@ -951,9 +952,9 @@ async function runAction(config: CfStageConfig, rootDir: string, rawBody: string
 
     if (action === "replay-history") {
       const id = form.get("id");
-      if (!id) throw new Error("Missing history entry id.");
+      if (!id) throw AgentErrors.validation("Missing history entry id.", "Provide the id field in the request body.");
       const entry = getDevUiHistoryEntry(rootDir, id);
-      if (!entry) throw new Error(`Unknown history entry "${id}"`);
+      if (!entry) throw AgentErrors.notFound(`Unknown history entry "${id}"`, "Check the dev UI history list for valid IDs.");
       const replayForm = new URLSearchParams(entry.form);
       replayForm.delete("action");
       return runAction(config, rootDir, new URLSearchParams({
@@ -962,7 +963,7 @@ async function runAction(config: CfStageConfig, rootDir: string, rawBody: string
       }).toString());
     }
 
-    throw new Error(`Unknown action "${action ?? "missing"}".`);
+    throw AgentErrors.validation(`Unknown action "${action ?? "missing"}".`, "Use a supported action name.");
   } catch (error) {
     return {
       ok: false,

@@ -3,6 +3,7 @@ import { join, dirname } from "node:path";
 import type { StageState, StateConfig } from "../types.js";
 import { getWranglerEnv, resolveAccountId } from "./auth.js";
 import { encryptState, decryptState } from "./crypto.js";
+import { AgentErrors } from "./cli-output.js";
 
 const CF_API_BASE = "https://api.cloudflare.com/client/v4";
 
@@ -24,14 +25,14 @@ export function resolveStateProvider(rootDir: string, stateConfig?: StateConfig,
 
   if (stateConfig.backend === "d1") {
     if (!stateConfig.databaseId) {
-      throw new Error("state.databaseId is required when backend: \"d1\"");
+      throw AgentErrors.config("state.databaseId is required when backend: \"d1\"", "Set state.databaseId in wrangler-deploy.config.ts.");
     }
     return new D1StateProvider(rootDir, stateConfig.databaseId, stateConfig.tableName, password);
   }
 
   if (stateConfig.backend === "r2") {
     if (!stateConfig.bucketName) {
-      throw new Error("state.bucketName is required when backend: \"r2\"");
+      throw AgentErrors.config("state.bucketName is required when backend: \"r2\"", "Set state.bucketName in wrangler-deploy.config.ts.");
     }
     return new R2StateProvider(rootDir, stateConfig.bucketName, stateConfig.keyPrefix, password);
   }
@@ -62,7 +63,7 @@ export class KvStateProvider implements StateProvider {
     const env = getWranglerEnv(rootDir);
     this.apiToken = env.CLOUDFLARE_API_TOKEN || "";
     if (!this.apiToken) {
-      throw new Error("CLOUDFLARE_API_TOKEN is required for remote state");
+      throw AgentErrors.auth("CLOUDFLARE_API_TOKEN is required for remote state", "Set CLOUDFLARE_API_TOKEN or run `wd login`.", { env: ["CLOUDFLARE_API_TOKEN"] });
     }
     this.accountId = resolveAccountId(rootDir);
     this.namespaceId = namespaceId;
@@ -75,7 +76,7 @@ export class KvStateProvider implements StateProvider {
     });
     if (!res.ok) {
       if (res.status === 404) return null;
-      throw new Error(`KV get failed: ${res.status} ${await res.text()}`);
+      throw AgentErrors.network(`KV get failed: ${res.status} ${await res.text()}`);
     }
     const text = await res.text();
     try {
@@ -93,7 +94,7 @@ export class KvStateProvider implements StateProvider {
       body: value,
     });
     if (!res.ok) {
-      throw new Error(`KV put failed: ${res.status} ${await res.text()}`);
+      throw AgentErrors.network(`KV put failed: ${res.status} ${await res.text()}`);
     }
   }
 
@@ -104,7 +105,7 @@ export class KvStateProvider implements StateProvider {
       headers: { Authorization: `Bearer ${this.apiToken}` },
     });
     if (!res.ok && res.status !== 404) {
-      throw new Error(`KV delete failed: ${res.status} ${await res.text()}`);
+      throw AgentErrors.network(`KV delete failed: ${res.status} ${await res.text()}`);
     }
   }
 
@@ -133,7 +134,7 @@ export class KvStateProvider implements StateProvider {
       headers: { Authorization: `Bearer ${this.apiToken}` },
     });
     if (!res.ok) {
-      throw new Error(`KV list failed: ${res.status} ${await res.text()}`);
+      throw AgentErrors.network(`KV list failed: ${res.status} ${await res.text()}`);
     }
     const data = (await res.json()) as { result: Array<{ name: string }> };
     return data.result.map((k: { name: string }) => k.name.replace(this.prefix, ""));
@@ -170,12 +171,12 @@ export class D1StateProvider implements StateProvider {
     const env = getWranglerEnv(rootDir);
     this.apiToken = env.CLOUDFLARE_API_TOKEN || "";
     if (!this.apiToken) {
-      throw new Error("CLOUDFLARE_API_TOKEN is required for remote state");
+      throw AgentErrors.auth("CLOUDFLARE_API_TOKEN is required for remote state", "Set CLOUDFLARE_API_TOKEN or run `wd login`.", { env: ["CLOUDFLARE_API_TOKEN"] });
     }
     this.accountId = resolveAccountId(rootDir);
     this.databaseId = databaseId;
     if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(tableName)) {
-      throw new Error(`state.tableName must match [a-zA-Z_][a-zA-Z0-9_]* (got "${tableName}")`);
+      throw AgentErrors.config(`state.tableName must match [a-zA-Z_][a-zA-Z0-9_]* (got "${tableName}")`, "Set state.tableName to a valid SQL identifier in wrangler-deploy.config.ts.");
     }
     this.tableName = tableName;
   }
@@ -194,7 +195,7 @@ export class D1StateProvider implements StateProvider {
       body: JSON.stringify({ sql, params }),
     });
     if (!res.ok) {
-      throw new Error(`D1 query failed: ${res.status} ${await res.text()}`);
+      throw AgentErrors.network(`D1 query failed: ${res.status} ${await res.text()}`);
     }
     const body = (await res.json()) as {
       success: boolean;
@@ -203,7 +204,7 @@ export class D1StateProvider implements StateProvider {
     };
     if (!body.success) {
       const message = body.errors?.map((e) => e.message).join(", ") ?? "unknown D1 error";
-      throw new Error(`D1 query failed: ${message}`);
+      throw AgentErrors.network(`D1 query failed: ${message}`);
     }
     return body.result;
   }
@@ -287,7 +288,7 @@ export class R2StateProvider implements StateProvider {
     const env = getWranglerEnv(rootDir);
     this.apiToken = env.CLOUDFLARE_API_TOKEN || "";
     if (!this.apiToken) {
-      throw new Error("CLOUDFLARE_API_TOKEN is required for remote state");
+      throw AgentErrors.auth("CLOUDFLARE_API_TOKEN is required for remote state", "Set CLOUDFLARE_API_TOKEN or run `wd login`.", { env: ["CLOUDFLARE_API_TOKEN"] });
     }
     this.accountId = resolveAccountId(rootDir);
     this.bucketName = bucketName;
@@ -304,7 +305,7 @@ export class R2StateProvider implements StateProvider {
     });
     if (res.status === 404) return null;
     if (!res.ok) {
-      throw new Error(`R2 get failed: ${res.status} ${await res.text()}`);
+      throw AgentErrors.network(`R2 get failed: ${res.status} ${await res.text()}`);
     }
     const text = await res.text();
     const parsed = JSON.parse(text) as StageState;
@@ -322,7 +323,7 @@ export class R2StateProvider implements StateProvider {
       body: JSON.stringify(toStore),
     });
     if (!res.ok) {
-      throw new Error(`R2 put failed: ${res.status} ${await res.text()}`);
+      throw AgentErrors.network(`R2 put failed: ${res.status} ${await res.text()}`);
     }
   }
 
@@ -332,7 +333,7 @@ export class R2StateProvider implements StateProvider {
       headers: { Authorization: `Bearer ${this.apiToken}` },
     });
     if (!res.ok && res.status !== 404) {
-      throw new Error(`R2 delete failed: ${res.status} ${await res.text()}`);
+      throw AgentErrors.network(`R2 delete failed: ${res.status} ${await res.text()}`);
     }
   }
 
@@ -342,7 +343,7 @@ export class R2StateProvider implements StateProvider {
       headers: { Authorization: `Bearer ${this.apiToken}` },
     });
     if (!res.ok) {
-      throw new Error(`R2 list failed: ${res.status} ${await res.text()}`);
+      throw AgentErrors.network(`R2 list failed: ${res.status} ${await res.text()}`);
     }
     const body = (await res.json()) as { result?: { objects?: Array<{ key: string }> } };
     const keys = body.result?.objects?.map((o) => o.key) ?? [];

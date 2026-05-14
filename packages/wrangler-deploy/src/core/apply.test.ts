@@ -351,6 +351,43 @@ describe("apply", () => {
     expect(result.resources["cache-kv"]?.props.delete).toBe(false);
   });
 
+  it("preserves prior deployment metadata on re-apply", async ({ task }) => {
+    story.init(task);
+
+    story.given("state where the worker has already been deployed (url + deployed=true + versionId)");
+    const existingState: StageState = {
+      stage: "staging",
+      createdAt: "2026-04-03T00:00:00.000Z",
+      updatedAt: "2026-04-03T00:00:00.000Z",
+      resources: {},
+      workers: {
+        "apps/api": {
+          name: "api-staging",
+          deployed: true,
+          url: "https://api-staging.example.workers.dev",
+          urls: ["https://api-staging.example.workers.dev"],
+          versionId: "v1",
+          routes: [],
+        },
+      },
+      secrets: {},
+    };
+    const provider = createMockProvider(existingState);
+    const config: CfStageConfig = { version: 1, workers: ["apps/api"], resources: {} };
+    const deps = stubDeps({ config, state: provider });
+
+    story.when("apply is re-run");
+    const nextState = await apply({ stage: "staging" }, deps);
+
+    story.then("deployment metadata is retained, not stripped");
+    expect(nextState.workers["apps/api"]).toMatchObject({
+      name: "api-staging",
+      deployed: true,
+      url: "https://api-staging.example.workers.dev",
+      versionId: "v1",
+    });
+  });
+
   it("removes workers from state that are no longer declared in the manifest", async ({ task }) => {
     story.init(task);
 

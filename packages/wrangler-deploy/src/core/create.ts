@@ -1,5 +1,14 @@
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
+import { AgentErrors } from "./cli-output.js";
+
+/**
+ * Templates that ship inline with the CLI. Currently only the bare
+ * hello-world Worker — everything else (vite, etc.) lives in the repo's
+ * `templates/` directory and is fetched at scaffold time via
+ * `core/scaffold.ts`. See templates/README.md.
+ */
+export type StarterTemplate = "hello";
 
 export interface CreateStarterOptions {
   targetDir: string;
@@ -8,7 +17,7 @@ export interface CreateStarterOptions {
 }
 
 export interface CreateStarterResult {
-  template: "vite";
+  template: StarterTemplate;
   targetDir: string;
   projectName: string;
   files: string[];
@@ -18,8 +27,10 @@ function assertEmptyDir(dir: string, force: boolean): void {
   if (!existsSync(dir)) return;
   const entries = readdirSync(dir);
   if (entries.length > 0 && !force) {
-    throw new Error(
+    throw AgentErrors.validation(
       `Target directory "${dir}" is not empty. Use a new directory or pass --force to overwrite files.`,
+      "Use a new directory, or pass --force to overwrite.",
+      { flag: "--force" },
     );
   }
 }
@@ -27,7 +38,7 @@ function assertEmptyDir(dir: string, force: boolean): void {
 function writeFile(targetPath: string, content: string, force: boolean): void {
   mkdirSync(dirname(targetPath), { recursive: true });
   if (existsSync(targetPath) && !force) {
-    throw new Error(`File "${targetPath}" already exists. Pass --force to overwrite.`);
+    throw AgentErrors.validation(`File "${targetPath}" already exists. Pass --force to overwrite.`, "Pass --force to overwrite the existing file.", { flag: "--force" });
   }
   writeFileSync(targetPath, content);
 }
@@ -36,13 +47,13 @@ function json(content: unknown): string {
   return `${JSON.stringify(content, null, 2)}\n`;
 }
 
-function kebabCase(input: string): string {
+function kebabCase(input: string, fallback = "my-worker"): string {
   return input
     .trim()
     .replace(/[^a-zA-Z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
-    .toLowerCase() || "cloudflare-vite-app";
+    .toLowerCase() || fallback;
 }
 
 function humanTitle(input: string): string {
@@ -53,9 +64,17 @@ function humanTitle(input: string): string {
     .join(" ");
 }
 
-export function createViteStarter(options: CreateStarterOptions): CreateStarterResult {
+/**
+ * Bare hello-world Worker template. No frontend, no KV, no Hono — the
+ * smallest possible "this works" scaffold for a Cloudflare newcomer.
+ *
+ * Local dev runs against `wrangler dev` directly, no `wd apply` needed first.
+ * `wd deploy --stage <name>` is the second-step ramp once they've seen
+ * localhost working.
+ */
+export function createHelloStarter(options: CreateStarterOptions): CreateStarterResult {
   const targetDir = resolve(options.targetDir);
-  const projectName = options.projectName ?? kebabCase(basename(targetDir));
+  const projectName = options.projectName ?? kebabCase(basename(targetDir), "hello-worker");
   const compatibilityDate = new Date().toISOString().slice(0, 10);
 
   assertEmptyDir(targetDir, !!options.force);
@@ -75,28 +94,23 @@ export function createViteStarter(options: CreateStarterOptions): CreateStarterR
       private: true,
       type: "module",
       scripts: {
-        dev: "concurrently -n web,worker -c cyan,magenta \"pnpm dev:web\" \"pnpm dev:worker\"",
-        "dev:web": "vite",
-        "dev:worker": "cd workers/api && wrangler dev --port 8787",
-        build: "vite build",
-        preview: "vite preview",
-        wd: "wd",
-        "wd:plan": "wd plan --stage staging",
-        "wd:apply": "wd apply --stage staging",
-        "wd:deploy": "wd deploy --stage staging",
-      },
-      dependencies: {
-        hono: "^4.12.12",
+        // Day-1 commands: dev + deploy go straight through Wrangler so the
+        // hello-world flow works without any wrangler-deploy stage concepts.
+        dev: "wrangler dev",
+        deploy: "wrangler deploy",
+        // Day-2 commands: once you've added resources to wrangler-deploy.config.ts,
+        // these create stage-suffixed environments. See:
+        //   https://wrangler-deploy.dev/wrangler-deploy/getting-started/quick-start/
+        plan: "wd plan",
+        apply: "wd apply",
+        status: "wd status",
+        "deploy:stage": "wd deploy",
       },
       devDependencies: {
         "@cloudflare/workers-types": "^4.20260412.1",
-        "@types/node": "^25.5.2",
-        concurrently: "^9.2.1",
-        tsx: "^4.21.0",
         typescript: "^6.0.2",
-        vite: "^8.0.3",
         wrangler: "^4.80.0",
-        "wrangler-deploy": "^1.2.0",
+        "wrangler-deploy": "^1.4.0",
       },
     }),
   );
@@ -110,238 +124,53 @@ export function createViteStarter(options: CreateStarterOptions): CreateStarterR
         moduleResolution: "bundler",
         strict: true,
         skipLibCheck: true,
-        lib: ["ES2022", "DOM", "DOM.Iterable"],
-        types: ["@cloudflare/workers-types", "node"],
+        lib: ["ES2022"],
+        types: ["@cloudflare/workers-types"],
       },
-      include: ["wrangler-deploy.config.ts", "vite.config.ts", "src/**/*.ts", "workers/**/*.ts"],
+      include: ["wrangler-deploy.config.ts", "src/**/*.ts"],
     }),
   );
 
   addFile(
-    "vite.config.ts",
-    `import { defineConfig } from "vite";
-
-export default defineConfig({
-  server: {
-    port: 5173,
-    proxy: {
-      "/api": "http://127.0.0.1:8787",
-    },
+    "src/index.ts",
+    `export default {
+  async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+    return Response.json({
+      message: "Hello from Cloudflare Workers!",
+      path: url.pathname,
+      now: new Date().toISOString(),
+    });
   },
-});
-`,
-  );
-
-  addFile(
-    "index.html",
-    `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${humanTitle(projectName)}</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
-</html>
-`,
-  );
-
-  addFile(
-    "src/main.ts",
-    `import "./style.css";
-
-type ApiResponse = {
-  ok: boolean;
-  message: string;
-  visits: number;
 };
-
-const app = document.querySelector<HTMLDivElement>("#app");
-
-if (!app) {
-  throw new Error("Missing #app container");
-}
-
-app.innerHTML = \`
-  <main class="shell">
-    <p class="eyebrow">Cloudflare Vite starter</p>
-    <h1>Ship a frontend and a stage-aware worker from one repo.</h1>
-    <p class="lede">The Vite app talks to a worker API, and wrangler-deploy handles the stage lifecycle.</p>
-    <button id="refresh">Refresh data</button>
-    <pre id="output">Loading...</pre>
-  </main>
-\`;
-
-const output = document.querySelector<HTMLElement>("#output");
-const button = document.querySelector<HTMLButtonElement>("#refresh");
-
-if (!output || !button) {
-  throw new Error("Starter UI failed to initialize");
-}
-
-async function loadData() {
-  const res = await fetch("/api");
-  const data = (await res.json()) as ApiResponse;
-  output.textContent = JSON.stringify(data, null, 2);
-}
-
-button.addEventListener("click", () => {
-  void loadData();
-});
-
-void loadData();
 `,
   );
 
   addFile(
-    "src/style.css",
-    `:root {
-  color-scheme: dark;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background:
-    radial-gradient(circle at top, rgba(88, 142, 255, 0.35), transparent 35%),
-    linear-gradient(180deg, #0b1020 0%, #050816 100%);
-  color: #eff4ff;
-}
-
-html,
-body {
-  margin: 0;
-  min-height: 100%;
-}
-
-body {
-  min-height: 100vh;
-}
-
-.shell {
-  min-height: 100vh;
-  display: grid;
-  place-content: center;
-  gap: 1rem;
-  padding: 3rem;
-  max-width: 44rem;
-  margin: 0 auto;
-}
-
-.eyebrow {
-  margin: 0;
-  text-transform: uppercase;
-  letter-spacing: 0.22em;
-  color: #8ab4ff;
-  font-size: 0.75rem;
-}
-
-h1 {
-  margin: 0;
-  font-size: clamp(2.5rem, 7vw, 5rem);
-  line-height: 0.95;
-}
-
-.lede {
-  margin: 0;
-  max-width: 38rem;
-  color: rgba(239, 244, 255, 0.8);
-  font-size: 1.05rem;
-  line-height: 1.6;
-}
-
-button {
-  width: fit-content;
-  border: 0;
-  border-radius: 999px;
-  padding: 0.9rem 1.4rem;
-  background: #eff4ff;
-  color: #0b1020;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-pre {
-  margin: 0;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 1rem;
-  padding: 1rem;
-  background: rgba(255, 255, 255, 0.06);
-  overflow: auto;
-}
-`,
-  );
-
-  addFile(
-    "workers/api/src/index.ts",
-    `import { Hono } from "hono";
-import type { apiEnv } from "../../../wrangler-deploy.config.ts";
-
-const app = new Hono<{ Bindings: typeof apiEnv.Env }>();
-
-app.get("/api", async (c) => {
-  const current = Number((await c.env.APP_STATE.get("visits")) ?? "0") + 1;
-  await c.env.APP_STATE.put("visits", String(current));
-
-  return c.json({
-    ok: true,
-    message: "Hello from Cloudflare Workers",
-    visits: current,
-  });
-});
-
-export default app;
-`,
-  );
-
-  addFile(
-    "workers/api/wrangler.jsonc",
+    "wrangler.jsonc",
     `{
-  "name": "api",
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "${projectName}",
   "main": "src/index.ts",
   "compatibility_date": "${compatibilityDate}",
-  "compatibility_flags": ["nodejs_compat"],
-  "dev": { "port": 8787 },
-  "kv_namespaces": [
-    { "binding": "APP_STATE", "id": "placeholder" }
-  ]
+  "compatibility_flags": ["nodejs_compat"]
 }
 `,
   );
 
   addFile(
     "wrangler-deploy.config.ts",
-    `import { defineConfig, kv, workerEnv } from "wrangler-deploy";
+    `import { defineConfig } from "wrangler-deploy";
 
-const appState = kv("app-state");
-
-export const apiEnv = workerEnv({
-  APP_STATE: appState,
-});
-
+// Adding resources later? Declare them here and they'll be created per-stage
+// when you run \`wd apply --stage <name>\`. See:
+//   https://wrangler-deploy.dev/wrangler-deploy/resources/
 export default defineConfig({
   version: 1,
-  workers: ["workers/api"],
-  resources: {
-    "app-state": {
-      type: "kv",
-      bindings: {
-        "workers/api": "APP_STATE",
-      },
-    },
-  },
-  dev: {
-    endpoints: {
-      api: {
-        worker: "workers/api",
-        path: "/api",
-        method: "GET",
-        description: "Starter worker API endpoint",
-      },
-    },
-  },
+  workers: ["."],
+  resources: {},
   stages: {
     production: { protected: true },
-    staging: { protected: true },
     "pr-*": { protected: false, ttl: "7d" },
   },
 });
@@ -352,13 +181,7 @@ export default defineConfig({
     "README.md",
     `# ${humanTitle(projectName)}
 
-Cloudflare Vite starter with a frontend, a worker API, and wrangler-deploy for stage-aware provisioning.
-
-## Install
-
-\`\`\`bash
-pnpm install
-\`\`\`
+A Cloudflare Worker scaffolded with [\`wrangler-deploy\`](https://wrangler-deploy.dev/).
 
 ## Local dev
 
@@ -366,13 +189,27 @@ pnpm install
 pnpm dev
 \`\`\`
 
-## Stage management
+Open <http://localhost:8787> — you should see JSON.
+
+## Deploy
+
+When you're ready to put it on the edge:
 
 \`\`\`bash
-wd plan --stage staging
-wd apply --stage staging
-wd deploy --stage staging
+pnpm run deploy
+# or: npm run deploy / yarn run deploy / bun run deploy
 \`\`\`
+
+Note: \`pnpm deploy\` (without \`run\`) is a built-in pnpm command that targets workspaces, so always use \`pnpm run deploy\` for this script.
+
+The first deploy will prompt you to log in to Cloudflare if you haven't yet.
+
+## What's next
+
+- Edit \`src/index.ts\` — \`wrangler dev\` hot-reloads on save.
+- Add resources (KV, D1, queues) in \`wrangler-deploy.config.ts\`.
+- Once you have resources, swap to staged deploys: \`pnpm run apply\` + \`pnpm run deploy:stage --stage <name>\`.
+- Run \`wd help\` for the full command list.
 `,
   );
 
@@ -386,7 +223,7 @@ dist
   );
 
   return {
-    template: "vite",
+    template: "hello",
     targetDir,
     projectName,
     files,

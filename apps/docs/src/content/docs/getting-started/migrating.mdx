@@ -50,38 +50,53 @@ wd introspect --filter payments-
 The config describes your resources and which workers use them. It does not contain any resource IDs from your existing environment. That is intentional — IDs are per-stage and tracked in state.
 
 ```ts
-import { defineConfig, d1, kv, queue } from "wrangler-deploy";
+// wrangler-deploy.config.ts
+import { defineConfig } from "wrangler-deploy";
 
 export default defineConfig({
   version: 1,
-  workers: {
-    api: { wranglerConfig: "./workers/api/wrangler.jsonc" },
-    batch: { wranglerConfig: "./workers/batch/wrangler.jsonc" },
-  },
+  workers: ["workers/api", "workers/batch"],
   resources: {
-    paymentsDb: d1("payments-db"),
-    cacheKv: kv("cache-kv"),
-    outbox: queue("outbox"),
+    "payments-db": {
+      type: "d1",
+      bindings: {
+        "workers/api": "DB",
+        "workers/batch": "DB",
+      },
+    },
+    "cache-kv": {
+      type: "kv",
+      bindings: { "workers/api": "CACHE" },
+    },
+    "outbox": {
+      type: "queue",
+      bindings: {
+        "workers/api": { producer: "OUTBOX" },
+        "workers/batch": { consumer: true },
+      },
+    },
   },
 });
 ```
 
+Workers are paths to directories that contain a `wrangler.jsonc`. Resource keys are logical names; the actual Cloudflare resource gets the stage suffix at apply time (e.g. `payments-db-staging`).
+
 ## Step 3: Protect production
 
-Before doing anything else, add stage protection so `wd destroy --stage production` refuses to run:
+Before doing anything else, add stage protection so `wd destroy --stage production` refuses to run without `--force`. The `stages` field is a map keyed by stage name; wildcards like `pr-*` match every matching stage.
 
 ```ts
 export default defineConfig({
   // ...
   stages: {
-    rules: [
-      { pattern: "production", protected: true },
-      { pattern: "staging", protected: true },
-      { pattern: "pr-*", ttl: "7d" },
-    ],
+    production: { protected: true },
+    staging: { protected: true },
+    "pr-*": { protected: false, ttl: "7d" },
   },
 });
 ```
+
+`ttl` is honoured by `wd gc`, which destroys expired unprotected stages.
 
 ## Step 4: Try it on a new stage
 

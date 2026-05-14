@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { AgentErrors } from "./cli-output.js";
 
 export interface ParseResult {
   values: Record<string, string>;
@@ -60,7 +61,7 @@ export interface LoadEnvFileOptions {
 
 export function loadEnvFile(path: string, options: LoadEnvFileOptions = {}): ParseResult {
   if (!existsSync(path)) {
-    throw new Error(`env file not found: ${path}`);
+    throw AgentErrors.notFound(`env file not found: ${path}`, "Check the path passed to --env-file.");
   }
   const content = readFileSync(path, "utf-8");
   const result = parseDotenv(content);
@@ -83,13 +84,13 @@ export function loadEnvFileFromArgs(
   if (idx === -1) return null;
   const value = args[idx + 1];
   if (!value || value.startsWith("--")) {
-    throw new Error("--env-file requires a path");
+    throw AgentErrors.validation("--env-file requires a path", "Pass --env-file <path>.", { flag: "--env-file" });
   }
   const fullPath = resolve(cwd, value);
   const result = loadEnvFile(fullPath, options);
   if (result.errors.length > 0) {
     const firstError = result.errors[0]!;
-    throw new Error(`env file ${value} parse error on line ${firstError.line}: ${firstError.message}`);
+    throw AgentErrors.config(`env file ${value} parse error on line ${firstError.line}: ${firstError.message}`, "Fix the syntax of the env file (KEY=value per line).");
   }
   return { path: fullPath, loaded: Object.keys(result.values).length };
 }
