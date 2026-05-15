@@ -9,6 +9,16 @@ export const BUILT_IN_TEMPLATE_MANIFEST: TemplateManifest = {
   "version": 1,
   "templates": [
     {
+      "name": "react",
+      "title": "React + Vite (Cloudflare official)",
+      "description": "Official Cloudflare React + Vite scaffold, then migrated with wrangler-deploy stage workflows",
+      "tags": [
+        "frontend",
+        "react",
+        "official"
+      ]
+    },
+    {
       "name": "vite",
       "title": "Vite + Hono + KV",
       "description": "Full-stack starter: Vite frontend, Hono worker API, typed KV binding",

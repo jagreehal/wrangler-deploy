@@ -25,10 +25,34 @@ $ wd create vite my-app
   ✓ .gitignore
 ```
 
-- `wd create vite` creates a starter in a new directory, defaulting to `cloudflare-vite-app` when you omit the directory
+- `wd create vite` creates a starter in a new directory, defaulting to `my-worker` when you omit the directory
 - `--name` sets the package name and displayed project title
 - `--force` allows overwriting existing files in the target directory
 - `--json` returns the scaffold summary as machine-readable output
+
+## `wd create react [directory]`
+
+Scaffold a React + Vite + Workers starter. The CLI first attempts the official
+Cloudflare `create-cloudflare` React-on-Workers flow, then applies
+wrangler-deploy defaults (`wrangler-deploy.config.ts` and stage scripts). If
+the official flow cannot complete in the current environment, it falls back to
+the official `cloudflare/templates` React template.
+
+```bash
+$ wd create react my-react-app
+  Created react starter in /repo/my-react-app
+  ✓ package.json
+  ✓ vite.config.ts
+  ✓ wrangler.jsonc
+  ✓ worker/index.ts
+  ✓ src/main.tsx
+  ✓ src/App.tsx
+  ✓ wrangler-deploy.config.ts
+```
+
+- `wd create react` is the recommended React starter path for Cloudflare Workers
+- the scaffold includes both direct deploy (`deploy`) and staged deploy scripts (`plan`, `apply`, `status`, `deploy:stage`)
+- use `pnpm run deploy` (not `pnpm deploy`) to run the deploy script under pnpm
 
 ## `wd context [get|set|unset|clear|doctor|export|import]`
 

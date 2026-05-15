@@ -124,6 +124,18 @@ CLOUDFLARE_ACCOUNT_ID=<32-char-hex>
 
 The CLI auto-loads `.env` from the project root — no `--env-file` needed.
 
+## Starter templates
+
+```bash
+wd create vite my-app   # Hono API + Vite frontend + typed KV binding
+wd create react my-app  # Official Cloudflare React + Vite + Workers scaffold + wd migration
+```
+
+`wd create react` tries `create-cloudflare` first and falls back to the
+official Cloudflare React template if needed. In both cases it adds
+`wrangler-deploy.config.ts` and staged scripts (`plan`, `apply`, `status`,
+`deploy:stage`).
+
 ## Workflow
 
 ```bash
@@ -142,6 +154,12 @@ wd quickstart  # print first-run workflow commands
 wd telemetry   # on/off/status local command timing telemetry
 wd release-note # summarize stage changes since last marked success
 ```
+
+For pnpm scripts, use `pnpm run <script>` (for example `pnpm run deploy`), not
+`pnpm <script>`, because `pnpm deploy` is a built-in workspace command.
+
+For a true Wrangler deploy preview, run `wrangler deploy --dry-run` (or
+`npx wrangler deploy --dry-run`) directly from the project directory.
 
 `apply` must run before `deploy`. Apply generates `wrangler.rendered.jsonc`
 with real resource IDs and a pinned `account_id`. Deploy reads those rendered
