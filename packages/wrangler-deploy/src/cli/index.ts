@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { resolve, join, dirname } from "node:path";
+import { resolve, join, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, rmSync, readdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -315,6 +315,126 @@ function printNextActions(actions: string[]): void {
   console.log("  Next:");
   for (const action of actions) console.log(`    - ${action}`);
   console.log("");
+}
+
+const OFFICIAL_REACT_TEMPLATE_SOURCE = "github:cloudflare/templates";
+const OFFICIAL_REACT_TEMPLATE_NAME = "vite-react-template";
+
+function listFilesRecursive(dir: string): string[] {
+  const out: string[] = [];
+  const skipDirs = new Set([".git", "node_modules", ".wrangler"]);
+  const stack = [dir];
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const fullPath = join(current, entry.name);
+      if (entry.isDirectory()) {
+        if (skipDirs.has(entry.name)) continue;
+        stack.push(fullPath);
+        continue;
+      }
+      if (entry.isFile()) out.push(fullPath.slice(dir.length + 1));
+    }
+  }
+  return out.sort();
+}
+
+function tryScaffoldReactViaCreateCloudflare(targetDir: string, nonInteractive: boolean): { ok: true; files: string[] } | { ok: false; reason: string } {
+  const parentDir = dirname(targetDir);
+  const projectDirName = basename(targetDir);
+  mkdirSync(parentDir, { recursive: true });
+  const cmd = "npx";
+  const argv = [
+    "--yes",
+    "create-cloudflare@latest",
+    projectDirName,
+    "--category=web-framework",
+    "--framework=react",
+    "--platform=workers",
+    "--variant=react-ts",
+    "--lang=ts",
+    "--no-git",
+    "--no-deploy",
+    ...(nonInteractive ? ["--accept-defaults"] : []),
+  ];
+  try {
+    execFileSync(cmd, argv, { cwd: parentDir, stdio: wantsJsonOutput() ? "pipe" : "inherit" });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { ok: false, reason: `create-cloudflare failed: ${message}` };
+  }
+  if (!existsSync(targetDir)) {
+    return { ok: false, reason: "create-cloudflare reported success but target directory was not created" };
+  }
+  const expectedReactFiles = [
+    "vite.config.ts",
+    "index.html",
+    "package.json",
+  ];
+  const looksReact = expectedReactFiles.every((relPath) => existsSync(join(targetDir, relPath)));
+  if (!looksReact) {
+    rmSync(targetDir, { recursive: true, force: true });
+    return { ok: false, reason: "create-cloudflare completed but did not scaffold the expected React + Vite project shape" };
+  }
+  return { ok: true, files: listFilesRecursive(targetDir) };
+}
+
+function normalizeProjectNameFromDir(targetDir: string): string {
+  return basename(targetDir)
+    .trim()
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .toLowerCase() || "my-worker";
+}
+
+function migrateReactTemplateForWranglerDeploy(targetDir: string): string[] {
+  const changed: string[] = [];
+
+  const wdConfigPath = join(targetDir, "wrangler-deploy.config.ts");
+  if (!existsSync(wdConfigPath)) {
+    writeFileSync(
+      wdConfigPath,
+      `import { defineConfig } from "wrangler-deploy";
+
+export default defineConfig({
+  version: 1,
+  workers: ["."],
+  resources: {},
+  stages: {
+    production: { protected: true },
+    "pr-*": { protected: false, ttl: "7d" },
+  },
+});
+`,
+    );
+    changed.push("wrangler-deploy.config.ts");
+  }
+
+  const packageJsonPath = join(targetDir, "package.json");
+  if (existsSync(packageJsonPath)) {
+    const pkg = JSON.parse(readFileSync(packageJsonPath, "utf-8")) as {
+      name?: string;
+      scripts?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    const projectName = normalizeProjectNameFromDir(targetDir);
+    if (!pkg.name || pkg.name === "vite-react-template") {
+      pkg.name = projectName;
+    }
+    pkg.scripts ??= {};
+    pkg.devDependencies ??= {};
+    pkg.scripts.wd ??= "wd";
+    pkg.scripts.plan ??= "wd plan --stage staging";
+    pkg.scripts.apply ??= "wd apply --stage staging";
+    pkg.scripts.status ??= "wd status --stage staging";
+    pkg.scripts["deploy:stage"] ??= "wd deploy --stage staging";
+    pkg.devDependencies["wrangler-deploy"] ??= "^1.5.0";
+    writeFileSync(packageJsonPath, `${JSON.stringify(pkg, null, 2)}\n`);
+    changed.push("package.json");
+  }
+
+  return changed;
 }
 
 function selectConfigWorkers(config: Awaited<ReturnType<typeof loadConfig>>, selectedWorkers: string[]) {
@@ -1134,14 +1254,57 @@ export default defineConfig({
           force: hasFlag("force"),
         });
       } else {
-        // Fetched path — either a manifest template or an arbitrary --example.
+        // React path: prefer running official create-cloudflare, then migrate.
+        if (chosenTemplate === "react" && !exampleFlag) {
+          const c3 = tryScaffoldReactViaCreateCloudflare(absoluteTargetDir, nonInteractive);
+          if (c3.ok) {
+            const projectName = normalizeProjectNameFromDir(absoluteTargetDir);
+            result = {
+              template: chosenTemplate,
+              targetDir: absoluteTargetDir,
+              projectName,
+              files: c3.files,
+            };
+            result.files.push(...migrateReactTemplateForWranglerDeploy(absoluteTargetDir));
+          } else {
+            if (!wantsJsonOutput()) {
+              console.warn(`\n  ! ${c3.reason}`);
+              console.warn("  ! Falling back to template fetch from cloudflare/templates.\n");
+            }
+            const substitutions = deriveSubstitutions(absoluteTargetDir, getFlag("name"));
+            const fetched = await fetchTemplate(
+              {
+                templateName: OFFICIAL_REACT_TEMPLATE_NAME,
+                targetDir: absoluteTargetDir,
+                source: OFFICIAL_REACT_TEMPLATE_SOURCE,
+                force: hasFlag("force"),
+              },
+              substitutions,
+            );
+            result = {
+              template: chosenTemplate,
+              targetDir: absoluteTargetDir,
+              projectName: substitutions.projectName!,
+              files: fetched.files,
+            };
+            result.files.push(...migrateReactTemplateForWranglerDeploy(absoluteTargetDir));
+          }
+        } else {
+          // Fetched path — either a manifest template or an arbitrary --example.
         const substitutions = deriveSubstitutions(absoluteTargetDir, getFlag("name"));
-        const templateName = chosenTemplate === "_example" ? "" : chosenTemplate;
+        const templateName = chosenTemplate === "_example"
+          ? ""
+          : chosenTemplate === "react"
+            ? OFFICIAL_REACT_TEMPLATE_NAME
+            : chosenTemplate;
+        const sourceOverride = chosenTemplate === "react"
+          ? OFFICIAL_REACT_TEMPLATE_SOURCE
+          : exampleFlag;
         const fetched = await fetchTemplate(
           {
             templateName,
             targetDir: absoluteTargetDir,
-            ...(exampleFlag !== undefined ? { source: exampleFlag } : {}),
+            ...(sourceOverride !== undefined ? { source: sourceOverride } : {}),
             force: hasFlag("force"),
           },
           substitutions,
@@ -1152,6 +1315,10 @@ export default defineConfig({
           projectName: substitutions.projectName!,
           files: fetched.files,
         };
+        if (chosenTemplate === "react") {
+          result.files.push(...migrateReactTemplateForWranglerDeploy(absoluteTargetDir));
+        }
+        }
       }
 
       if (hasFlag("vibe-rules")) {

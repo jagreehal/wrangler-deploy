@@ -85,6 +85,7 @@ The scaffolder gives you the bare minimum on purpose. Add things as you need the
 | --- | --- |
 | A KV namespace, D1 database, or queue | Add it to `wrangler-deploy.config.ts` — see [Resources](/wrangler-deploy/resources/) |
 | A frontend (Hono API + Vite) | `npm create wrangler-deploy@latest my-app -- --template vite` |
+| A React + Vite + Workers starter | `npm create wrangler-deploy@latest my-app -- --template react` |
 | Any Cloudflare template from GitHub | `npm create wrangler-deploy@latest my-app -- --example github:user/repo/path` |
 | Multiple workers in one repo | Add more paths to `workers` in the config |
 | Editor / agent hints | `wd create vibe-rules claude-code,cursor` |
@@ -104,6 +105,7 @@ $ npm create wrangler-deploy@latest
 ◆  Pick a template
 │  ● hello — Bare hello-world Worker (fastest, recommended for beginners)
 │  ○ vite — Hono API + Vite frontend + typed KV binding
+│  ○ react — React + Vite + Workers (official Cloudflare scaffold + wrangler-deploy migration)
 │
 └  Scaffolding hello into ./my-worker…
 ```
@@ -123,6 +125,11 @@ The first time you run it, Wrangler opens a browser tab to authenticate you. Aft
 
 :::caution[pnpm gotcha]
 Use `pnpm run deploy`, not `pnpm deploy`. `pnpm deploy` is a built-in pnpm workspace command and won't run the script.
+:::
+
+:::note[Dry-run tip]
+If you need a true Wrangler deploy preview, run `wrangler deploy --dry-run`
+directly (or `npx wrangler deploy --dry-run`) from the project directory.
 :::
 
 ### When you outgrow a single deploy
