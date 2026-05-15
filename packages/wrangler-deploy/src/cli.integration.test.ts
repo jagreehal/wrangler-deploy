@@ -152,4 +152,45 @@ describe("CLI integration (dist)", () => {
     expect(payload.valid).toBe(true);
     expect(payload.errors).toHaveLength(0);
   });
+
+  // Regression: `wd <command> --help` previously fell through to the command
+  // handler. For mutating commands like `deploy` this triggered a real
+  // deploy attempt. Help must short-circuit before any side effect.
+  it("`wd deploy --help` prints help without dispatching", () => {
+    const repo = makeRepo();
+    // Intentionally no config + no creds — a real dispatch would fail loudly.
+    const result = runCli(repo, ["deploy", "--help"]);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("wd deploy —");
+    expect(result.stdout).toContain("Flags:");
+    expect(result.stdout).toContain("--verify");
+    // Side-effect markers from a real deploy must not appear.
+    expect(result.stdout).not.toContain("deploying");
+    expect(result.stdout).not.toContain("FAILED");
+    expect(result.stderr).not.toMatch(/WD_E_/);
+  });
+
+  it("`wd <command> -h` (short form) prints help without dispatching", () => {
+    const repo = makeRepo();
+    const result = runCli(repo, ["destroy", "-h"]);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("wd destroy —");
+    expect(result.stdout).not.toContain("destroying");
+  });
+
+  it("`wd <command> --help --json` returns the manifest entry as JSON", () => {
+    const repo = makeRepo();
+    const result = runCli(repo, ["deploy", "--help", "--json"]);
+    expect(result.status).toBe(0);
+    const payload = JSON.parse(result.stdout) as {
+      command: string;
+      manifest: { name: string; mutating?: boolean; flags?: string[] };
+      examples: Array<{ command: string }>;
+    };
+    expect(payload.command).toBe("deploy");
+    expect(payload.manifest.name).toBe("deploy");
+    expect(payload.manifest.mutating).toBe(true);
+    expect(payload.manifest.flags).toContain("--verify");
+    expect(payload.examples.length).toBeGreaterThan(0);
+  });
 });

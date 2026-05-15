@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { CfStageConfig } from "../types.js";
 import type { StateProvider } from "./state.js";
@@ -8,6 +9,24 @@ import { verify } from "./verify.js";
 import { resolveAccountId } from "./auth.js";
 import { appendDeployEvents } from "./history.js";
 import { AgentErrors } from "./cli-output.js";
+
+/**
+ * Read the `account_id` field from a rendered wrangler.jsonc. Returns
+ * undefined if the file is missing, unparseable, or has no account_id.
+ * Stays narrow on purpose — full parsing happens in core/wrangler.ts.
+ */
+function readRenderedAccountId(renderedConfigPath: string): string | undefined {
+  if (!existsSync(renderedConfigPath)) return undefined;
+  try {
+    const raw = readFileSync(renderedConfigPath, "utf-8");
+    const stripped = raw.replace(/"(?:[^"\\]|\\.)*"|\/\/.*$|\/\*[\s\S]*?\*\//gm, (m) =>
+      m.startsWith('"') ? m : "");
+    const parsed = JSON.parse(stripped) as { account_id?: unknown };
+    return typeof parsed.account_id === "string" ? parsed.account_id : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export type DeployArgs = {
   stage: string;
@@ -115,6 +134,12 @@ export async function deploy(args: DeployArgs, deps: DeployDeps): Promise<Deploy
       verified: false,
     };
   }
+  // Drift check: if the rendered config's account_id doesn't match the
+  // currently-resolved account, deploying would hit the wrong account and
+  // surface as the misleading WD_E_ACCOUNT_MISMATCH (CF API 10000). The
+  // actual fix is `wd apply` to refresh the rendered config, so we catch it
+  // here with a dedicated code that points at the right remediation.
+  const currentAccountId = resolveAccountId(rootDir);
   for (const workerPath of deployOrder) {
     const renderedConfigPath = join(
       rootDir,
@@ -123,6 +148,14 @@ export async function deploy(args: DeployArgs, deps: DeployDeps): Promise<Deploy
       workerPath,
       "wrangler.rendered.jsonc",
     );
+    const renderedAccountId = readRenderedAccountId(renderedConfigPath);
+    if (renderedAccountId && renderedAccountId !== currentAccountId) {
+      throw AgentErrors.staleRender(
+        `Rendered config for ${workerPath} pins account_id ${renderedAccountId}, but the current account is ${currentAccountId}. The state was applied against a different account.`,
+        `Re-run \`wd apply --stage ${stage}\` to refresh the rendered config for the current account.`,
+        { workerPath, stage, renderedAccountId, currentAccountId },
+      );
+    }
 
     const workerState = state.workers[workerPath];
     const workerName = workerState?.name ?? workerPath;
@@ -203,7 +236,9 @@ export async function deploy(args: DeployArgs, deps: DeployDeps): Promise<Deploy
   let verified = false;
   if (args.verify) {
     logger.log("  Running post-deploy verification...\n");
-    const result = await verifyFn({ stage }, { rootDir, config, state: provider });
+    // probeUrls: true so Cloudflare propagation hiccups (1104, 525, 526) absorb
+    // into a brief retry loop instead of surfacing as a flaky deploy.
+    const result = await verifyFn({ stage, probeUrls: true }, { rootDir, config, state: provider });
 
     for (const check of result.checks) {
       const icon = check.passed ? "+" : "x";

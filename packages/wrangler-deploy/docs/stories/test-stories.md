@@ -2,9 +2,9 @@
 
 | Key | Value |
 | --- | --- |
-| Date | 2026-05-14T21:55:57.378Z |
-| Version | 1.4.4 |
-| Git SHA | 5966dfe |
+| Date | 2026-05-15T18:24:46.656Z |
+| Version | 1.5.0 |
+| Git SHA | 296fc0c |
 
 ## src/github.test.ts
 
@@ -315,6 +315,20 @@
 - **Given** a stage with workers and declared secrets
 - **When** deploy is called with missing secrets
 - **Then** deploy is blocked with error
+
+### deploy - rendered-config drift detection
+
+### ✅ blocks deploy and throws WD_E_RENDERED_CONFIG_STALE when account_id drifts
+
+- **Given** a rendered config pinning a different account_id than the current env
+- **When** deploy runs against an env whose account is the mocked a1b2... value
+- **Then** deploy throws with the dedicated stale-render code, not WD_E_ACCOUNT_MISMATCH
+
+### ✅ proceeds when rendered account_id matches the current env
+
+- **Given** a rendered config pinning the same account_id as the current env
+- **When** deploy runs
+- **Then** wrangler is invoked normally
 
 ## src/core/destroy.test.ts
 
@@ -1369,6 +1383,23 @@
 - **Given** state containing an extra worker not declared in config.workers
 - **When** verification runs
 - **Then** verification should fail because state contains undeclared workers
+
+### verify - URL probing (probeUrls)
+
+### ✅ passes when the URL returns 2xx on first try
+
+
+### ✅ retries past Cloudflare propagation errors (1104) and then passes
+
+
+### ✅ fails fast on a 4xx that isn't a propagation error
+
+
+### ✅ skips URL probing entirely when probeUrls is not set
+
+
+### ✅ ignores dashboard URLs (only probes live worker endpoints)
+
 
 ### verifyLocal
 

@@ -21,6 +21,11 @@ export interface VerifyCheck {
 
 export type VerifyArgs = {
   stage: string;
+  /** Probe each deployed worker URL until it returns 2xx. Useful right after deploy
+   *  to absorb Cloudflare propagation delays (e.g. transient error 1104). */
+  probeUrls?: boolean;
+  /** Total time budget for URL probing across retries, in ms. Default: 30000. */
+  probeTimeoutMs?: number;
 };
 
 export type VerifyDeps = {
@@ -28,6 +33,9 @@ export type VerifyDeps = {
   config: CfStageConfig;
   state: StateProvider;
   existsFn?: typeof existsSync;
+  fetchFn?: typeof fetch;
+  /** Sleep injection for tests to avoid real timer waits. */
+  sleepFn?: (ms: number) => Promise<void>;
 };
 
 export interface LocalVerifyResult {
@@ -48,10 +56,62 @@ export interface LocalVerifyDeps {
   executeLocalD1Fn?: typeof executeLocalD1;
 }
 
+/** Cloudflare edge errors that mean "still propagating, try again." */
+const PROPAGATION_ERROR_CODES = [1102, 1104, 525, 526];
+
+async function probeUrl(
+  url: string,
+  budgetMs: number,
+  fetchFn: typeof fetch,
+  sleepFn: (ms: number) => Promise<void>,
+): Promise<{ passed: boolean; details: string }> {
+  const start = Date.now();
+  let attempt = 0;
+  let lastDetails = "no attempt made";
+  while (Date.now() - start < budgetMs) {
+    attempt += 1;
+    const requestStart = Date.now();
+    try {
+      const controller = new AbortController();
+      const requestTimeout = setTimeout(() => controller.abort(), Math.min(10_000, budgetMs - (Date.now() - start)));
+      const res = await fetchFn(url, { method: "GET", signal: controller.signal, redirect: "follow" });
+      clearTimeout(requestTimeout);
+      const elapsed = Date.now() - requestStart;
+      if (res.status >= 200 && res.status < 400) {
+        return {
+          passed: true,
+          details: `${res.status} in ${elapsed}ms (attempt ${attempt})`,
+        };
+      }
+      // Read a small slice of the body to look for Cloudflare propagation codes.
+      const body = await res.text().catch(() => "");
+      const propagating = PROPAGATION_ERROR_CODES.some((code) =>
+        body.includes(`error code: ${code}`) || body.includes(`Error ${code}`));
+      lastDetails = `${res.status}${propagating ? " (propagating)" : ""} (attempt ${attempt})`;
+      if (!propagating && res.status < 500) {
+        // 4xx that isn't a propagation error — won't fix itself with retry.
+        return { passed: false, details: lastDetails };
+      }
+    } catch (err) {
+      lastDetails = `${(err as Error).message} (attempt ${attempt})`;
+    }
+    // Exponential-ish backoff capped at 5s, with a slight jitter to spread retries.
+    const backoff = Math.min(5_000, 500 * 2 ** Math.min(attempt - 1, 4));
+    const remaining = budgetMs - (Date.now() - start);
+    if (remaining <= 0) break;
+    await sleepFn(Math.min(backoff, remaining));
+  }
+  return { passed: false, details: `${lastDetails} (gave up after ${Date.now() - start}ms)` };
+}
+
+const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
 export async function verify(args: VerifyArgs, deps: VerifyDeps): Promise<VerifyResult> {
   const { stage } = args;
   const { rootDir, config, state: provider } = deps;
   const checkExists = deps.existsFn ?? existsSync;
+  const fetchFn = deps.fetchFn ?? fetch;
+  const sleepFn = deps.sleepFn ?? defaultSleep;
   const state = await provider.read(stage);
   const checks: VerifyCheck[] = [];
 
@@ -159,6 +219,25 @@ export async function verify(args: VerifyArgs, deps: VerifyDeps): Promise<Verify
             : `Target worker "${targetWorker}" not in state`,
         });
       }
+    }
+  }
+
+  // 8. Optionally probe each deployed worker URL until it answers 2xx.
+  //    Absorbs Cloudflare propagation delays (e.g. transient error 1104
+  //    immediately after deploy) so verification doesn't surface as flaky.
+  if (args.probeUrls) {
+    const probeBudget = args.probeTimeoutMs ?? 30_000;
+    for (const [workerPath, workerState] of Object.entries(state.workers)) {
+      const url = workerState.url;
+      if (!url || !workerState.deployed) continue;
+      // Skip dashboard URLs — those aren't the live worker endpoint.
+      if (url.startsWith("https://dash.cloudflare.com/")) continue;
+      const result = await probeUrl(url, probeBudget, fetchFn, sleepFn);
+      checks.push({
+        name: `URL probe: ${workerPath} (${url})`,
+        passed: result.passed,
+        details: result.details,
+      });
     }
   }
 

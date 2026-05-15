@@ -2393,6 +2393,14 @@ a.toc-title:hover {
           <span class="toc-status status-passed">✓</span>
           blocks deploys when declared secrets are missing
         </a>
+<a class="toc-scenario" href="#scenario-045dc8e3dc58">
+          <span class="toc-status status-passed">✓</span>
+          blocks deploy and throws WD_E_RENDERED_CONFIG_STALE when account_id drifts
+        </a>
+<a class="toc-scenario" href="#scenario-8b80552cf9c0">
+          <span class="toc-status status-passed">✓</span>
+          proceeds when rendered account_id matches the current env
+        </a>
       </div>
     </div>
 <div class="toc-feature">
@@ -3244,6 +3252,26 @@ a.toc-title:hover {
           <span class="toc-status status-passed">✓</span>
           fails when state still contains workers removed from the manifest
         </a>
+<a class="toc-scenario" href="#scenario-b088fd396b19">
+          <span class="toc-status status-passed">✓</span>
+          passes when the URL returns 2xx on first try
+        </a>
+<a class="toc-scenario" href="#scenario-762249798ce6">
+          <span class="toc-status status-passed">✓</span>
+          retries past Cloudflare propagation errors (1104) and then passes
+        </a>
+<a class="toc-scenario" href="#scenario-5d07b08fb052">
+          <span class="toc-status status-passed">✓</span>
+          fails fast on a 4xx that isn&#039;t a propagation error
+        </a>
+<a class="toc-scenario" href="#scenario-e8c0940d9992">
+          <span class="toc-status status-passed">✓</span>
+          skips URL probing entirely when probeUrls is not set
+        </a>
+<a class="toc-scenario" href="#scenario-6fced834a6be">
+          <span class="toc-status status-passed">✓</span>
+          ignores dashboard URLs (only probes live worker endpoints)
+        </a>
 <a class="toc-scenario" href="#scenario-f200ba54130f">
           <span class="toc-status status-passed">✓</span>
           passes when all local runtime checks succeed
@@ -3435,16 +3463,16 @@ a.toc-title:hover {
             <button type="button" class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme"></button>
           </div>
         </header>
-        <dl class="meta-info"><dt>Started:</dt><dd>2026-05-14T21:55:57.378Z</dd><dt>Duration:</dt><dd>3.42s</dd><dt>Version:</dt><dd>1.4.4</dd><dt>Git:</dt><dd>5966dfe</dd></dl>
+        <dl class="meta-info"><dt>Started:</dt><dd>2026-05-15T18:24:46.656Z</dd><dt>Duration:</dt><dd>2.64s</dd><dt>Version:</dt><dd>1.5.0</dd><dt>Git:</dt><dd>296fc0c</dd></dl>
 
 <div class="summary">
   <div class="summary-card">
     <div class="label">Total</div>
-    <div class="value">250</div>
+    <div class="value">257</div>
   </div>
   <div class="summary-card passed">
     <div class="label">Passed</div>
-    <div class="value">250</div>
+    <div class="value">257</div>
   </div>
   <div class="summary-card failed">
     <div class="label">Failed</div>
@@ -5267,7 +5295,7 @@ a.toc-title:hover {
       <div class="feature-path">src/core/deploy.test.ts</div>
     </div>
     <div class="feature-stats">
-      <span class="stat passed">✓ 4</span>
+      <span class="stat passed">✓ 6</span>
       <span class="stat failed">✗ 0</span>
       <span class="stat skipped">○ 0</span>
       <span class="chevron">▼</span>
@@ -5393,6 +5421,84 @@ a.toc-title:hover {
   <span class="step-status status-passed">✓</span>
   <span class="step-keyword">Then</span>
   <span class="step-text">deploy is blocked with error</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-045dc8e3dc58">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">blocks deploy and throws WD_E_RENDERED_CONFIG_STALE when account_id drifts</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <div class="scenario-actions">
+      <button class="copy-scenario-btn" onclick="copyScenarioAsMarkdown('scenario-045dc8e3dc58')" aria-label="Copy scenario as markdown" title="Copy as Markdown"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+      <button class="permalink-anchor" onclick="copyPermalink('scenario-045dc8e3dc58')" aria-label="Copy link to scenario" title="Copy link">#</button>
+      <span class="scenario-duration"></span>
+    </div>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step" data-keyword="Given" data-text="a rendered config pinning a different account_id than the current env">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a rendered config pinning a different account_id than the current env</span>
+  <span class="step-duration"></span>
+</div><div class="step" data-keyword="When" data-text="deploy runs against an env whose account is the mocked a1b2... value">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">deploy runs against an env whose account is the mocked a1b2... value</span>
+  <span class="step-duration"></span>
+</div><div class="step" data-keyword="Then" data-text="deploy throws with the dedicated stale-render code, not WD_E_ACCOUNT_MISMATCH">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">deploy throws with the dedicated stale-render code, not WD_E_ACCOUNT_MISMATCH</span>
+  <span class="step-duration"></span>
+</div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-8b80552cf9c0">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">proceeds when rendered account_id matches the current env</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <div class="scenario-actions">
+      <button class="copy-scenario-btn" onclick="copyScenarioAsMarkdown('scenario-8b80552cf9c0')" aria-label="Copy scenario as markdown" title="Copy as Markdown"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+      <button class="permalink-anchor" onclick="copyPermalink('scenario-8b80552cf9c0')" aria-label="Copy link to scenario" title="Copy link">#</button>
+      <span class="scenario-duration"></span>
+    </div>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"><div class="step" data-keyword="Given" data-text="a rendered config pinning the same account_id as the current env">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Given</span>
+  <span class="step-text">a rendered config pinning the same account_id as the current env</span>
+  <span class="step-duration"></span>
+</div><div class="step" data-keyword="When" data-text="deploy runs">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">When</span>
+  <span class="step-text">deploy runs</span>
+  <span class="step-duration"></span>
+</div><div class="step" data-keyword="Then" data-text="wrangler is invoked normally">
+  <span class="step-status status-passed">✓</span>
+  <span class="step-keyword">Then</span>
+  <span class="step-text">wrangler is invoked normally</span>
   <span class="step-duration"></span>
 </div></div>
     
@@ -11879,7 +11985,7 @@ a.toc-title:hover {
       <div class="feature-path">src/core/verify.test.ts</div>
     </div>
     <div class="feature-stats">
-      <span class="stat passed">✓ 9</span>
+      <span class="stat passed">✓ 14</span>
       <span class="stat failed">✗ 0</span>
       <span class="stat skipped">○ 0</span>
       <span class="chevron">▼</span>
@@ -12056,6 +12162,126 @@ a.toc-title:hover {
   <span class="step-text">verification should fail because state contains undeclared workers</span>
   <span class="step-duration"></span>
 </div></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-b088fd396b19">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">passes when the URL returns 2xx on first try</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <div class="scenario-actions">
+      <button class="copy-scenario-btn" onclick="copyScenarioAsMarkdown('scenario-b088fd396b19')" aria-label="Copy scenario as markdown" title="Copy as Markdown"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+      <button class="permalink-anchor" onclick="copyPermalink('scenario-b088fd396b19')" aria-label="Copy link to scenario" title="Copy link">#</button>
+      <span class="scenario-duration"></span>
+    </div>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-762249798ce6">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">retries past Cloudflare propagation errors (1104) and then passes</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <div class="scenario-actions">
+      <button class="copy-scenario-btn" onclick="copyScenarioAsMarkdown('scenario-762249798ce6')" aria-label="Copy scenario as markdown" title="Copy as Markdown"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+      <button class="permalink-anchor" onclick="copyPermalink('scenario-762249798ce6')" aria-label="Copy link to scenario" title="Copy link">#</button>
+      <span class="scenario-duration"></span>
+    </div>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-5d07b08fb052">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">fails fast on a 4xx that isn&#039;t a propagation error</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <div class="scenario-actions">
+      <button class="copy-scenario-btn" onclick="copyScenarioAsMarkdown('scenario-5d07b08fb052')" aria-label="Copy scenario as markdown" title="Copy as Markdown"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+      <button class="permalink-anchor" onclick="copyPermalink('scenario-5d07b08fb052')" aria-label="Copy link to scenario" title="Copy link">#</button>
+      <span class="scenario-duration"></span>
+    </div>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-e8c0940d9992">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">skips URL probing entirely when probeUrls is not set</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <div class="scenario-actions">
+      <button class="copy-scenario-btn" onclick="copyScenarioAsMarkdown('scenario-e8c0940d9992')" aria-label="Copy scenario as markdown" title="Copy as Markdown"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+      <button class="permalink-anchor" onclick="copyPermalink('scenario-e8c0940d9992')" aria-label="Copy link to scenario" title="Copy link">#</button>
+      <span class="scenario-duration"></span>
+    </div>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"></div>
+    
+    
+    
+  </div>
+</div>
+
+<div class="scenario" id="scenario-6fced834a6be">
+  <div class="scenario-header" role="button" tabindex="0" aria-expanded="true">
+    <div class="scenario-info">
+      <div class="scenario-title">
+        <span class="status-icon status-passed">✓</span>
+        <span class="scenario-name">ignores dashboard URLs (only probes live worker endpoints)</span>
+      </div>
+      <div class="scenario-meta"></div>
+    </div>
+    <div class="scenario-actions">
+      <button class="copy-scenario-btn" onclick="copyScenarioAsMarkdown('scenario-6fced834a6be')" aria-label="Copy scenario as markdown" title="Copy as Markdown"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+      <button class="permalink-anchor" onclick="copyPermalink('scenario-6fced834a6be')" aria-label="Copy link to scenario" title="Copy link">#</button>
+      <span class="scenario-duration"></span>
+    </div>
+  </div>
+  <div class="scenario-content">
+    
+    <div class="steps"></div>
     
     
     
