@@ -159,6 +159,16 @@ export const AgentErrors = {
       ...(fix ? { fix } : { fix: "Run `wd apply --stage <name>` first to create state." }),
     });
   },
+  staleRender(message: string, fix?: string, expected?: unknown): never {
+    return throwAgentError({
+      type: "state",
+      code: "WD_E_RENDERED_CONFIG_STALE",
+      message,
+      retryable: false,
+      ...(fix ? { fix } : { fix: "Re-run `wd apply --stage <name>` to refresh the rendered config." }),
+      ...(expected !== undefined ? { expected } : {}),
+    });
+  },
   auth(message: string, fix?: string, expected?: unknown): never {
     return throwAgentError({
       type: "auth",

@@ -797,6 +797,54 @@ async function main() {
     console.log(`  (alias: ${command} -> ${resolvedCommand})`);
   }
 
+  // Per-command help: `wd <command> --help` (or -h) must short-circuit before
+  // any side-effecting work (auth, config load, sandbox guard, dispatch).
+  // The top-level help block above only matches `wd help` / `wd --help`; this
+  // handles the per-command form so e.g. `wd deploy --help` doesn't deploy.
+  if (args.includes("--help") || args.includes("-h")) {
+    const entry = cliManifest.commands.find((c) => c.name === resolvedCommand);
+    const exampleSet = getExamples(resolvedCommand);
+    if (wantsJsonOutput()) {
+      printJson({
+        command: resolvedCommand,
+        manifest: entry ?? null,
+        examples: exampleSet?.examples ?? [],
+      });
+      return;
+    }
+    if (!entry) {
+      console.log(`\n  Unknown command: ${resolvedCommand}\n  Run \`wd help\` for the full list.\n`);
+      return;
+    }
+    const traits = [
+      entry.mutating ? "mutating" : null,
+      entry.requiresAuth ? "requires-auth" : null,
+      entry.requiresStage ? "requires-stage" : null,
+      entry.network ? "network" : null,
+      entry.writesFiles ? "writes-files" : null,
+      entry.supportsDryRun ? "supports --dry-run" : null,
+    ].filter(Boolean);
+    console.log(`\n  wd ${entry.name} — ${entry.description}\n`);
+    if (entry.subcommands?.length) {
+      console.log(`  Subcommands: ${entry.subcommands.join(", ")}`);
+    }
+    if (entry.flags?.length) {
+      console.log(`  Flags: ${entry.flags.join(" ")}`);
+    }
+    if (traits.length) {
+      console.log(`  Traits: ${traits.join(", ")}`);
+    }
+    if (exampleSet?.examples.length) {
+      console.log(`\n  Examples:`);
+      for (const ex of exampleSet.examples) {
+        console.log(`    ${ex.description}`);
+        console.log(`      $ ${ex.command}`);
+      }
+    }
+    console.log(`\n  Run \`wd examples --command ${resolvedCommand}\` for more, or \`wd help\` for all commands.\n`);
+    return;
+  }
+
   // Load config early to read its stage field (beats .wdrc and $USER)
   let configStage: string | undefined;
   const isConfigCommand = ["plan", "apply", "deploy", "destroy", "status", "open", "dashboard", "output",
@@ -1924,7 +1972,13 @@ export default defineConfig({
       assertStage(stage);
       const config = await loadConfig(rootDir);
       const stateProvider = resolveStateProvider(rootDir, config.state, resolveStatePassword(config, projectContext));
-      const result = await verify({ stage }, { rootDir, config, state: stateProvider });
+      const probeUrls = hasFlag("probe-urls");
+      const probeTimeoutRaw = getFlag("probe-timeout-ms");
+      const probeTimeoutMs = probeTimeoutRaw ? Number(probeTimeoutRaw) : undefined;
+      const result = await verify(
+        { stage, probeUrls, ...(probeTimeoutMs !== undefined ? { probeTimeoutMs } : {}) },
+        { rootDir, config, state: stateProvider },
+      );
 
       if (wantsJsonOutput()) {
         printJson(result);

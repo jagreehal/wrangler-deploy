@@ -85,6 +85,7 @@ export const cliManifest = {
     errorTypes: ["auth", "validation", "network", "config", "state", "not_found", "permission", "sandbox", "unknown"],
     errorCodes: [
       "WD_E_STATE_MISSING",
+      "WD_E_RENDERED_CONFIG_STALE",
       "WD_E_ACCOUNT_MISMATCH",
       "WD_E_AUTH_FAILED",
       "WD_E_CONFIG_MISSING",
@@ -108,7 +109,7 @@ export const cliManifest = {
     { name: "gc", description: "Destroy expired protected-by-TTL stages.", flags: ["--json", "--dry-run"], mutating: true, network: true, requiresAuth: true, supportsDryRun: true, output: "json" },
     { name: "status", description: "Inspect one stage or list available stages.", flags: ["--json", "--output", "--watch", "--interval-ms", "--web", "--diff", "--summary", "--fail-on-drift", "--output-file"], requiresStage: true, output: "json" },
     { name: "check", description: "Run combined doctor and plan preflight checks.", flags: ["--json", "--pack", "--output-file"], requiresStage: true, output: "json" },
-    { name: "verify", description: "Run remote or local verification checks.", flags: ["--json", "--json-report", "--output-file"], requiresStage: true, output: "json" },
+    { name: "verify", description: "Run remote or local verification checks.", flags: ["--json", "--json-report", "--output-file", "--probe-urls", "--probe-timeout-ms"], requiresStage: true, network: true, output: "json" },
     { name: "graph", description: "Render the resource/workers topology.", flags: ["--format json", "--output-file"], output: "graph" },
     { name: "impact", description: "Explain the dependency impact of a worker.", flags: ["--json"], output: "json" },
     { name: "diff", description: "Compare two stages.", flags: ["--format json"], output: "json" },

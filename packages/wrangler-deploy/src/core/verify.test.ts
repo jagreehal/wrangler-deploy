@@ -187,6 +187,148 @@ describe("verify", () => {
     const workerCheck = result.checks.find((c) => c.name.includes("Undeclared worker in state"));
     expect(workerCheck?.passed).toBe(false);
   });
+
+  describe("URL probing (probeUrls)", () => {
+    function deployedState(url: string): StageState {
+      return {
+        stage: "staging",
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+        resources: {},
+        workers: {
+          "apps/api": { name: "api-staging", url, deployed: true },
+        },
+        secrets: {},
+      };
+    }
+
+    const minimalConfig: CfStageConfig = {
+      version: 1,
+      workers: ["apps/api"],
+      deployOrder: ["apps/api"],
+      resources: {},
+    };
+
+    function fakeFetch(responses: Array<Response | Error>): typeof fetch {
+      let i = 0;
+      return vi.fn(async () => {
+        const next = responses[Math.min(i, responses.length - 1)];
+        i += 1;
+        if (next instanceof Error) throw next;
+        return next!;
+      }) as unknown as typeof fetch;
+    }
+
+    it("passes when the URL returns 2xx on first try", async ({ task }) => {
+      story.init(task);
+
+      const provider = createMockProvider(deployedState("https://api-staging.example.workers.dev"));
+      const result = await verify(
+        { stage: "staging", probeUrls: true },
+        {
+          rootDir: "/repo",
+          config: minimalConfig,
+          state: provider,
+          existsFn: () => true,
+          fetchFn: fakeFetch([new Response("ok", { status: 200 })]),
+          sleepFn: async () => {},
+        },
+      );
+
+      const probe = result.checks.find((c) => c.name.startsWith("URL probe:"));
+      expect(probe?.passed).toBe(true);
+      expect(probe?.details).toMatch(/^200/);
+    });
+
+    it("retries past Cloudflare propagation errors (1104) and then passes", async ({ task }) => {
+      story.init(task);
+
+      const provider = createMockProvider(deployedState("https://api-staging.example.workers.dev"));
+      const result = await verify(
+        { stage: "staging", probeUrls: true, probeTimeoutMs: 5_000 },
+        {
+          rootDir: "/repo",
+          config: minimalConfig,
+          state: provider,
+          existsFn: () => true,
+          fetchFn: fakeFetch([
+            new Response("error code: 1104", { status: 530 }),
+            new Response("ok", { status: 200 }),
+          ]),
+          sleepFn: async () => {},
+        },
+      );
+
+      const probe = result.checks.find((c) => c.name.startsWith("URL probe:"));
+      expect(probe?.passed).toBe(true);
+      expect(probe?.details).toContain("attempt 2");
+    });
+
+    it("fails fast on a 4xx that isn't a propagation error", async ({ task }) => {
+      story.init(task);
+
+      const fetchSpy = vi.fn().mockResolvedValue(new Response("not found", { status: 404 }));
+      const provider = createMockProvider(deployedState("https://api-staging.example.workers.dev"));
+      const result = await verify(
+        { stage: "staging", probeUrls: true, probeTimeoutMs: 5_000 },
+        {
+          rootDir: "/repo",
+          config: minimalConfig,
+          state: provider,
+          existsFn: () => true,
+          fetchFn: fetchSpy as unknown as typeof fetch,
+          sleepFn: async () => {},
+        },
+      );
+
+      const probe = result.checks.find((c) => c.name.startsWith("URL probe:"));
+      expect(probe?.passed).toBe(false);
+      expect(probe?.details).toMatch(/^404/);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("skips URL probing entirely when probeUrls is not set", async ({ task }) => {
+      story.init(task);
+
+      const fetchSpy = vi.fn();
+      const provider = createMockProvider(deployedState("https://api-staging.example.workers.dev"));
+      const result = await verify(
+        { stage: "staging" },
+        {
+          rootDir: "/repo",
+          config: minimalConfig,
+          state: provider,
+          existsFn: () => true,
+          fetchFn: fetchSpy as unknown as typeof fetch,
+          sleepFn: async () => {},
+        },
+      );
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(result.checks.find((c) => c.name.startsWith("URL probe:"))).toBeUndefined();
+    });
+
+    it("ignores dashboard URLs (only probes live worker endpoints)", async ({ task }) => {
+      story.init(task);
+
+      const fetchSpy = vi.fn();
+      const provider = createMockProvider(deployedState("https://dash.cloudflare.com/abc/workers/services/view/api"));
+      const result = await verify(
+        { stage: "staging", probeUrls: true },
+        {
+          rootDir: "/repo",
+          config: minimalConfig,
+          state: provider,
+          existsFn: () => true,
+          fetchFn: fetchSpy as unknown as typeof fetch,
+          sleepFn: async () => {},
+        },
+      );
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(result.checks.find((c) => c.name.startsWith("URL probe:"))).toBeUndefined();
+    });
+  });
 });
 
 describe("verifyLocal", () => {

@@ -3,9 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "concurrently -n web,worker -c cyan,magenta \"pnpm dev:web\" \"pnpm dev:worker\"",
+    "dev": "concurrently -n web,worker -c cyan,magenta \"vite\" \"wrangler dev --cwd workers/api --port 8787\"",
     "dev:web": "vite",
-    "dev:worker": "cd workers/api && wrangler dev --port 8787",
+    "dev:worker": "wrangler dev --cwd workers/api --port 8787",
     "build": "vite build",
     "preview": "vite preview",
     "wd": "wd",

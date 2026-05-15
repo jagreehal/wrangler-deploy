@@ -1,4 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { story } from "executable-stories-vitest";
 import { deploy } from "./deploy.js";
 import type { StageState } from "../types.js";
@@ -240,5 +243,99 @@ describe("deploy", () => {
     expect(logSpy).toHaveBeenCalledWith("    x apps/api/API_TOKEN");
     expect(logSpy).toHaveBeenCalledWith("    x apps/api/ANOTHER_SECRET");
     expect(wrangler.run).not.toHaveBeenCalled();
+  });
+
+  describe("rendered-config drift detection", () => {
+    const tempDirs: string[] = [];
+
+    afterEach(() => {
+      for (const dir of tempDirs) rmSync(dir, { recursive: true, force: true });
+      tempDirs.length = 0;
+    });
+
+    function makeRepoWithRenderedConfig(renderedAccountId: string): string {
+      const dir = mkdtempSync(join(tmpdir(), "wd-deploy-drift-"));
+      tempDirs.push(dir);
+      const renderedDir = join(dir, ".wrangler-deploy", "staging", "apps/api");
+      mkdirSync(renderedDir, { recursive: true });
+      writeFileSync(
+        join(renderedDir, "wrangler.rendered.jsonc"),
+        `{
+  // rendered by wd apply
+  "name": "api-staging",
+  "main": "src/index.ts",
+  "account_id": "${renderedAccountId}"
+}
+`,
+      );
+      return dir;
+    }
+
+    it("blocks deploy and throws WD_E_RENDERED_CONFIG_STALE when account_id drifts", async ({ task }) => {
+      story.init(task);
+
+      story.given("a rendered config pinning a different account_id than the current env");
+      const STALE = "0000000000000000000000000000000a";
+      const repo = makeRepoWithRenderedConfig(STALE);
+      const wrangler: WranglerRunner = { run: vi.fn().mockReturnValue("") };
+      const provider = createMockStateProvider(createMockState());
+
+      story.when("deploy runs against an env whose account is the mocked a1b2... value");
+      const promise = deploy(
+        { stage: "staging" },
+        {
+          rootDir: repo,
+          config: {
+            version: 1,
+            workers: ["apps/api"],
+            deployOrder: ["apps/api"],
+            resources: {},
+          },
+          state: provider,
+          wrangler,
+          validateSecretsFn: vi.fn().mockResolvedValue([]),
+        },
+      );
+
+      story.then("deploy throws with the dedicated stale-render code, not WD_E_ACCOUNT_MISMATCH");
+      await expect(promise).rejects.toMatchObject({
+        agentError: {
+          code: "WD_E_RENDERED_CONFIG_STALE",
+          type: "state",
+          fix: expect.stringContaining("wd apply --stage staging"),
+        },
+      });
+      expect(wrangler.run).not.toHaveBeenCalled();
+    });
+
+    it("proceeds when rendered account_id matches the current env", async ({ task }) => {
+      story.init(task);
+
+      story.given("a rendered config pinning the same account_id as the current env");
+      const CURRENT = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6";
+      const repo = makeRepoWithRenderedConfig(CURRENT);
+      const wrangler: WranglerRunner = { run: vi.fn().mockReturnValue("") };
+      const provider = createMockStateProvider(createMockState());
+
+      story.when("deploy runs");
+      await deploy(
+        { stage: "staging" },
+        {
+          rootDir: repo,
+          config: {
+            version: 1,
+            workers: ["apps/api"],
+            deployOrder: ["apps/api"],
+            resources: {},
+          },
+          state: provider,
+          wrangler,
+          validateSecretsFn: vi.fn().mockResolvedValue([]),
+        },
+      );
+
+      story.then("wrangler is invoked normally");
+      expect(wrangler.run).toHaveBeenCalledTimes(1);
+    });
   });
 });
