@@ -9,7 +9,7 @@
   "devDependencies": {
     "@types/node": "^25.6.2",
     "wrangler-deploy": "workspace:*",
-    "wrangler": "^4.90.0",
+    "wrangler": "^4.92.0",
     "tsx": "^4.21.0",
     "vitest": "^4.1.5"
   }
