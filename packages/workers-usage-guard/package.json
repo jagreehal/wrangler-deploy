@@ -64,6 +64,6 @@
     "typescript": "^6.0.3",
     "vitest": "^4.1.5",
     "vitest-mock-extended": "^3.0.0",
-    "wrangler": "^4.90.0"
+    "wrangler": "^4.92.0"
   }
 }
