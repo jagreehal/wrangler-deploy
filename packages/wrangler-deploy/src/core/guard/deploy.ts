@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { execFileSync as _execFileSync } from "node:child_process";
 import { join } from "node:path";
 import type { ExecFileSyncOptions } from "node:child_process";
+import { assertWranglerVersion } from "../wrangler-version-check.js";
 
 export type ExecFileSyncFn = (
   cmd: string,
@@ -30,6 +31,10 @@ export function deployGuard(
     writeFileSync: writeFile = writeFileSync,
     unlinkSync: unlink = unlinkSync,
   } = deps;
+
+  // Verify peer wrangler version satisfies what wd's CLI shells out to.
+  // Cached, so this is a no-op after the first call per process.
+  assertWranglerVersion();
 
   const templatePath = join(args.guardDir, "wrangler.jsonc");
   const tempPath = join(args.guardDir, ".wrangler-deploy-temp.jsonc");

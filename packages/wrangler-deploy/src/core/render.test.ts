@@ -139,4 +139,78 @@ describe("renderWranglerConfig", () => {
     story.then("rendered config has no account_id");
     expect(rendered.account_id).toBeUndefined();
   });
+
+  it("resolves migrations_dir relative to the SOURCE worker directory, not the rendered output dir", ({ task }) => {
+    story.init(task);
+
+    story.given("a worker config with migrations_dir as a relative path traversing upward");
+    const baseConfig: WranglerConfig = {
+      name: "api",
+      main: "src/index.ts",
+      // wrangler.jsonc fields with snake_case live under the index signature
+      migrations_dir: "../../drizzle",
+    } as WranglerConfig;
+
+    const config: CfStageConfig = {
+      version: 1,
+      workers: ["workers/api"],
+      deployOrder: ["workers/api"],
+      resources: {},
+    };
+
+    const state: StageState = {
+      stage: "dev",
+      createdAt: "2026-04-03T00:00:00.000Z",
+      updatedAt: "2026-04-03T00:00:00.000Z",
+      resources: {},
+      workers: {
+        "workers/api": { name: "api-dev" },
+      },
+      secrets: {},
+    };
+
+    story.when("renderWranglerConfig is called with a repo root path");
+    const rendered = renderWranglerConfig(baseConfig, "workers/api", config, state, "dev", "/repo");
+
+    story.then(
+      "migrations_dir resolves from the SOURCE worker dir (so wrangler finds the migrations regardless of where the rendered config is written)"
+    );
+    expect(rendered["migrations_dir"]).toBe("/repo/drizzle");
+  });
+
+  it("resolves assets.directory and site.bucket relative to the source worker dir", ({ task }) => {
+    story.init(task);
+
+    const baseConfig = {
+      name: "site",
+      main: "src/index.ts",
+      assets: { directory: "./public", binding: "ASSETS" },
+      site: { bucket: "../static" },
+    } as unknown as WranglerConfig;
+
+    const config: CfStageConfig = {
+      version: 1,
+      workers: ["apps/site"],
+      deployOrder: ["apps/site"],
+      resources: {},
+    };
+
+    const state: StageState = {
+      stage: "dev",
+      createdAt: "2026-04-03T00:00:00.000Z",
+      updatedAt: "2026-04-03T00:00:00.000Z",
+      resources: {},
+      workers: { "apps/site": { name: "site-dev" } },
+      secrets: {},
+    };
+
+    const rendered = renderWranglerConfig(baseConfig, "apps/site", config, state, "dev", "/repo");
+
+    const renderedAssets = rendered["assets"] as { directory: string; binding: string };
+    expect(renderedAssets.directory).toBe("/repo/apps/site/public");
+    expect(renderedAssets.binding).toBe("ASSETS");
+
+    const renderedSite = rendered["site"] as { bucket: string };
+    expect(renderedSite.bucket).toBe("/repo/apps/static");
+  });
 });

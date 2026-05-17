@@ -84,7 +84,8 @@ function formatProjectContextValue(key: keyof ProjectContext, value: ProjectCont
   }
   if (typeof value === "boolean") return value ? "true" : "false";
   if (typeof value === "number") return String(value);
-  return value;
+  if (typeof value === "string") return value;
+  return JSON.stringify(value);
 }
 
 export async function renderDevUi(
@@ -102,6 +103,7 @@ export async function renderDevUi(
     ["session", formatProjectContextValue("session", projectContext.context.session)],
     ["persistTo", formatProjectContextValue("persistTo", projectContext.context.persistTo)],
     ["accountId", formatProjectContextValue("accountId", projectContext.context.accountId)],
+    ["stageAccounts", formatProjectContextValue("stageAccounts", projectContext.context.stageAccounts)],
     ["databaseUrl", formatProjectContextValue("databaseUrl", projectContext.context.databaseUrl)],
     ["statePassword", formatProjectContextValue("statePassword", projectContext.context.statePassword)],
   ];

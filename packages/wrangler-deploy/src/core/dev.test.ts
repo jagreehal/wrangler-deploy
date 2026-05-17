@@ -150,6 +150,25 @@ describe("buildDevPlan", () => {
     expect(plan.session?.configPaths).toHaveLength(3);
   });
 
+  it("does not force session mode when only persistTo is provided", async ({ task }) => {
+    story.init(task);
+
+    const config = makeConfig();
+
+    story.given("persistTo is provided but session mode is not enabled");
+    const plan = await buildDevPlan(config, exampleRoot, {
+      basePort: 8787,
+      persistTo: ".wrangler/state",
+    });
+
+    story.then("the plan stays in workers mode and each worker gets --persist-to");
+    expect(plan.mode).toBe("workers");
+    for (const worker of plan.workers) {
+      expect(worker.args[0]).toBe("--persist-to");
+      expect(worker.args[1]).toBe(resolve(exampleRoot, ".wrangler/state"));
+    }
+  });
+
   it("renders stage bindings directly when stage is provided", async ({ task }) => {
     story.init(task);
 

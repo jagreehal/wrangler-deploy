@@ -1,8 +1,10 @@
 import { execFileSync } from "node:child_process";
 import { getWranglerEnv } from "../core/auth.js";
+import { assertWranglerVersion } from "../core/wrangler-version-check.js";
 import type { VectorizeOutput } from "../types.js";
 
 function wrangler(args: string[], cwd: string): string {
+  assertWranglerVersion();
   try {
     return execFileSync("npx", ["wrangler", ...args], {
       encoding: "utf-8",

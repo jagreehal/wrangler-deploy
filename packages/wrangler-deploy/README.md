@@ -23,12 +23,24 @@ npm install -D wrangler-deploy
 Then in any project with a `wrangler.jsonc`:
 
 ```bash
-wd create vite my-app   # scaffold a new Vite starter
-wd init    # scans your wrangler configs, generates wrangler-deploy.config.ts
-wd plan --stage staging   # shows what would be created
-wd apply --stage staging  # creates the resources
-wd deploy --stage staging # deploys workers
+wd create vite my-app    # scaffold a new Vite starter
+wd init                  # scans your wrangler configs, generates wrangler-deploy.config.ts
+wd plan   --stage staging # shows what would be created
+wd up     --stage staging # apply + deploy in one shot (use this for first deploys)
+wd tail   --stage staging # stream logs for every worker in the stage
 ```
+
+Or run the two phases separately:
+
+```bash
+wd apply  --stage staging # creates resources, renders configs
+wd deploy --stage staging # deploys workers using rendered configs
+```
+
+### Gotchas
+
+- **Peer wrangler version.** `wrangler-deploy` declares `wrangler >=4.88.0` as a peer dependency. Older `wrangler@^3` may appear to work for some commands but will fail in surprising ways on others. Upgrade `wrangler` if your project pins an older major.
+- **`pnpm deploy` is taken.** pnpm's built-in `deploy` workspace command intercepts `pnpm deploy` and errors with `ERR_PNPM_CANNOT_DEPLOY`. Use `pnpm run deploy` (or `pnpm wd deploy`). In templates we now recommend `"ship": "wd up"` as the npm-script name to avoid the trap.
 
 Your `wrangler.jsonc` files stay untouched. `wrangler dev` still works. `wd dev` can either start one process per worker or a single shared Queue-oriented Wrangler session with `--persist-to`, while `wd` runtime commands resolve workers, ports, queue producers, and helper routes from one repo config.
 

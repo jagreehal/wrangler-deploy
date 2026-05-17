@@ -135,4 +135,37 @@ describe("auth", () => {
     expect(() => resolveAccountId("/cwd")).toThrow(/\.wdrc/);
     expect(() => resolveAccountId("/cwd")).toThrow(/32-character hexadecimal/);
   });
+
+  it("prefers explicit --account-id override over env and project context", ({ task }) => {
+    story.init(task);
+
+    story.given("all account sources exist but an explicit override is supplied");
+    process.env.CLOUDFLARE_ACCOUNT_ID = "11111111111111111111111111111111";
+    mockExistsSync.mockImplementation((path) => typeof path === "string" && path === "/cwd/.wdrc");
+    mockReadFileSync.mockReturnValue('{"accountId":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}');
+
+    story.when("resolveAccountId is called with accountIdOverride");
+    const result = resolveAccountId("/cwd", {
+      accountIdOverride: "22222222222222222222222222222222",
+    });
+
+    story.then("the override wins");
+    expect(result).toBe("22222222222222222222222222222222");
+  });
+
+  it("re-evaluates when CLOUDFLARE_ACCOUNT_ID changes in the same process", ({ task }) => {
+    story.init(task);
+
+    story.given("a first account id is resolved from env");
+    process.env.CLOUDFLARE_ACCOUNT_ID = "11111111111111111111111111111111";
+    const first = resolveAccountId("/cwd");
+    expect(first).toBe("11111111111111111111111111111111");
+
+    story.when("the env account id is changed and resolved again");
+    process.env.CLOUDFLARE_ACCOUNT_ID = "22222222222222222222222222222222";
+    const second = resolveAccountId("/cwd");
+
+    story.then("the new value is used instead of a stale cwd-only cache");
+    expect(second).toBe("22222222222222222222222222222222");
+  });
 });

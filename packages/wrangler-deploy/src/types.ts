@@ -17,6 +17,8 @@ export interface ProjectContext {
   persistTo?: string;
   /** Default account ID for Cloudflare auth and KV-backed state. */
   accountId?: string;
+  /** Optional per-stage account ID overrides. */
+  stageAccounts?: Record<string, string>;
   /** Default Hyperdrive database URL when not passed on the command line. */
   databaseUrl?: string;
   /** Default state password for encrypted state. */

@@ -33,9 +33,48 @@ export function renderWranglerConfig(
   // Stage-suffix the worker name
   rendered.name = workerName(baseConfig.name, stage);
 
-  // Make main path absolute so wrangler finds it regardless of cwd
-  if (rendered.main && rootDir) {
-    rendered.main = resolve(rootDir, workerPath, rendered.main);
+  // Make path-bearing fields absolute relative to the SOURCE worker directory
+  // (where the user-authored wrangler.jsonc lives). The rendered file is
+  // written elsewhere (.wrangler-deploy/<stage>/<workerPath>/wrangler.rendered.jsonc),
+  // so relative paths like `../../drizzle` or `src/index.ts` would otherwise
+  // resolve from the wrong base when wrangler reads the rendered config.
+  if (rootDir) {
+    const sourceDir = resolve(rootDir, workerPath);
+
+    // `main` — worker entry script
+    if (typeof rendered.main === "string" && rendered.main.trim()) {
+      rendered.main = resolve(sourceDir, rendered.main);
+    }
+
+    // `migrations_dir` — D1 migrations folder (wrangler resolves relative to
+    // the config file's directory; rendered file lives in a different dir).
+    if (typeof rendered["migrations_dir"] === "string" && (rendered["migrations_dir"] as string).trim()) {
+      rendered["migrations_dir"] = resolve(sourceDir, rendered["migrations_dir"] as string);
+    }
+
+    // `assets.directory` — static asset bundle path
+    const assets = rendered["assets"];
+    if (assets && typeof assets === "object" && !Array.isArray(assets)) {
+      const assetsObj = assets as Record<string, unknown>;
+      if (typeof assetsObj["directory"] === "string" && (assetsObj["directory"] as string).trim()) {
+        rendered["assets"] = {
+          ...assetsObj,
+          directory: resolve(sourceDir, assetsObj["directory"] as string),
+        };
+      }
+    }
+
+    // `site.bucket` — legacy Workers Sites bucket path
+    const site = rendered["site"];
+    if (site && typeof site === "object" && !Array.isArray(site)) {
+      const siteObj = site as Record<string, unknown>;
+      if (typeof siteObj["bucket"] === "string" && (siteObj["bucket"] as string).trim()) {
+        rendered["site"] = {
+          ...siteObj,
+          bucket: resolve(sourceDir, siteObj["bucket"] as string),
+        };
+      }
+    }
   }
 
   // Remove localConnectionString and filter out placeholder Hyperdrive IDs

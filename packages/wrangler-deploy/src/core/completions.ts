@@ -16,6 +16,7 @@ const COMMANDS = [
   "onboard",
   "destroy",
   "check",
+  "preflight",
   "quickstart",
   "release-note",
   "gc",
@@ -44,8 +45,11 @@ const COMMANDS = [
   "configure",
   "login",
   "logout",
+  "auth",
   "profile",
+  "bootstrap",
   "telemetry",
+  "upgrade-check",
   "util",
   "completions",
 ];
@@ -55,8 +59,13 @@ export function generateCompletions(shell: "zsh" | "bash" | "fish"): string {
     return `#compdef wd
 
 _wd() {
-  local -a commands stages workers
+  local -a commands stages workers profiles
   stages=($(command ls -1 .wrangler-deploy 2>/dev/null))
+  if [[ -f .wdrc ]]; then
+    stages+=($(command sed -nE 's/^[[:space:]]*"stage"[[:space:]]*:[[:space:]]*"([^"]+)".*/\\1/p' .wdrc))
+    stages+=($(command sed -nE 's/^[[:space:]]*"([^"]+)"[[:space:]]*:[[:space:]]*"[a-fA-F0-9]{32}".*/\\1/p' .wdrc))
+  fi
+  profiles=($(command sed -nE 's/^[[:space:]]*"([^"]+)"[[:space:]]*:[[:space:]]*\\{.*/\\1/p' "$HOME/.wrangler-deploy/config.json" 2>/dev/null))
   workers=($(command ls -1 workers 2>/dev/null))
   commands=(
 ${COMMANDS.map((cmd) => `    '${cmd}'`).join("\n")}
@@ -64,6 +73,8 @@ ${COMMANDS.map((cmd) => `    '${cmd}'`).join("\n")}
   _arguments \
     '--stage[Stage name]:stage:(\${stages})' \
     '--worker[Worker path or deployed name]:worker:(\${workers})' \
+    '--profile[Profile name]:profile:(\${profiles})' \
+    '--account-id[Cloudflare account id]:account-id:' \
     '--fallback-stage[Fallback stage]:stage:(\${stages})' \
     '--format[Output format]:format:(json text ndjson)' \
     '--watch[Watch for changes]' \
@@ -91,10 +102,19 @@ _wd_completions() {
   local prev="${"${COMP_WORDS[COMP_CWORD-1]}"}"
   local commands="${COMMANDS.join(" ")}"
   local stages="$(ls -1 .wrangler-deploy 2>/dev/null | tr '\\n' ' ')"
+  if [[ -f .wdrc ]]; then
+    stages="$stages $(sed -nE 's/^[[:space:]]*\"stage\"[[:space:]]*:[[:space:]]*\"([^\"]+)\".*/\\1/p' .wdrc | tr '\\n' ' ')"
+    stages="$stages $(sed -nE 's/^[[:space:]]*\"([^\"]+)\"[[:space:]]*:[[:space:]]*\"[a-fA-F0-9]{32}\".*/\\1/p' .wdrc | tr '\\n' ' ')"
+  fi
+  local profiles="$(sed -nE 's/^[[:space:]]*\"([^\"]+)\"[[:space:]]*:[[:space:]]*\\{.*/\\1/p' \"$HOME/.wrangler-deploy/config.json\" 2>/dev/null | tr '\\n' ' ')"
   local workers="$(ls -1 workers 2>/dev/null | tr '\\n' ' ')"
-  local flags="--stage --worker --fallback-stage --format --watch --verify --plan-only --open --dashboard --print-url --copy --latest --no-open --strict --diff --only --only-resources --since --tail --grep-json --interval-ms --output --fail-on-drift --error-code --versioned --canary --lock --zone-id"
+  local flags="--stage --worker --profile --account-id --fallback-stage --format --watch --verify --plan-only --open --dashboard --print-url --copy --latest --no-open --strict --diff --only --only-resources --since --tail --grep-json --interval-ms --output --fail-on-drift --error-code --versioned --canary --lock --zone-id"
   if [[ "$prev" == "--stage" || "$prev" == "--fallback-stage" ]]; then
     COMPREPLY=($(compgen -W "$stages" -- "$cur"))
+    return 0
+  fi
+  if [[ "$prev" == "--profile" ]]; then
+    COMPREPLY=($(compgen -W "$profiles" -- "$cur"))
     return 0
   fi
   if [[ "$prev" == "--worker" ]]; then
@@ -119,6 +139,8 @@ complete -F _wd_completions wd
     const flags = [
       "complete -c wd -l stage -r -d 'Stage name'",
       "complete -c wd -l worker -r -d 'Worker path or name'",
+      "complete -c wd -l profile -r -d 'Profile name'",
+      "complete -c wd -l account-id -r -d 'Cloudflare account id'",
       "complete -c wd -l fallback-stage -r -d 'Fallback stage'",
       "complete -c wd -l open -d 'Open deployed URL after deploy'",
       "complete -c wd -l dashboard -d 'Open Cloudflare dashboard after deploy'",

@@ -4,6 +4,7 @@ import { loadProjectContext } from "./project-context.js";
 import { AgentErrors } from "./cli-output.js";
 
 const resolvedAccountIds = new Map<string, string>();
+const whoamiSummaries = new Map<string, string>();
 
 const ACCOUNT_ID_HEX = /^[a-f0-9]{32}$/i;
 
@@ -27,6 +28,16 @@ function assertAccountId32Hex(value: string, sourceLabel: string): string {
 
 export function resetResolvedAccountId(): void {
   resolvedAccountIds.clear();
+  whoamiSummaries.clear();
+}
+
+export interface AccountResolutionOptions {
+  accountIdOverride?: string;
+}
+
+export interface ResolvedAccount {
+  accountId: string;
+  source: "flag" | "env" | "project-context" | "whoami" | "wrangler-config";
 }
 
 /**
@@ -44,23 +55,40 @@ export function resetResolvedAccountId(): void {
  * The resolved ID is cached for the process lifetime and injected into the env for all
  * subsequent wrangler calls via `getWranglerEnv()`.
  */
-export function resolveAccountId(cwd: string): string {
-  const cached = resolvedAccountIds.get(cwd);
+export function resolveAccountId(cwd: string, options?: AccountResolutionOptions): string {
+  const projectContext = loadProjectContext(cwd);
+  const cacheKey = [
+    cwd,
+    options?.accountIdOverride?.trim() ?? "",
+    process.env.CLOUDFLARE_ACCOUNT_ID?.trim() ?? "",
+    projectContext.accountId?.trim() ?? "",
+    process.env.CLOUDFLARE_API_TOKEN ? "token" : "no-token",
+  ].join("|");
+
+  const cached = resolvedAccountIds.get(cacheKey);
   if (cached) return cached;
+
+  // 0. Explicit account override (CLI flag)
+  const rawOverride = options?.accountIdOverride;
+  if (typeof rawOverride === "string" && rawOverride.trim()) {
+    const overrideId = assertAccountId32Hex(rawOverride, "--account-id");
+    resolvedAccountIds.set(cacheKey, overrideId);
+    return overrideId;
+  }
 
   // 1. CLOUDFLARE_ACCOUNT_ID (CI/CD and explicit local override)
   const rawEnvId = process.env.CLOUDFLARE_ACCOUNT_ID;
   if (typeof rawEnvId === "string" && rawEnvId.trim()) {
     const envId = assertAccountId32Hex(rawEnvId, "CLOUDFLARE_ACCOUNT_ID");
-    resolvedAccountIds.set(cwd, envId);
+    resolvedAccountIds.set(cacheKey, envId);
     return envId;
   }
 
   // 2. accountId from .wdrc / .wdrc.json
-  const rawContextId = loadProjectContext(cwd).accountId;
+  const rawContextId = projectContext.accountId;
   if (typeof rawContextId === "string" && rawContextId.trim()) {
     const projectContextAccountId = assertAccountId32Hex(rawContextId, ".wdrc / .wdrc.json accountId");
-    resolvedAccountIds.set(cwd, projectContextAccountId);
+    resolvedAccountIds.set(cacheKey, projectContextAccountId);
     return projectContextAccountId;
   }
 
@@ -77,7 +105,7 @@ export function resolveAccountId(cwd: string): string {
     const matchedId = match?.[1];
     if (matchedId) {
       const id = matchedId.toLowerCase();
-      resolvedAccountIds.set(cwd, id);
+      resolvedAccountIds.set(cacheKey, id);
       return id;
     }
 
@@ -86,7 +114,7 @@ export function resolveAccountId(cwd: string): string {
     const hexId = hexMatch?.[1];
     if (hexId) {
       const id = hexId.toLowerCase();
-      resolvedAccountIds.set(cwd, id);
+      resolvedAccountIds.set(cacheKey, id);
       return id;
     }
   } catch {
@@ -117,7 +145,7 @@ export function resolveAccountId(cwd: string): string {
       const match = content.match(/account_id\s*=\s*["']([a-f0-9]{32})["']/i);
       if (match?.[1]) {
         const id = match[1].toLowerCase();
-        resolvedAccountIds.set(cwd, id);
+        resolvedAccountIds.set(cacheKey, id);
         return id;
       }
     } catch {
@@ -145,4 +173,68 @@ export function getWranglerEnv(cwd: string): NodeJS.ProcessEnv {
     ...process.env,
     CLOUDFLARE_ACCOUNT_ID: accountId,
   };
+}
+
+export function resolveAccount(cwd: string, options?: AccountResolutionOptions): ResolvedAccount {
+  const rawOverride = options?.accountIdOverride;
+  if (typeof rawOverride === "string" && rawOverride.trim()) {
+    return {
+      accountId: resolveAccountId(cwd, options),
+      source: "flag",
+    };
+  }
+  if (typeof process.env.CLOUDFLARE_ACCOUNT_ID === "string" && process.env.CLOUDFLARE_ACCOUNT_ID.trim()) {
+    return {
+      accountId: resolveAccountId(cwd, options),
+      source: "env",
+    };
+  }
+  const projectContext = loadProjectContext(cwd);
+  if (typeof projectContext.accountId === "string" && projectContext.accountId.trim()) {
+    return {
+      accountId: resolveAccountId(cwd, options),
+      source: "project-context",
+    };
+  }
+
+  const accountId = resolveAccountId(cwd, options);
+  const source: ResolvedAccount["source"] = process.env.CLOUDFLARE_API_TOKEN ? "whoami" : "wrangler-config";
+  return { accountId, source };
+}
+
+export function resolveWranglerWhoamiSummary(cwd: string): string {
+  const cached = whoamiSummaries.get(cwd);
+  if (cached) return cached;
+  const output = execFileSync("npx", ["wrangler", "whoami"], {
+    encoding: "utf-8",
+    cwd,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  const text = output.replace(/\u001b\[[0-9;]*m/g, "");
+  const lines = text.split(/\r?\n/);
+  let email: string | undefined;
+  let accountName: string | undefined;
+  let accountId: string | undefined;
+  for (const line of lines) {
+    if (!email) {
+      const emailMatch = line.match(/\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+\b/);
+      if (emailMatch) email = emailMatch[0];
+    }
+    const accountMatch = line.match(/^\s*│?\s*(.+?)\s+│\s+([a-f0-9]{32})\s*│?\s*$/i)
+      ?? line.match(/^\s*\|\s*(.+?)\s+\|\s+([a-f0-9]{32})\s*\|\s*$/i);
+    if (accountMatch && !accountId) {
+      accountName = (accountMatch[1] ?? "").trim();
+      accountId = (accountMatch[2] ?? "").trim();
+    }
+  }
+  let summary = "authenticated";
+  if (email && accountId) summary = `${email} (account ${accountName ?? accountId})`;
+  else if (email) summary = email;
+  else if (accountId) summary = `account ${accountName ?? accountId}`;
+  else {
+    const firstNonBanner = lines.find((line) => line.trim() && !line.includes("wrangler") && !line.includes("─"));
+    summary = firstNonBanner?.trim() ?? "authenticated";
+  }
+  whoamiSummaries.set(cwd, summary);
+  return summary;
 }
