@@ -34,7 +34,7 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.4.0",
-    "@cloudflare/workers-types": "^4.20260510.1",
+    "@cloudflare/workers-types": "^4.20260517.1",
     "giget": "^3.2.0",
     "workers-usage-guard-shared": "workspace:^"
   },
