@@ -11,6 +11,6 @@
     "wrangler-deploy": "workspace:*",
     "wrangler": "^4.90.0",
     "tsx": "^4.21.0",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.6"
   }
 }
