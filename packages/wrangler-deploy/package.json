@@ -1,6 +1,6 @@
 {
   "name": "wrangler-deploy",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "description": "Create, deploy, and tear down full Cloudflare Workers environments per stage",
   "type": "module",
   "bin": {
@@ -19,6 +19,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "postbuild": "node scripts/copy-concepts.mjs",
     "prebuild": "node scripts/generate-template-manifest.mjs",
     "generate:agent-context": "node scripts/generate-agent-context.mjs",
     "generate:template-manifest": "node scripts/generate-template-manifest.mjs",
@@ -29,7 +30,7 @@
     "prepublishOnly": "pnpm build"
   },
   "peerDependencies": {
-    "wrangler": ">=4.88.0"
+    "wrangler": ">=3.91.0 <5"
   },
   "dependencies": {
     "@clack/prompts": "^1.4.0",

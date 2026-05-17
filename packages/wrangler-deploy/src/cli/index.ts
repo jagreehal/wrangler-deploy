@@ -3,9 +3,10 @@
 import { resolve, join, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, rmSync, readdirSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { createWranglerRunner } from "../core/wrangler-runner.js";
+import { assertWranglerVersion } from "../core/wrangler-version-check.js";
 import { resolveStateProvider } from "../core/state.js";
 import {
   clearProjectContext,
@@ -125,6 +126,7 @@ import {
 import { allExampleSets, getExamples, listExampleCommands } from "../core/examples.js";
 import { defaultUserStage } from "../core/defaults.js";
 import { loadEnvFileFromArgs } from "../core/dotenv.js";
+import { resolveAccount, resolveAccountId, resolveWranglerWhoamiSummary } from "../core/auth.js";
 import {
   applyProfileToEnv,
   defaultProfileName,
@@ -134,6 +136,7 @@ import {
   profileCredentialsPath,
   profilesConfigPath,
   removeProfile,
+  readCloudflareCredential,
   resolveProfileSelection,
   upsertCloudflareProfile,
   writeCloudflareCredential,
@@ -160,6 +163,17 @@ import { eraseSecrets, rotatePassword } from "../core/rotate-password.js";
 import { openUrl } from "../core/open-url.js";
 import { copyToClipboard } from "../core/clipboard.js";
 import { explainIssue } from "../core/explain.js";
+import {
+  closestConcept,
+  getConcept,
+  listConcepts,
+} from "../core/explain-concepts.js";
+import {
+  CATEGORY_ORDER,
+  getRegistry,
+  getRegistryByCategory,
+  type ActionCategory,
+} from "./registry.js";
 import { outputSchemas } from "../core/output-schemas.js";
 import { schemaForCommand } from "../core/output-schemas.js";
 import { configSchema } from "../core/config-schema.js";
@@ -511,6 +525,20 @@ function lastErrorPath(rootDir: string): string {
   return resolve(rootDir, ".wrangler-deploy", "last-error.json");
 }
 
+let cachedWdVersion: string | undefined;
+function getWdVersion(): string {
+  if (cachedWdVersion) return cachedWdVersion;
+  try {
+    const cliDir = fileURLToPath(new URL(".", import.meta.url));
+    const pkgPath = resolve(cliDir, "../../package.json");
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as { version?: string };
+    cachedWdVersion = pkg.version ?? "0.0.0";
+  } catch {
+    cachedWdVersion = "0.0.0";
+  }
+  return cachedWdVersion;
+}
+
 function runWranglerVersion(): string {
   const raw = execFileSync("npx", ["wrangler", "--version"], {
     encoding: "utf-8",
@@ -520,39 +548,61 @@ function runWranglerVersion(): string {
   return match?.[1] ?? raw.split("\n")[0]?.trim() ?? raw;
 }
 
-function summarizeWranglerWhoami(raw: string): string {
-  const text = raw.replace(/\[[0-9;]*m/g, "");
-  const lines = text.split(/\r?\n/);
-  let email: string | undefined;
-  let accountName: string | undefined;
-  let accountId: string | undefined;
-  for (const line of lines) {
-    if (!email) {
-      const emailMatch = line.match(/\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+\b/);
-      if (emailMatch) email = emailMatch[0];
-    }
-    const accountMatch = line.match(/^\s*│?\s*(.+?)\s+│\s+([a-f0-9]{32})\s*│?\s*$/i)
-      ?? line.match(/^\s*\|\s*(.+?)\s+\|\s+([a-f0-9]{32})\s*\|\s*$/i);
-    if (accountMatch && !accountId) {
-      accountName = (accountMatch[1] ?? "").trim();
-      accountId = (accountMatch[2] ?? "").trim();
-    }
-  }
-  if (email && accountId) {
-    return `${email} (account ${accountName ?? accountId})`;
-  }
-  if (email) return email;
-  if (accountId) return `account ${accountName ?? accountId}`;
-  const firstNonBanner = lines.find((line) => line.trim() && !line.includes("wrangler") && !line.includes("─"));
-  return firstNonBanner?.trim() ?? "authenticated";
+function runWranglerWhoami(cwd: string = process.cwd()): string {
+  return resolveWranglerWhoamiSummary(cwd);
 }
 
-function runWranglerWhoami(): string {
-  const raw = execFileSync("npx", ["wrangler", "whoami"], {
-    encoding: "utf-8",
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  return summarizeWranglerWhoami(raw);
+async function probeCloudflareAccountAccess(apiToken: string, accountId: string): Promise<{
+  ok: boolean;
+  status?: number;
+  message?: string;
+}> {
+  try {
+    const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}`, {
+      headers: {
+        Authorization: `Bearer ${apiToken}`,
+      },
+    });
+    const bodyText = await res.text();
+    if (!res.ok) {
+      return {
+        ok: false,
+        status: res.status,
+        message: bodyText.slice(0, 400),
+      };
+    }
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : "Unknown network error",
+    };
+  }
+}
+
+function buildAuthContext(rootDir: string, profileName: string, profileSource: string, explicitAccountId?: string) {
+  const account = (() => {
+    try {
+      return resolveAccount(rootDir, { accountIdOverride: explicitAccountId });
+    } catch {
+      return null;
+    }
+  })();
+  const whoami = (() => {
+    try {
+      return runWranglerWhoami(rootDir);
+    } catch {
+      return null;
+    }
+  })();
+  return {
+    profile: profileName,
+    profileSource,
+    accountId: account?.accountId ?? null,
+    accountSource: account?.source ?? null,
+    tokenPresent: Boolean(process.env.CLOUDFLARE_API_TOKEN),
+    wranglerWhoami: whoami,
+  };
 }
 
 function releaseSnapshotPath(rootDir: string, stage: string): string {
@@ -652,6 +702,7 @@ function resolveRootDir(): string {
 async function main() {
   const commandStartedAt = Date.now();
   const rootDir = resolveRootDir();
+  const globalWarnings: string[] = [];
 
   const envFileResult = loadEnvFileFromArgs(args, rootDir);
   if (envFileResult) {
@@ -679,6 +730,10 @@ async function main() {
   }
 
   const profileSelection = resolveProfileSelection(args);
+  const explicitAccountId = getFlag("account-id");
+  if (explicitAccountId !== undefined) {
+    process.env.CLOUDFLARE_ACCOUNT_ID = explicitAccountId;
+  }
   const isProfileCommand =
     command === "configure" ||
     command === "login" ||
@@ -687,6 +742,14 @@ async function main() {
     command === "util";
   if (!isProfileCommand) {
     applyProfileToEnv(profileSelection.name);
+    if (!wantsJsonOutput() && !isQuiet() && explicitAccountId) {
+      const profile = getProfile(profileSelection.name);
+      const profileAccountId = profile?.cloudflare?.metadata?.id;
+      if (profileAccountId && profileAccountId.toLowerCase() !== explicitAccountId.toLowerCase()) {
+        console.log(`  warning: --account-id (${explicitAccountId}) differs from profile "${profileSelection.name}" account (${profileAccountId})`);
+        globalWarnings.push(`--account-id (${explicitAccountId}) differs from profile "${profileSelection.name}" account (${profileAccountId})`);
+      }
+    }
   }
 
   const projectContext = loadProjectContext(rootDir);
@@ -711,6 +774,32 @@ async function main() {
       return;
     }
     console.log(`wrangler-deploy ${pkg.version ?? "0.0.0"}`);
+    return;
+  }
+
+  if (command === "upgrade-check") {
+    const cliDir = fileURLToPath(new URL(".", import.meta.url));
+    const pkgPath = resolve(cliDir, "../../package.json");
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as { version?: string };
+    const current = pkg.version ?? "0.0.0";
+    let latest: string | null = null;
+    try {
+      latest = execFileSync("npm", ["view", "wrangler-deploy", "version"], {
+        encoding: "utf-8",
+        stdio: ["ignore", "pipe", "pipe"],
+      }).trim();
+    } catch {
+      latest = null;
+    }
+    const updateAvailable = Boolean(latest && latest !== current);
+    const payload = { current, latest, updateAvailable };
+    if (wantsJsonOutput()) {
+      printJson(payload);
+    } else {
+      console.log(`\n  current: ${current}`);
+      console.log(`  latest: ${latest ?? "unavailable"}`);
+      console.log(`  update available: ${updateAvailable ? "yes" : "no"}\n`);
+    }
     return;
   }
 
@@ -767,6 +856,8 @@ async function main() {
     plan (p)               Show what would be created/changed
     apply (a)              Provision resources and generate configs
     deploy (d)             Deploy workers using rendered configs
+    up (u)                 Apply + deploy in one shot (first-run friendly)
+    tail                   Stream wrangler logs for stage workers
     rollback               Roll back worker to a specific version
     history                Show deployment/rollback history for a stage
     env diff               Diff local wrangler config vs rendered stage config
@@ -804,6 +895,8 @@ async function main() {
 
   Infrastructure:
     d1 list/inspect/exec/seed/reset   D1 database operations
+    d1 execute <db>        Execute SQL against the staged DB (passthrough)
+    d1 migrations apply <db>   Apply D1 migrations (passthrough)
     d1 migrate status      Show local D1 migration status
     queue list/inspect/send/replay/tail   Queue operations
     queue dlq list/retry/drop  Dead-letter queue helpers
@@ -820,6 +913,8 @@ async function main() {
     login                  Save Cloudflare API token
     logout                 Remove saved credentials
     profile list           List configured profiles
+    auth status/check      Show effective auth/account and validate account access
+    bootstrap              Safe setup flow (configure/login/context/doctor)
     telemetry on/off/status Toggle local command telemetry
     util create-cf-token   Print scopes + dashboard URL for token creation
 
@@ -874,6 +969,7 @@ async function main() {
     --verify               Run post-deploy verification
     --filter <worker>      Filter dev/deploy to one worker
     --session              Single multi-config local dev session
+    --mode <kind>          Explicit dev mode: workers or session
     --tunnel [worker|all]  Expose local dev via tunnel
     --base-port <number>  Base port for wd dev
     --fallback-stage <name>  Fallback stage for dev filter read mode
@@ -883,6 +979,7 @@ async function main() {
     --erase-secrets       Clear encrypted secrets from state (apply --force)
     --database-url <url>  Postgres URL for Hyperdrive (apply)
     --account-id <id>     Cloudflare account ID override
+    --require-account-match Fail mutating command when resolved account differs from profile account
     --fields <paths>      Filter JSON output to dot-paths
     --key <name>          Key for wd context get
 
@@ -908,6 +1005,7 @@ async function main() {
   // Short aliases (resolve before config loading since we need the resolved command name)
   const aliasMap: Record<string, string | undefined> = {
     d: "deploy", p: "plan", a: "apply", s: "status",
+    u: "up",
     i: "init", g: "graph", gc: "gc",
     des: "destroy", ver: "verify", doc: "doctor",
     conf: "configure", prof: "profile",
@@ -970,7 +1068,7 @@ async function main() {
   const isConfigCommand = ["plan", "apply", "deploy", "destroy", "status", "open", "dashboard", "output",
     "graph", "diff", "impact", "verify", "secrets", "run", "state", "worker", "d1", "queue",
     "cron", "logs", "snapshot", "fixture", "doctor", "check", "rollback", "history", "env", "route", "lock",
-    "replay", "onboard", "quickstart", "release-note"].includes(resolvedCommand);
+    "replay", "onboard", "quickstart", "release-note", "preflight"].includes(resolvedCommand);
   if (isConfigCommand) {
     try {
       const cfg = await loadConfig(rootDir);
@@ -982,6 +1080,12 @@ async function main() {
 
   const envStage = process.env.WD_STAGE;
   const stage = explicitStage ?? configStage ?? projectContext.stage ?? envStage ?? defaultUserStage();
+  if (!explicitAccountId && !process.env.CLOUDFLARE_ACCOUNT_ID) {
+    const stagePinnedAccount = projectContext.stageAccounts?.[stage];
+    if (stagePinnedAccount) {
+      process.env.CLOUDFLARE_ACCOUNT_ID = stagePinnedAccount;
+    }
+  }
   if (!explicitStage && !projectContext.stage && !isQuiet() && !wantsJsonOutput() && command !== "dev") {
     const source = configStage ? "config" : process.env.WD_STAGE ? "WD_STAGE env" : "$USER";
     console.log(`  stage: ${stage} (from ${source}, use --stage to override)`);
@@ -1022,7 +1126,7 @@ async function main() {
     if (!hasToken || !hasAccount) {
       let wranglerOk = false;
       try {
-        runWranglerWhoami();
+        runWranglerWhoami(rootDir);
         wranglerOk = true;
       } catch {
         wranglerOk = false;
@@ -1062,9 +1166,40 @@ async function main() {
     }
   }
 
+  if (manifestEntry?.mutating && !wantsJsonOutput() && !isQuiet()) {
+    const authContext = buildAuthContext(rootDir, profileSelection.name, profileSelection.source, explicitAccountId);
+    console.log(`  auth: profile=${authContext.profile} account=${authContext.accountId ?? "unresolved"} (${authContext.accountSource ?? "unknown"}) token=${authContext.tokenPresent ? "present" : "missing"}`);
+  }
+  if (manifestEntry?.mutating && hasFlag("require-account-match")) {
+    const profile = getProfile(profileSelection.name);
+    const profileAccountId = profile?.cloudflare?.metadata?.id;
+    const resolvedAccountId = resolveAccountId(rootDir, { accountIdOverride: explicitAccountId });
+    if (profileAccountId && profileAccountId.toLowerCase() !== resolvedAccountId.toLowerCase()) {
+      throw AgentErrors.auth(
+        `Resolved account ${resolvedAccountId} does not match profile "${profileSelection.name}" account ${profileAccountId}.`,
+        "Use --account-id to target the matching account, or switch profile.",
+      );
+    }
+  }
+
   switch (resolvedCommand) {
     case "init": {
       const preset = getFlag("preset");
+      const initAccountFlag = getFlag("account");
+      const shouldAutoAccount = initAccountFlag === "auto";
+      const explicitInitAccount = initAccountFlag && initAccountFlag !== "auto" ? initAccountFlag : undefined;
+      let initAccountId: string | null = explicitInitAccount ?? null;
+      let initAccountSource: string | null = explicitInitAccount ? "flag" : null;
+      if (shouldAutoAccount) {
+        try {
+          const resolved = resolveAccount(rootDir, { accountIdOverride: explicitAccountId });
+          initAccountId = resolved.accountId;
+          initAccountSource = resolved.source;
+        } catch {
+          initAccountId = null;
+          initAccountSource = null;
+        }
+      }
       let output: string;
       if (preset === "minimal") {
         output = `import { defineConfig } from "wrangler-deploy";
@@ -1120,6 +1255,9 @@ export default defineConfig({
           bytes: Buffer.byteLength(output, "utf-8"),
           wouldOverwrite: exists,
           preview: output,
+          accountId: initAccountId,
+          accountSource: initAccountSource,
+          wouldWriteContext: Boolean(initAccountId),
         };
         if (wantsJsonOutput()) {
           printJson(result);
@@ -1131,13 +1269,27 @@ export default defineConfig({
         break;
       }
       writeFileSync(outPath, output);
-      const result = { ok: true, path: outPath, preset: preset ?? null, bytes: Buffer.byteLength(output, "utf-8") };
+      let contextPath: string | null = null;
+      if (initAccountId) {
+        const updated = writeProjectContext(rootDir, { accountId: initAccountId });
+        contextPath = updated.path ?? null;
+      }
+      const result = {
+        ok: true,
+        path: outPath,
+        preset: preset ?? null,
+        bytes: Buffer.byteLength(output, "utf-8"),
+        accountId: initAccountId,
+        accountSource: initAccountSource,
+        contextPath,
+      };
       if (wantsJsonOutput()) {
         printJson(result);
         maybeWriteArtifact(result);
         break;
       }
       console.log(`\n  Generated wrangler-deploy.config.ts from ${rootDir}\n`);
+      if (initAccountId) console.log(`  account default pinned: ${initAccountId}${initAccountSource ? ` (${initAccountSource})` : ""}`);
       console.log(`  Next:\n`);
       console.log(`    wd context set --stage <name>   Set default stage`);
       console.log(`    wd plan                        Preview what will be created`);
@@ -1431,6 +1583,7 @@ export default defineConfig({
 
     case "plan": {
       assertStage(stage);
+      const authContext = buildAuthContext(rootDir, profileSelection.name, profileSelection.source, explicitAccountId);
       const baseConfig = await loadConfig(rootDir);
       const inputSelection = readSelectionFromInput();
       const workersOnly = [...getFlags("only"), ...inputSelection.workersOnly];
@@ -1441,8 +1594,9 @@ export default defineConfig({
       const result = await plan({ stage }, { rootDir, config, state: stateProvider });
 
       if (wantsJsonOutput()) {
-        printJson(result);
-        maybeWriteArtifact(result);
+        const payload = { ...result, authContext, ...(globalWarnings.length > 0 ? { warnings: globalWarnings } : {}) };
+        printJson(payload);
+        maybeWriteArtifact(payload);
         break;
       }
       maybeWriteArtifact(result);
@@ -1496,6 +1650,7 @@ export default defineConfig({
 
     case "apply": {
       assertStage(stage);
+      const authContext = buildAuthContext(rootDir, profileSelection.name, profileSelection.source, explicitAccountId);
       const baseConfig = await loadConfig(rootDir);
       const inputSelection = readSelectionFromInput();
       const workersOnly = [...getFlags("only"), ...inputSelection.workersOnly];
@@ -1514,8 +1669,9 @@ export default defineConfig({
           workers: config.workers,
         };
         if (wantsJsonOutput()) {
-          printJson(result);
-          maybeWriteArtifact(result);
+          const payload = { ...result, authContext, ...(globalWarnings.length > 0 ? { warnings: globalWarnings } : {}) };
+          printJson(payload);
+          maybeWriteArtifact(payload);
         } else {
           maybeWriteArtifact(result);
           console.log(`\n  wrangler-deploy apply --stage ${stage} --dry-run\n`);
@@ -1583,8 +1739,9 @@ export default defineConfig({
 
       const result = await runApply();
       if (wantsJsonOutput()) {
-        printJson(result);
-        maybeWriteArtifact(result);
+        const payload = { ...result, authContext, ...(globalWarnings.length > 0 ? { warnings: globalWarnings } : {}) };
+        printJson(payload);
+        maybeWriteArtifact(payload);
       } else {
         maybeWriteArtifact(result);
         printNextActions([`wd deploy --stage ${stage}`, `wd status --stage ${stage}`]);
@@ -1829,6 +1986,7 @@ export default defineConfig({
 
     case "deploy": {
       assertStage(stage);
+      const authContext = buildAuthContext(rootDir, profileSelection.name, profileSelection.source, explicitAccountId);
       const canaryPercentRaw = getFlag("canary");
       const canaryParsed = canaryPercentRaw ? Number.parseInt(canaryPercentRaw, 10) : Number.NaN;
       const canaryPercent = Number.isNaN(canaryParsed) ? undefined : canaryParsed;
@@ -1873,8 +2031,9 @@ export default defineConfig({
           })),
         };
         if (wantsJsonOutput()) {
-          printJson(result);
-          maybeWriteArtifact(result);
+          const payload = { ...result, authContext, ...(globalWarnings.length > 0 ? { warnings: globalWarnings } : {}) };
+          printJson(payload);
+          maybeWriteArtifact(payload);
         } else {
           maybeWriteArtifact(result);
           console.log(`\n  wrangler-deploy deploy --stage ${stage} --dry-run\n`);
@@ -1914,7 +2073,7 @@ export default defineConfig({
           targetVersion: state.workers[workerPath]?.versionId ?? null,
         }));
         if (wantsJsonOutput()) {
-          printJson({ stage, planOnly: true, actions });
+          printJson({ stage, planOnly: true, actions, authContext, ...(globalWarnings.length > 0 ? { warnings: globalWarnings } : {}) });
         } else {
           console.log(`\n  deploy plan (${stage})\n`);
           for (const action of actions) {
@@ -1964,8 +2123,9 @@ export default defineConfig({
       }
       const deploySummary = { ...result, canary: canaryPercent ?? null, canaryApplied, lock: hasFlag("lock") };
       if (wantsJsonOutput()) {
-        printJson(deploySummary);
-        maybeWriteArtifact(deploySummary);
+        const payload = { ...deploySummary, authContext, ...(globalWarnings.length > 0 ? { warnings: globalWarnings } : {}) };
+        printJson(payload);
+        maybeWriteArtifact(payload);
       } else {
         maybeWriteArtifact(deploySummary);
         printNextActions([
@@ -1977,7 +2137,7 @@ export default defineConfig({
 
       const selected = result.deployedWorkers[0];
       if (selected && (hasFlag("open") || hasFlag("dashboard"))) {
-        const accountId = (await import("../core/auth.js")).resolveAccountId(rootDir);
+        const accountId = resolveAccountId(rootDir, { accountIdOverride: explicitAccountId });
         if (hasFlag("open") && selected.urls[0]) {
           if (hasFlag("print-url")) {
             console.log(selected.urls[0]);
@@ -2016,6 +2176,220 @@ export default defineConfig({
         process.on("SIGTERM", shutdown);
         await new Promise(() => {});
       }
+      break;
+    }
+
+    case "up": {
+      // Thin orchestrator: run apply then deploy in one shot.
+      // Eliminates the WD_E_STATE_MISSING two-step trap on first deploys.
+      assertStage(stage);
+      const authContext = buildAuthContext(rootDir, profileSelection.name, profileSelection.source, explicitAccountId);
+      const baseConfig = await loadConfig(rootDir);
+      const inputSelection = readSelectionFromInput();
+      const workersOnly = [...getFlags("only"), ...inputSelection.workersOnly];
+      const resourcesOnly = [...getFlags("only-resources"), ...inputSelection.resourcesOnly];
+      const configScopedWorkers = workersOnly.length > 0 ? selectConfigWorkers(baseConfig, workersOnly) : baseConfig;
+      const config = resourcesOnly.length > 0 ? selectConfigResources(configScopedWorkers, resourcesOnly) : configScopedWorkers;
+      const wrangler = createWranglerRunner();
+      const stateProvider = resolveStateProvider(rootDir, config.state, resolveStatePassword(config, projectContext));
+      const logger = wantsJsonOutput() ? silentLogger : console;
+
+      if (isDryRun(args)) {
+        const preview = await plan({ stage }, { rootDir, config, state: stateProvider });
+        const result = {
+          stage,
+          dryRun: true,
+          phase: "up",
+          plan: preview,
+          deployOrder: resolveDeployOrder(config),
+          workers: config.workers,
+        };
+        if (wantsJsonOutput()) {
+          const payload = { ...result, authContext, ...(globalWarnings.length > 0 ? { warnings: globalWarnings } : {}) };
+          printJson(payload);
+          maybeWriteArtifact(payload);
+        } else {
+          maybeWriteArtifact(result);
+          console.log(`\n  wrangler-deploy up --stage ${stage} --dry-run\n`);
+          for (const item of preview.items) {
+            const symbol =
+              item.action === "create"
+                ? "+"
+                : item.action === "in-sync"
+                  ? "="
+                  : item.action === "drifted"
+                    ? "~"
+                    : item.action === "orphaned"
+                      ? "!"
+                      : "-";
+            console.log(`  ${symbol} ${item.name} (${item.type}) ${item.action}`);
+          }
+          console.log("");
+          for (const workerPath of result.deployOrder) {
+            console.log(`  would deploy ${workerPath}`);
+          }
+          console.log(`\n  Preview only — no resources were changed.\n`);
+        }
+        break;
+      }
+
+      if (!wantsJsonOutput()) {
+        console.log(`\n  wrangler-deploy up --stage ${stage}  (apply + deploy)\n`);
+        console.log(`  Phase 1/2: apply`);
+      }
+
+      const applyResult = await apply(
+        {
+          stage,
+          databaseUrl: getFlag("database-url") ?? projectContext.databaseUrl,
+          force: hasFlag("force"),
+        },
+        { rootDir, config, state: stateProvider, wrangler, logger },
+      );
+
+      if (!wantsJsonOutput()) {
+        console.log(`\n  Phase 2/2: deploy`);
+      }
+
+      const deployResult = await deploy(
+        { stage, verify: hasFlag("verify") },
+        {
+          rootDir,
+          config,
+          state: stateProvider,
+          wrangler,
+          logger,
+          validateSecretsFn: validateSecrets,
+          verifyFn: verify,
+        },
+      );
+
+      const combined = {
+        stage,
+        phase: "up",
+        apply: applyResult.summary,
+        deploy: deployResult,
+      };
+
+      if (wantsJsonOutput()) {
+        const payload = { ...combined, authContext, ...(globalWarnings.length > 0 ? { warnings: globalWarnings } : {}) };
+        printJson(payload);
+        maybeWriteArtifact(payload);
+      } else {
+        maybeWriteArtifact(combined);
+        printNextActions([`wd status --stage ${stage}`, `wd tail --stage ${stage}`]);
+      }
+      maybeRecordTelemetry(rootDir, !!projectContext.telemetry, "up", commandStartedAt);
+      break;
+    }
+
+    case "tail": {
+      // Tail wrangler logs for one or all workers in a stage.
+      // Wraps `wrangler tail <stage-suffixed-name> --config <rendered>`.
+      assertWranglerVersion();
+      assertStage(stage);
+      const config = await loadConfig(rootDir);
+      const stateProvider = resolveStateProvider(rootDir, config.state, resolveStatePassword(config, projectContext));
+      const state = await stateProvider.read(stage);
+      assertStageState(state, stage);
+
+      const workerFlag = getFlag("worker");
+      const format = getFlag("format") ?? "pretty";
+      const status = getFlag("status");
+      const sampling = getFlag("sampling-rate");
+      const passthrough: string[] = [];
+      if (format) passthrough.push("--format", format);
+      if (status) passthrough.push("--status", status);
+      if (sampling) passthrough.push("--sampling-rate", sampling);
+
+      type Target = { workerPath: string; workerName: string; renderedConfigPath: string };
+      const allTargets: Target[] = Object.entries(state.workers).map(([workerPath, ws]) => ({
+        workerPath,
+        workerName: ws.name,
+        renderedConfigPath: resolve(rootDir, ".wrangler-deploy", stage, workerPath, "wrangler.rendered.jsonc"),
+      }));
+
+      const targets = workerFlag
+        ? allTargets.filter((t) => t.workerPath === workerFlag)
+        : allTargets;
+
+      if (targets.length === 0) {
+        throw AgentErrors.notFound(
+          workerFlag
+            ? `Worker "${workerFlag}" not found in stage "${stage}" state.`
+            : `No deployed workers found for stage "${stage}".`,
+          workerFlag
+            ? `Run \`wd status --stage ${stage}\` to list workers.`
+            : `Run \`wd deploy --stage ${stage}\` first.`,
+        );
+      }
+
+      // Build column widths so prefixes align ([api    ] vs [dispatcher])
+      const prefixWidth = Math.max(...targets.map((t) => t.workerPath.length));
+
+      if (!wantsJsonOutput()) {
+        console.log(`\n  Tailing ${targets.length} worker(s) for stage "${stage}"  (Ctrl+C to stop)\n`);
+        for (const t of targets) {
+          console.log(`  [${t.workerPath.padEnd(prefixWidth)}] -> ${t.workerName}`);
+        }
+        console.log("");
+      }
+
+      const children: ReturnType<typeof spawn>[] = [];
+      const shutdown = () => {
+        for (const child of children) {
+          if (!child.killed) {
+            try { child.kill("SIGINT"); } catch { /* best effort */ }
+          }
+        }
+        process.exit(0);
+      };
+      process.on("SIGINT", shutdown);
+      process.on("SIGTERM", shutdown);
+
+      for (const t of targets) {
+        const prefix = targets.length > 1 ? `[${t.workerPath.padEnd(prefixWidth)}] ` : "";
+        const wranglerArgs = ["wrangler", "tail", t.workerName, "-c", t.renderedConfigPath, ...passthrough];
+        const child = spawn("npx", wranglerArgs, {
+          cwd: resolve(rootDir, t.workerPath),
+          env: { ...process.env },
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+        children.push(child);
+
+        const pipe = (stream: NodeJS.ReadableStream, sink: NodeJS.WriteStream): void => {
+          let buffer = "";
+          stream.on("data", (chunk: Buffer) => {
+            buffer += chunk.toString("utf-8");
+            let newlineIdx = buffer.indexOf("\n");
+            while (newlineIdx !== -1) {
+              const line = buffer.slice(0, newlineIdx);
+              buffer = buffer.slice(newlineIdx + 1);
+              sink.write(`${prefix}${line}\n`);
+              newlineIdx = buffer.indexOf("\n");
+            }
+          });
+          stream.on("end", () => {
+            if (buffer.length > 0) sink.write(`${prefix}${buffer}\n`);
+          });
+        };
+
+        if (child.stdout) pipe(child.stdout, process.stdout);
+        if (child.stderr) pipe(child.stderr, process.stderr);
+
+        child.on("exit", (code, signal) => {
+          if (!wantsJsonOutput()) {
+            console.log(`${prefix}(tail exited code=${code ?? "?"} signal=${signal ?? "?"})`);
+          }
+        });
+      }
+
+      // Wait until all children exit (typically only happens on Ctrl+C).
+      await Promise.all(
+        children.map(
+          (child) => new Promise<void>((resolveExit) => child.on("exit", () => resolveExit())),
+        ),
+      );
       break;
     }
 
@@ -2263,6 +2637,7 @@ export default defineConfig({
 
     case "status": {
       const config = await loadConfig(rootDir);
+      const authContext = buildAuthContext(rootDir, profileSelection.name, profileSelection.source, explicitAccountId);
       const stateProvider = resolveStateProvider(rootDir, config.state, resolveStatePassword(config, projectContext));
       const watchEnabled = hasFlag("watch");
       const watchIntervalMs = Math.max(1000, Number.parseInt(getFlag("interval-ms") ?? "5000", 10));
@@ -2295,7 +2670,7 @@ export default defineConfig({
               const resourcesChanged = Object.keys(stageState.resources).filter((k) => JSON.stringify(stageState.resources[k]) !== JSON.stringify(previousState?.resources[k])).length;
               diff = { workersChanged, resourcesChanged };
             }
-            const payload = { stage, tick: tick ?? 1, state: stageState, ...(diff ? { diff } : {}) };
+            const payload = { stage, tick: tick ?? 1, state: stageState, ...(diff ? { diff } : {}), authContext, ...(globalWarnings.length > 0 ? { warnings: globalWarnings } : {}) };
             printJson(payload);
             // Only persist the first tick to avoid noisy artifact churn during --watch.
             if ((tick ?? 1) === 1) maybeWriteArtifact(payload);
@@ -2369,7 +2744,7 @@ export default defineConfig({
             const state = await stateProvider.read(name);
             if (state) details.push({ stage: name, state });
           }
-          const payload = { stages: details };
+          const payload = { stages: details, authContext, ...(globalWarnings.length > 0 ? { warnings: globalWarnings } : {}) };
           printJson(payload);
           maybeWriteArtifact(payload);
           return;
@@ -2411,10 +2786,7 @@ export default defineConfig({
       }
 
       const { resourceId } = await import("../types.js");
-      const accountId = await (async () => {
-        const { resolveAccountId } = await import("../core/auth.js");
-        return resolveAccountId(rootDir);
-      })();
+      const accountId = resolveAccountId(rootDir, { accountIdOverride: explicitAccountId });
 
       console.log(`\n  ─── ${stage} outputs ───\n`);
 
@@ -2876,6 +3248,19 @@ export default defineConfig({
           console.log(`  ${icon} ${check.name}: ${check.message}`);
           if (check.details) console.log(`    ${check.details}`);
         }
+        if (hasFlag("fix")) {
+          const updates: Partial<ProjectContext> = {};
+          if (!projectContext.persistTo) updates.persistTo = ".wrangler/state";
+          if (projectContext.session === undefined) updates.session = false;
+          if (Object.keys(updates).length > 0 && !hasFlag("fix-dry-run")) {
+            writeProjectContext(rootDir, updates);
+          }
+          if (Object.keys(updates).length > 0) {
+            console.log(hasFlag("fix-dry-run")
+              ? "  (dry-run) would set .wdrc defaults for dev persist/session"
+              : "  applied .wdrc defaults for dev persist/session");
+          }
+        }
         console.log("");
         break;
       }
@@ -2899,7 +3284,11 @@ export default defineConfig({
       const config = await loadConfig(rootDir);
       const fallbackStage = getFlag("fallback-stage") ?? projectContext.fallbackStage ?? config.dev?.fallbackStage;
       const basePort = getFlag("port") ? parseInt(getFlag("port")!, 10) : projectContext.basePort;
-      const session = hasFlag("session") ? true : projectContext.session;
+      const mode = getFlag("mode");
+      if (mode && mode !== "workers" && mode !== "session") {
+        throw AgentErrors.validation(`--mode must be one of: workers, session. Got "${mode}".`, "Pass --mode workers or --mode session.", { flag: "--mode" });
+      }
+      const session = mode ? mode === "session" : (hasFlag("session") ? true : projectContext.session);
       const persistTo = getFlag("persist-to") ?? projectContext.persistTo;
 
       // Dev doesn't need a stage — only use it if explicitly set by the user
@@ -2917,6 +3306,28 @@ export default defineConfig({
         session,
         persistTo,
       });
+      if (subCmd === "explain") {
+        const explanation = {
+          mode: plan.mode,
+          filter: filter ?? null,
+          entryWorker: plan.session?.entryWorkerPath ?? null,
+          workerPaths: plan.workers.map((worker) => worker.workerPath),
+          ports: plan.mode === "session" ? { [plan.session!.entryWorkerPath]: plan.session!.port } : plan.ports,
+          persistTo: persistTo ?? null,
+          companions: plan.companions.map((c) => ({ name: c.name, cwd: c.cwd, command: c.command })),
+        };
+        if (wantsJsonOutput()) {
+          printJson(explanation);
+        } else {
+          console.log("\n  dev explain\n");
+          console.log(`  mode: ${explanation.mode}`);
+          console.log(`  entry worker: ${explanation.entryWorker ?? "(none)"}`);
+          console.log(`  workers: ${explanation.workerPaths.join(", ")}`);
+          console.log(`  persistTo: ${explanation.persistTo ?? "(default)"}`);
+          console.log("");
+        }
+        break;
+      }
       const logDir = resolveDevLogDir(rootDir);
 
       // NDJSON event-stream mode for agents. One JSON object per line on stdout.
@@ -3375,11 +3786,127 @@ export default defineConfig({
     }
 
     case "d1": {
+      assertWranglerVersion();
       const subCmd = args[1];
       const d1Sub = args[2];
       const logicalName = args[2] && !args[2].startsWith("--") ? args[2] : undefined;
       const config = await loadConfig(rootDir);
       const fixtureName = getFlag("fixture");
+
+      // --- Remote passthrough helpers ---------------------------------------
+      // `wd d1 execute <name> --stage <s> [--remote] (--command "..."|--file p)`
+      // `wd d1 migrations apply <name> --stage <s> [--remote]`
+      //
+      // Resolve a bare or stage-suffixed logical/staged DB name against the
+      // current state, then shell out to `npx wrangler d1 ...` using any
+      // rendered worker config that binds the DB. This wraps what users
+      // otherwise do by hand 3-4 times per debug session.
+      const isRemotePassthrough =
+        subCmd === "execute" || (subCmd === "migrations" && d1Sub === "apply");
+
+      if (isRemotePassthrough) {
+        assertStage(stage);
+        const stateProvider = resolveStateProvider(rootDir, config.state, resolveStatePassword(config, projectContext));
+        const state = await stateProvider.read(stage);
+        assertStageState(state, stage);
+
+        // Argument layout differs between the two subcommands:
+        //   wd d1 execute <name>            args[2] is name
+        //   wd d1 migrations apply <name>   args[3] is name
+        const rawName = subCmd === "execute" ? args[2] : args[3];
+        if (!rawName || rawName.startsWith("--")) {
+          const usage = subCmd === "execute"
+            ? "Usage: wd d1 execute <database> --stage <s> [--remote] (--command \"SQL\" | --file path.sql)"
+            : "Usage: wd d1 migrations apply <database> --stage <s> [--remote]";
+          throw AgentErrors.validation(usage, usage);
+        }
+
+        // Resolve the bare logical name to the staged name from state.
+        // Accept either the logical name (`eventing-db`) or the staged name
+        // (`eventing-db-dev`) for ergonomics.
+        let resolvedLogical: string | undefined;
+        let stagedDbName: string | undefined;
+        for (const [logical, resource] of Object.entries(state.resources)) {
+          if (resource.type !== "d1") continue;
+          const staged = resource.props.name;
+          if (logical === rawName || staged === rawName) {
+            resolvedLogical = logical;
+            stagedDbName = staged;
+            break;
+          }
+        }
+        if (!resolvedLogical || !stagedDbName) {
+          throw AgentErrors.notFound(
+            `D1 database "${rawName}" not found in stage "${stage}" state.`,
+            `Run \`wd d1 list\` to see declared databases, or \`wd apply --stage ${stage}\` first.`,
+          );
+        }
+
+        // Pick any rendered worker config that binds this DB.
+        const databases = listD1Databases(config);
+        const route = databases.find((d) => d.logicalName === resolvedLogical);
+        if (!route || route.bindings.length === 0) {
+          throw AgentErrors.config(
+            `No worker binds D1 database "${resolvedLogical}".`,
+            "Add a d1_databases binding to a worker's wrangler.jsonc.",
+          );
+        }
+        const explicitWorker = getFlag("worker");
+        const bindingEntry = explicitWorker
+          ? route.bindings.find((b) => b.workerPath === explicitWorker)
+          : route.bindings[0];
+        if (!bindingEntry) {
+          throw AgentErrors.notFound(
+            `Worker "${explicitWorker}" does not bind D1 database "${resolvedLogical}".`,
+            "Pass --worker <path> for a worker that does, or omit --worker.",
+          );
+        }
+        const workerPath = bindingEntry.workerPath;
+        const renderedConfigPath = resolve(rootDir, ".wrangler-deploy", stage, workerPath, "wrangler.rendered.jsonc");
+        if (!existsSync(renderedConfigPath)) {
+          throw AgentErrors.state(
+            `Rendered config missing for worker "${workerPath}" in stage "${stage}".`,
+            `Run \`wd apply --stage ${stage}\` to regenerate rendered configs.`,
+          );
+        }
+
+        const remote = hasFlag("remote");
+        const workerDir = resolve(rootDir, workerPath);
+
+        if (subCmd === "execute") {
+          const command = getFlag("command");
+          const file = getFlag("file");
+          if (!command && !file) {
+            throw AgentErrors.validation(
+              "wd d1 execute requires --command \"SQL\" or --file <path>.",
+              "Pass --command \"SELECT 1\" or --file path.sql.",
+              { flag: "--command" },
+            );
+          }
+          if (command && file) {
+            throw AgentErrors.validation("Use only one of --command or --file.", "Pick --command or --file, not both.");
+          }
+          const wranglerArgs = ["wrangler", "d1", "execute", stagedDbName, "-c", renderedConfigPath, remote ? "--remote" : "--local", "-y"];
+          if (command) wranglerArgs.push("--command", command);
+          if (file) wranglerArgs.push("--file", resolve(rootDir, file));
+
+          if (!wantsJsonOutput()) {
+            console.log(`\n  wd d1 execute ${stagedDbName} (${remote ? "remote" : "local"})  via worker ${workerPath}\n`);
+          }
+          // Inherit stdio so output streams live (some queries are long-running).
+          execFileSync("npx", wranglerArgs, { cwd: workerDir, stdio: "inherit" });
+          break;
+        }
+
+        // migrations apply
+        const wranglerArgs = ["wrangler", "d1", "migrations", "apply", stagedDbName, "-c", renderedConfigPath, remote ? "--remote" : "--local", "-y"];
+        if (!wantsJsonOutput()) {
+          console.log(`\n  wd d1 migrations apply ${stagedDbName} (${remote ? "remote" : "local"})  via worker ${workerPath}\n`);
+        }
+        execFileSync("npx", wranglerArgs, { cwd: workerDir, stdio: "inherit" });
+        break;
+      }
+      // --- end remote passthrough -------------------------------------------
 
       if (subCmd === "migrate" && d1Sub === "status") {
         assertStage(stage);
@@ -3944,8 +4471,7 @@ export default defineConfig({
       const stageState = await stateProvider.read(stage);
       assertStageState(stageState, stage);
 
-      const { resolveAccountId } = await import("../core/auth.js");
-      const accountId = resolveAccountId(rootDir);
+      const accountId = resolveAccountId(rootDir, { accountIdOverride: explicitAccountId });
       const target = getFlag("worker") || (args[1] && !args[1].startsWith("--") ? args[1] : undefined);
       const entries = Object.entries(stageState.workers).map(([workerPath, worker]) => ({ workerPath, worker }));
       if (entries.length === 0) throw AgentErrors.notFound(`No workers found in stage "${stage}".`, `Run \`wd deploy --stage ${stage}\` first.`);
@@ -4007,13 +4533,17 @@ export default defineConfig({
       }
       const deps = {
         wranglerVersion: () => runWranglerVersion(),
-        wranglerAuth: () => runWranglerWhoami(),
+        wranglerAuth: () => runWranglerWhoami(rootDir),
         workerExists: (p: string) => existsSync(resolve(rootDir, p, "wrangler.jsonc")) || existsSync(resolve(rootDir, p, "wrangler.json")),
         configErrors,
       };
 
-      const checks = runDoctor(configForDoctor, deps);
-      if (!hasConfig) {
+      let checks = runDoctor(configForDoctor, deps);
+      const authOnly = hasFlag("auth");
+      if (authOnly) {
+        checks = checks.filter((c) => c.name === "wrangler installed" || c.name === "wrangler auth");
+      }
+      if (!hasConfig && !authOnly) {
         checks.push({
           name: "wrangler-deploy config",
           status: "warn",
@@ -4025,7 +4555,7 @@ export default defineConfig({
       if (hasFlag("fix")) {
         const fixes: string[] = [];
         const dryFix = hasFlag("fix-dry-run");
-        if (!existsSync(resolve(rootDir, "wrangler-deploy.config.ts")) && !existsSync(resolve(rootDir, "wrangler-deploy.config.js"))) {
+        if (!authOnly && !existsSync(resolve(rootDir, "wrangler-deploy.config.ts")) && !existsSync(resolve(rootDir, "wrangler-deploy.config.js"))) {
           if (!dryFix) {
             const generated = generateConfig(rootDir);
             writeFileSync(resolve(rootDir, "wrangler-deploy.config.ts"), generated);
@@ -4036,7 +4566,7 @@ export default defineConfig({
           if (!dryFix) writeProjectContext(rootDir, { accountId: process.env.CLOUDFLARE_ACCOUNT_ID });
           fixes.push("Saved `CLOUDFLARE_ACCOUNT_ID` into `.wdrc` as `accountId`.");
         }
-        if (!projectContext.stage) {
+        if (!authOnly && !projectContext.stage) {
           if (!dryFix) writeProjectContext(rootDir, { stage: "dev" });
           fixes.push("Set default stage to `dev` in `.wdrc`.");
         }
@@ -4088,22 +4618,119 @@ export default defineConfig({
         const last = JSON.parse(readFileSync(path, "utf-8")) as { message?: string; code?: string };
         query = last.code ?? last.message ?? query;
       }
+
+      // Listing mode: `wd explain` with no args or `--list`.
+      if (!query || hasFlag("list")) {
+        const concepts = listConcepts();
+        const errorCodes = [
+          "WD_E_STATE_MISSING",
+          "WD_E_RENDERED_CONFIG_STALE",
+          "WD_E_ACCOUNT_MISMATCH",
+          "WD_E_AUTH_FAILED",
+          "WD_E_CONFIG_MISSING",
+          "WD_E_NOT_FOUND",
+          "WD_E_NETWORK",
+          "WD_E_VALIDATION",
+          "WD_E_PERMISSION",
+          "WD_E_SANDBOX_BLOCKED",
+          "WD_E_UNKNOWN",
+        ];
+        if (wantsJsonOutput()) {
+          printJson({ command: "explain", ok: true, result: { errorCodes, concepts } });
+          break;
+        }
+        console.log(`\n  wd explain — guided remediation and concept reference\n`);
+        console.log(`  Concepts:`);
+        for (const c of concepts) console.log(`    ${c.name.padEnd(20)} ${c.summary.slice(0, 80)}`);
+        console.log(`\n  Error codes:`);
+        for (const code of errorCodes) console.log(`    ${code}`);
+        console.log(`\n  Usage: wd explain <concept-or-code>\n`);
+        break;
+      }
+
+      // Concept mode: `wd explain <name>` matching a concept markdown file.
+      const concept = getConcept(query);
+      if (concept) {
+        if (wantsJsonOutput()) {
+          printJson({
+            command: "explain",
+            ok: true,
+            result: { kind: "concept", name: concept.name, summary: concept.summary, body: concept.body },
+          });
+          break;
+        }
+        console.log(`\n${concept.body}`);
+        break;
+      }
+
+      // Error-code / message mode (legacy path).
       const result = explainIssue(query);
+      const concepts = listConcepts();
+      const isUnknown = result.summary.startsWith("No specific signature matched");
+      const suggestion = isUnknown ? closestConcept(query, concepts.map((c) => c.name)) : undefined;
+
       if (wantsJsonOutput()) {
-        printJson(result);
+        if (isUnknown) {
+          printJson({
+            command: "explain",
+            ok: false,
+            errors: [
+              {
+                code: "WD_E_NOT_FOUND",
+                message: `Unknown topic: ${query}`,
+                fix: suggestion
+                  ? `Did you mean \`wd explain ${suggestion}\`?`
+                  : "Run `wd explain --list` to see available concepts and error codes.",
+                doc: "wd explain explain",
+              },
+            ],
+          });
+          break;
+        }
+        printJson({ command: "explain", ok: true, result: { kind: "error", ...result } });
         break;
       }
-      if (!query) {
-        console.log(`\n  wd explain — guided remediation for wrangler-deploy errors\n`);
-        console.log(`  ${result.summary}\n`);
-        for (const action of result.actions) console.log(`  - ${action}`);
-        console.log("");
-        break;
-      }
+
       console.log(`\n  explain: ${result.query}\n`);
       console.log(`  ${result.summary}\n`);
       for (const action of result.actions) console.log(`  - ${action}`);
+      if (suggestion) console.log(`\n  Did you mean \`wd explain ${suggestion}\`?`);
       console.log("");
+      break;
+    }
+
+    case "actions": {
+      const categoryFilter = getFlag("category") as ActionCategory | undefined;
+      const grouped = getRegistryByCategory();
+      const flat = getRegistry().filter((a) => !categoryFilter || a.category === categoryFilter);
+
+      if (wantsJsonOutput()) {
+        printJson({
+          command: "actions",
+          ok: true,
+          result: { actions: flat },
+          meta: { wdVersion: getWdVersion(), durationMs: 0, schemaVersion: "1" },
+        });
+        break;
+      }
+
+      console.log(`\n  wd actions — the sitemap (${flat.length} commands)\n`);
+      for (const category of CATEGORY_ORDER) {
+        const items = grouped[category].filter((a) => !categoryFilter || a.category === categoryFilter);
+        if (items.length === 0) continue;
+        console.log(`  ${category}:`);
+        const nameWidth = Math.max(...items.map((i) => i.name.length));
+        for (const action of items) {
+          const traits: string[] = [];
+          if (action.mutating) traits.push("mut");
+          if (action.requires.stage) traits.push("stage");
+          if (action.requires.login) traits.push("login");
+          const traitText = traits.length > 0 ? `[${traits.join(",")}]` : "";
+          console.log(`    ${action.name.padEnd(nameWidth)}  ${action.summary} ${traitText}`);
+        }
+        console.log("");
+      }
+      console.log(`  Run \`wd actions --json\` for the machine-readable sitemap, or \`wd <name> --help\` for one.\n`);
       break;
     }
 
@@ -4257,6 +4884,17 @@ export default defineConfig({
         printJson({ version: 1, schema: outputSchemas.error, codes: cliManifest.errorEnvelope.errorCodes, types: cliManifest.errorEnvelope.errorTypes });
         break;
       }
+      if (args[1] === "examples") {
+        const target = getFlag("command");
+        if (target) {
+          const set = getExamples(target);
+          if (!set) throw AgentErrors.notFound(`No examples found for command "${target}"`, "Run `wd examples --json` to list known command examples.");
+          printJson({ version: 1, command: target, examples: set });
+          break;
+        }
+        printJson({ version: 1, commands: listExampleCommands(), sets: allExampleSets() });
+        break;
+      }
       if (hasFlag("versioned")) {
         printJson({ schemaVersion: "1.0.0", generatedAt: new Date().toISOString(), manifest: cliManifest, outputs: outputSchemas, config: configSchema });
         break;
@@ -4297,6 +4935,23 @@ export default defineConfig({
       }
 
       if (subCommand === "doctor") {
+        const fixMode = hasFlag("fix");
+        const dryFix = hasFlag("fix-dry-run");
+        const fixes: string[] = [];
+        if (fixMode) {
+          const updates: Partial<ProjectContext> = {};
+          if (!projectContext.stage) {
+            updates.stage = "dev";
+            fixes.push("Set .wdrc stage=dev");
+          }
+          if (!projectContext.accountId && process.env.CLOUDFLARE_ACCOUNT_ID) {
+            updates.accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+            fixes.push("Saved CLOUDFLARE_ACCOUNT_ID into .wdrc accountId");
+          }
+          if (Object.keys(updates).length > 0 && !dryFix) {
+            writeProjectContext(rootDir, updates);
+          }
+        }
         const summary = {
           stage: {
             value: explicitStage ?? configStage ?? projectContext.stage ?? process.env.WD_STAGE ?? defaultUserStage(),
@@ -4306,19 +4961,31 @@ export default defineConfig({
             value: process.env.CLOUDFLARE_ACCOUNT_ID ?? projectContext.accountId ?? null,
             source: process.env.CLOUDFLARE_ACCOUNT_ID ? "env:CLOUDFLARE_ACCOUNT_ID" : projectContext.accountId ? ".wdrc" : "none",
           },
+          stageAccounts: {
+            count: Object.keys(projectContext.stageAccounts ?? {}).length,
+          },
           telemetry: {
             value: projectContext.telemetry ?? false,
             source: projectContext.telemetry !== undefined ? ".wdrc" : "default:false",
           },
         };
         if (wantsJsonOutput()) {
-          printJson(summary);
+          printJson({ ...summary, ...(fixMode ? { fixes, dryRun: dryFix } : {}) });
           break;
         }
         console.log("\n  context doctor\n");
         console.log(`  stage: ${summary.stage.value} (${summary.stage.source})`);
         console.log(`  accountId: ${summary.accountId.value ?? "unset"} (${summary.accountId.source})`);
+        console.log(`  stageAccounts: ${summary.stageAccounts.count}`);
         console.log(`  telemetry: ${summary.telemetry.value} (${summary.telemetry.source})\n`);
+        if (fixMode) {
+          if (dryFix) console.log("  (dry-run: no files changed)\n");
+          if (fixes.length === 0) console.log("  no fixes applied\n");
+          else {
+            for (const fix of fixes) console.log(`  + ${fix}`);
+            console.log("");
+          }
+        }
         break;
       }
 
@@ -4331,6 +4998,7 @@ export default defineConfig({
           "session",
           "persistTo",
           "accountId",
+          "stageAccounts",
           "databaseUrl",
           "statePassword",
           "telemetry",
@@ -4661,6 +5329,234 @@ export default defineConfig({
       break;
     }
 
+    case "auth": {
+      const subCommand = args[1] ?? "status";
+      if (!["status", "check", "switch", "doctor", "pin"].includes(subCommand)) {
+        throw AgentErrors.validation(`Unknown auth subcommand "${subCommand}". Available: status, check, switch, doctor, pin.`, "Run `wd auth status`, `wd auth check`, `wd auth doctor`, `wd auth switch`, or `wd auth pin`.");
+      }
+
+      const hasToken = Boolean(process.env.CLOUDFLARE_API_TOKEN);
+      const whoami = (() => {
+        try {
+          return runWranglerWhoami(rootDir);
+        } catch {
+          return null;
+        }
+      })();
+      const account = (() => {
+        try {
+          return resolveAccount(rootDir, { accountIdOverride: explicitAccountId });
+        } catch {
+          return null;
+        }
+      })();
+
+      const base = {
+        profile: profileSelection.name,
+        profileSource: profileSelection.source,
+        accountId: account?.accountId ?? null,
+        accountSource: account?.source ?? null,
+        tokenPresent: hasToken,
+        wranglerWhoami: whoami,
+      };
+
+      if (subCommand === "status") {
+        if (wantsJsonOutput()) {
+          printJson(base);
+          break;
+        }
+        console.log(`\n  wrangler-deploy auth status\n`);
+        console.log(`  profile: ${base.profile} (${base.profileSource})`);
+        console.log(`  account: ${base.accountId ?? "unresolved"}${base.accountSource ? ` (${base.accountSource})` : ""}`);
+        console.log(`  token: ${base.tokenPresent ? "present" : "missing"}`);
+        console.log(`  wrangler whoami: ${base.wranglerWhoami ?? "not authenticated"}`);
+        console.log("");
+        break;
+      }
+
+      if (subCommand === "doctor") {
+        const profile = getProfile(profileSelection.name);
+        const matrix = {
+          flag: explicitAccountId ?? null,
+          env: process.env.CLOUDFLARE_ACCOUNT_ID ?? null,
+          profile: profile?.cloudflare?.metadata?.id ?? null,
+          project: projectContext.accountId ?? null,
+          whoami: account?.source === "whoami" || account?.source === "wrangler-config" ? account.accountId : null,
+          winner: account?.accountId ?? null,
+          winnerSource: account?.source ?? null,
+        };
+        const diagnostics = [
+          {
+            code: "WD_AUTH_ACCOUNT_UNRESOLVED",
+            status: matrix.winner ? "pass" : "fail",
+            message: matrix.winner
+              ? `Resolved account ${matrix.winner} from ${matrix.winnerSource ?? "unknown source"}.`
+              : "Could not resolve a Cloudflare account id.",
+            fix: "Set --account-id, CLOUDFLARE_ACCOUNT_ID, .wdrc accountId/stageAccounts, or run `wrangler login`.",
+          },
+          {
+            code: "WD_AUTH_TOKEN_MISSING",
+            status: hasToken ? "pass" : "warn",
+            message: hasToken ? "CLOUDFLARE_API_TOKEN is present." : "CLOUDFLARE_API_TOKEN is not set.",
+            fix: "Run `wd login --profile <name>` or export CLOUDFLARE_API_TOKEN for CI-style auth.",
+          },
+          {
+            code: "WD_AUTH_PROFILE_ACCOUNT_MISMATCH",
+            status:
+              matrix.profile && matrix.winner && matrix.profile.toLowerCase() !== matrix.winner.toLowerCase()
+                ? "warn"
+                : "pass",
+            message:
+              matrix.profile && matrix.winner && matrix.profile.toLowerCase() !== matrix.winner.toLowerCase()
+                ? `Profile account ${matrix.profile} differs from resolved account ${matrix.winner}.`
+                : "Profile account metadata matches the resolved account or is not configured.",
+            fix: "Use `wd configure --profile <name> --account-id <id>` or pass --account-id explicitly.",
+          },
+        ] as const;
+        if (wantsJsonOutput()) {
+          printJson({ ...matrix, diagnostics });
+        } else {
+          console.log("\n  auth doctor\n");
+          console.log(`  flag: ${matrix.flag ?? "unset"}`);
+          console.log(`  env: ${matrix.env ?? "unset"}`);
+          console.log(`  profile: ${matrix.profile ?? "unset"}`);
+          console.log(`  project: ${matrix.project ?? "unset"}`);
+          console.log(`  whoami/default: ${matrix.whoami ?? "n/a"}`);
+          console.log(`  winner: ${matrix.winner ?? "unresolved"} (${matrix.winnerSource ?? "unknown"})\n`);
+          for (const item of diagnostics) {
+            console.log(`  ${item.status === "pass" ? "✓" : item.status === "warn" ? "!" : "✗"} ${item.code}  ${item.message}`);
+          }
+          console.log("");
+        }
+        break;
+      }
+
+      if (subCommand === "switch") {
+        const profileName = getFlag("profile") ?? profileSelection.name;
+        const profile = getProfile(profileName);
+        const accountId = profile?.cloudflare?.metadata?.id;
+        if (!accountId) {
+          throw AgentErrors.config(`Profile "${profileName}" has no configured account id.`, `Run \`wd configure --profile ${profileName} --account-id <id>\` first.`);
+        }
+        const result = writeProjectContext(rootDir, { accountId });
+        if (wantsJsonOutput()) {
+          printJson({ profile: profileName, accountId, contextPath: result.path });
+        } else {
+          console.log(`\n  Switched project default account to ${accountId} from profile "${profileName}".\n`);
+        }
+        break;
+      }
+
+      if (subCommand === "pin") {
+        const pinStage = getFlag("stage") ?? stage;
+        const pinAccountId = account?.accountId ?? explicitAccountId ?? process.env.CLOUDFLARE_ACCOUNT_ID ?? projectContext.accountId;
+        if (!pinAccountId) {
+          throw AgentErrors.validation("Could not determine account id to pin.", "Pass --account-id or configure auth first.");
+        }
+        const nextStageAccounts = {
+          ...(projectContext.stageAccounts ?? {}),
+          [pinStage]: pinAccountId,
+        };
+        const updated = writeProjectContext(rootDir, { stageAccounts: nextStageAccounts });
+        const payload = { stage: pinStage, accountId: pinAccountId, stageAccounts: updated.context.stageAccounts ?? {}, contextPath: updated.path };
+        if (wantsJsonOutput()) {
+          printJson(payload);
+        } else {
+          console.log(`\n  Pinned ${pinAccountId} for stage "${pinStage}" in ${updated.path}\n`);
+        }
+        break;
+      }
+
+      if (!account?.accountId) {
+        throw AgentErrors.auth(
+          "Could not resolve Cloudflare account ID for auth check.",
+          "Set --account-id, CLOUDFLARE_ACCOUNT_ID, or .wdrc accountId; or run `wrangler login`.",
+        );
+      }
+
+      let accessProbe:
+        | { ok: boolean; status?: number; message?: string; skipped?: boolean }
+        | undefined;
+      if (hasToken) {
+        accessProbe = await probeCloudflareAccountAccess(process.env.CLOUDFLARE_API_TOKEN!, account.accountId);
+      } else {
+        accessProbe = {
+          ok: true,
+          skipped: true,
+          message: "No CLOUDFLARE_API_TOKEN set; relied on wrangler login state.",
+        };
+      }
+
+      const checkResult = {
+        ...base,
+        accessProbe,
+        ok: Boolean(whoami) && Boolean(accessProbe?.ok),
+      };
+      if (wantsJsonOutput()) {
+        printJson(checkResult);
+      } else {
+        console.log(`\n  wrangler-deploy auth check\n`);
+        console.log(`  account: ${checkResult.accountId} (${checkResult.accountSource})`);
+        console.log(`  wrangler whoami: ${checkResult.wranglerWhoami ?? "not authenticated"}`);
+        if (accessProbe.skipped) {
+          console.log(`  account API probe: skipped (${accessProbe.message})`);
+        } else if (accessProbe.ok) {
+          console.log("  account API probe: ok");
+        } else {
+          console.log(`  account API probe: failed${accessProbe.status ? ` (HTTP ${accessProbe.status})` : ""}`);
+          if (accessProbe.message) console.log(`    ${accessProbe.message}`);
+        }
+        console.log("");
+      }
+      if (!checkResult.ok) process.exit(1);
+      break;
+    }
+
+    case "bootstrap": {
+      const desiredStage = getFlag("stage") ?? projectContext.stage ?? "dev";
+      const desiredProfile = getFlag("profile") ?? profileSelection.name;
+      const configuredProfile = getProfile(desiredProfile);
+      const contextUpdates: Partial<ProjectContext> = { stage: desiredStage };
+      const explicitAccount = getFlag("account-id");
+      if (explicitAccount) contextUpdates.accountId = explicitAccount;
+      const hasCredential = Boolean(process.env.CLOUDFLARE_API_TOKEN);
+      const writes: string[] = [];
+      if (!isDryRun(args)) {
+        writeProjectContext(rootDir, contextUpdates);
+        writes.push(".wdrc");
+      }
+      const payload = {
+        ok: true,
+        stage: desiredStage,
+        profile: desiredProfile,
+        profileConfigured: Boolean(configuredProfile?.cloudflare),
+        tokenPresent: hasCredential,
+        contextUpdated: contextUpdates,
+        dryRun: isDryRun(args),
+        writes,
+        next: [
+          configuredProfile?.cloudflare ? null : `wd configure --profile ${desiredProfile} --method api-token --account-id <32-char-hex>`,
+          hasCredential ? null : `wd login --profile ${desiredProfile}`,
+          `wd doctor --auth`,
+          `wd doctor`,
+        ].filter(Boolean),
+      };
+      if (wantsJsonOutput()) {
+        printJson(payload);
+      } else {
+        console.log(`\n  bootstrap\n`);
+        console.log(`  stage default: ${desiredStage}`);
+        console.log(`  profile: ${desiredProfile}`);
+        console.log(`  profile configured: ${payload.profileConfigured ? "yes" : "no"}`);
+        console.log(`  token present: ${hasCredential ? "yes" : "no"}`);
+        if (isDryRun(args)) console.log("  dry-run: no files changed");
+        console.log("\n  next:");
+        for (const next of payload.next) console.log(`    ${next}`);
+        console.log("");
+      }
+      break;
+    }
+
     case "configure": {
       const profileName = getFlag("profile") ?? defaultProfileName();
       const method: AuthMethod = (getFlag("method") as AuthMethod) ?? "api-token";
@@ -4853,7 +5749,21 @@ export default defineConfig({
         if (!accountId || !token) process.exit(1);
         break;
       }
-      throw AgentErrors.validation(`Unknown profile subcommand "${subCommand}". Available: list, test.`, "Run `wd profile list` or `wd profile test`.");
+      if (subCommand === "clone") {
+        const from = getFlag("from");
+        const to = getFlag("to");
+        if (!from || !to) throw AgentErrors.validation("profile clone requires --from <name> and --to <name>", "Run `wd profile clone --from <src> --to <dst>`.");
+        const sourceProfile = getProfile(from);
+        if (!sourceProfile?.cloudflare) throw AgentErrors.notFound(`Profile "${from}" not found or not configured.`, "Run `wd profile list` to inspect configured profiles.");
+        upsertCloudflareProfile(to, sourceProfile.cloudflare);
+        const sourceCred = readCloudflareCredential(from);
+        if (sourceCred) writeCloudflareCredential(to, sourceCred);
+        const payload = { from, to, copiedProfile: true, copiedCredential: Boolean(sourceCred) };
+        if (wantsJsonOutput()) printJson(payload);
+        else console.log(`\n  cloned profile "${from}" -> "${to}"${sourceCred ? " (including credential)" : ""}\n`);
+        break;
+      }
+      throw AgentErrors.validation(`Unknown profile subcommand "${subCommand}". Available: list, test, clone.`, "Run `wd profile list`, `wd profile test`, or `wd profile clone`.");
     }
 
     case "telemetry": {
@@ -4906,6 +5816,46 @@ export default defineConfig({
       throw AgentErrors.validation(`Unknown util subcommand "${subCommand}". Available: create-cf-token, scopes.`, "Run `wd util create-cf-token` or `wd util scopes`.");
     }
 
+    case "preflight": {
+      assertStage(stage);
+      const config = await loadConfig(rootDir);
+      const stateProvider = resolveStateProvider(rootDir, config.state, resolveStatePassword(config, projectContext));
+      const auth = buildAuthContext(rootDir, profileSelection.name, profileSelection.source, explicitAccountId);
+      const fixMode = hasFlag("fix");
+      const fixesApplied: string[] = [];
+      if (fixMode && !isDryRun(args)) {
+        const updates: Partial<ProjectContext> = {};
+        if (!projectContext.stage) {
+          updates.stage = stage;
+          fixesApplied.push(`Set .wdrc stage="${stage}"`);
+        }
+        if (!projectContext.accountId && auth.accountId) {
+          updates.accountId = auth.accountId;
+          fixesApplied.push(`Set .wdrc accountId="${auth.accountId}"`);
+        }
+        if (Object.keys(updates).length > 0) writeProjectContext(rootDir, updates);
+      }
+      const doctorChecks = runDoctor(config, {
+        wranglerVersion: () => runWranglerVersion(),
+        wranglerAuth: () => runWranglerWhoami(rootDir),
+        workerExists: (p: string) => existsSync(resolve(rootDir, p, "wrangler.jsonc")) || existsSync(resolve(rootDir, p, "wrangler.json")),
+        configErrors: validateConfig(config),
+      });
+      const planResult = await plan({ stage }, { rootDir, config, state: stateProvider });
+      const ok = Boolean(auth.accountId) && doctorChecks.every((c) => c.status === "pass") && planResult.items.every((i) => i.action !== "drifted");
+      const payload = { ok, auth, doctor: doctorChecks, plan: planResult, fixMode, fixesApplied };
+      if (wantsJsonOutput()) printJson(payload);
+      else {
+        console.log(`\n  preflight (${stage})\n`);
+        console.log(`  auth: ${auth.accountId ? "ok" : "fail"} (${auth.accountId ?? "unresolved"})`);
+        console.log(`  doctor: ${doctorChecks.every((c) => c.status === "pass") ? "ok" : "issues"}`);
+        console.log(`  plan items: ${planResult.items.length}\n`);
+        if (fixMode) console.log(`  fixes: ${fixesApplied.length > 0 ? fixesApplied.join("; ") : "none applied"}\n`);
+      }
+      if (!ok) process.exit(1);
+      break;
+    }
+
     case "check": {
       assertStage(stage);
       const config = await loadConfig(rootDir);
@@ -4913,7 +5863,7 @@ export default defineConfig({
       const pack = getFlag("pack") ?? "full";
       const checks = runDoctor(config, {
         wranglerVersion: () => runWranglerVersion(),
-        wranglerAuth: () => runWranglerWhoami(),
+        wranglerAuth: () => runWranglerWhoami(rootDir),
         workerExists: (p: string) => existsSync(resolve(rootDir, p, "wrangler.jsonc")) || existsSync(resolve(rootDir, p, "wrangler.json")),
         configErrors: validateConfig(config),
       });

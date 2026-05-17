@@ -48,6 +48,17 @@
       "supportsDryRun": true
     },
     {
+      "name": "up",
+      "kind": "mutating",
+      "output": "json",
+      "supportsDryRun": true
+    },
+    {
+      "name": "tail",
+      "kind": "workflow",
+      "output": "text"
+    },
+    {
       "name": "rollback",
       "kind": "mutating",
       "output": "json",
@@ -250,8 +261,10 @@
         "list",
         "inspect",
         "exec",
+        "execute",
         "seed",
-        "reset"
+        "reset",
+        "migrations"
       ]
     },
     {
@@ -300,6 +313,18 @@
       "mutating": true
     },
     {
+      "name": "auth",
+      "kind": "inspection",
+      "output": "json",
+      "subcommands": [
+        "status",
+        "check",
+        "switch",
+        "doctor",
+        "pin"
+      ]
+    },
+    {
       "name": "profile",
       "kind": "inspection",
       "output": "json",
@@ -308,6 +333,11 @@
         "remove",
         "test"
       ]
+    },
+    {
+      "name": "bootstrap",
+      "kind": "utility",
+      "output": "json"
     },
     {
       "name": "quickstart",
@@ -332,6 +362,16 @@
     {
       "name": "version",
       "kind": "utility",
+      "output": "json"
+    },
+    {
+      "name": "upgrade-check",
+      "kind": "utility",
+      "output": "json"
+    },
+    {
+      "name": "preflight",
+      "kind": "inspection",
       "output": "json"
     },
     {
@@ -796,6 +836,12 @@
             "type": "string",
             "required": false,
             "description": "Default account ID for Cloudflare auth and KV-backed state."
+          },
+          {
+            "name": "stageAccounts",
+            "type": "Record<string, string>",
+            "required": false,
+            "description": "Optional per-stage account ID overrides."
           },
           {
             "name": "databaseUrl",

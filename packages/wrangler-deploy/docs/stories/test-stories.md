@@ -2,9 +2,9 @@
 
 | Key | Value |
 | --- | --- |
-| Date | 2026-05-15T18:24:46.656Z |
-| Version | 1.5.0 |
-| Git SHA | 296fc0c |
+| Date | 2026-05-17T19:04:16.340Z |
+| Version | 1.5.3 |
+| Git SHA | 80423e0 |
 
 ## src/github.test.ts
 
@@ -239,6 +239,18 @@
 - **Given** project context accountId is present but not 32 hex characters
 - **When** resolveAccountId is called
 
+### ✅ prefers explicit --account-id override over env and project context
+
+- **Given** all account sources exist but an explicit override is supplied
+- **When** resolveAccountId is called with accountIdOverride
+- **Then** the override wins
+
+### ✅ re-evaluates when CLOUDFLARE_ACCOUNT_ID changes in the same process
+
+- **Given** a first account id is resolved from env
+- **When** the env account id is changed and resolved again
+- **Then** the new value is used instead of a stale cwd-only cache
+
 ## src/core/completions.test.ts
 
 ### generateCompletions
@@ -440,6 +452,11 @@
 
 - **Given** a config opting into Wrangler's multi-config local session
 - **Then** the plan uses a single session with all worker configs and shared state
+
+### ✅ does not force session mode when only persistTo is provided
+
+- **Given** persistTo is provided but session mode is not enabled
+- **Then** the plan stays in workers mode and each worker gets --persist-to
 
 ### ✅ renders stage bindings directly when stage is provided
 
@@ -1116,6 +1133,15 @@
 - **Given** resolveAccountId fails and base config has no account_id
 - **When** renderWranglerConfig is called with a repo root path
 - **Then** rendered config has no account_id
+
+### ✅ resolves migrations_dir relative to the SOURCE worker directory, not the rendered output dir
+
+- **Given** a worker config with migrations_dir as a relative path traversing upward
+- **When** renderWranglerConfig is called with a repo root path
+- **Then** migrations_dir resolves from the SOURCE worker dir (so wrangler finds the migrations regardless of where the rendered config is written)
+
+### ✅ resolves assets.directory and site.bucket relative to the source worker dir
+
 
 ## src/core/runtime.test.ts
 

@@ -20,6 +20,15 @@ function normalizeProjectContext(value: unknown): ProjectContext {
   if (typeof value.session === "boolean") context.session = value.session;
   if (typeof value.persistTo === "string") context.persistTo = value.persistTo;
   if (typeof value.accountId === "string") context.accountId = value.accountId;
+  if (isRecord(value.stageAccounts)) {
+    const stageAccounts: Record<string, string> = {};
+    for (const [stage, accountId] of Object.entries(value.stageAccounts)) {
+      if (typeof accountId === "string" && accountId.trim()) {
+        stageAccounts[stage] = accountId;
+      }
+    }
+    if (Object.keys(stageAccounts).length > 0) context.stageAccounts = stageAccounts;
+  }
   if (typeof value.databaseUrl === "string") context.databaseUrl = value.databaseUrl;
   if (typeof value.statePassword === "string") context.statePassword = value.statePassword;
   return context;

@@ -28,6 +28,7 @@ describe("cliManifest", () => {
     expect(commandNames).toContain("dashboard");
     expect(commandNames).toContain("explain");
     expect(commandNames).toContain("telemetry");
+    expect(commandNames).toContain("auth");
     expect(commandNames).toContain("rollback");
     expect(commandNames).toContain("history");
     expect(commandNames).toContain("check");

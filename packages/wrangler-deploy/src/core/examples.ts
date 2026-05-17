@@ -40,6 +40,34 @@ const EXAMPLES: Record<string, CommandExampleSet> = {
       },
     ],
   },
+  auth: {
+    command: "auth",
+    summary: "Inspect effective auth context and validate account access.",
+    examples: [
+      {
+        description: "Show effective profile, account source, and whoami summary.",
+        command: "wd auth status --json",
+      },
+      {
+        description: "Validate the resolved account can be accessed with current credentials.",
+        command: "wd auth check --json",
+      },
+      {
+        description: "Switch the project default account id from profile metadata.",
+        command: "wd auth switch --profile work --json",
+      },
+    ],
+  },
+  preflight: {
+    command: "preflight",
+    summary: "Run auth + doctor + dry-run plan before mutating commands.",
+    examples: [
+      {
+        description: "Run preflight for staging in JSON mode (CI friendly).",
+        command: "wd preflight --stage staging --json",
+      },
+    ],
+  },
   init: {
     command: "init",
     summary: "Generate wrangler-deploy.config.ts from existing wrangler.jsonc files.",

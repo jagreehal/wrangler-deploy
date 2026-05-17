@@ -10,6 +10,7 @@ import { findAvailablePorts } from "./port-finder.js";
 import { readWranglerConfig } from "./wrangler.js";
 import { renderWranglerConfig } from "./render.js";
 import { AgentErrors } from "./cli-output.js";
+import { assertWranglerVersion } from "./wrangler-version-check.js";
 
 export interface WorkerDevPlan {
   workerPath: string;
@@ -400,7 +401,7 @@ export async function buildDevPlan(
   const sessionEnabled = options.session ?? config.dev?.session?.enabled ?? false;
   const persistTo = options.persistTo ?? config.dev?.session?.persistTo;
 
-  if (sessionEnabled || options.persistTo !== undefined) {
+  if (sessionEnabled) {
     if (workerPlans.length === 0) {
       throw AgentErrors.config("Cannot start a dev session without any workers.", "Add workers to your config or remove the session/persistTo settings.");
     }
@@ -442,6 +443,13 @@ export async function buildDevPlan(
         args: sessionArgs,
       },
     };
+  }
+
+  if (persistTo) {
+    const resolvedPersistTo = resolveDevPath(rootDir, persistTo);
+    for (const workerPlan of workerPlans) {
+      workerPlan.args = ["--persist-to", resolvedPersistTo, ...workerPlan.args];
+    }
   }
 
   return {
@@ -495,6 +503,8 @@ export async function startDev(
 ): Promise<DevHandle> {
   const output = options?.output ?? ((line: string) => process.stdout.write(line + "\n"));
   const rootDir = options?.rootDir;
+  // Verify peer wrangler version once before spawning any wrangler dev/companion processes.
+  assertWranglerVersion();
   const mux = createLogMultiplexer(output, { logDir: options?.logDir, onLine: options?.onLine });
   const processes = new Map<string, ReturnType<typeof spawn>>();
   const resolvedPorts: Record<string, number> = {};
