@@ -151,8 +151,8 @@ importers:
         specifier: ^25.6.2
         version: 25.6.2
       executable-stories-vitest:
-        specifier: ^8.1.16
-        version: 8.1.16(vitest@4.1.6(@types/node@25.6.2)(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.10.0)(@types/node@25.6.2)(esbuild@0.27.7)(tsx@4.21.0)))
+        specifier: ^8.1.20
+        version: 8.1.20(vitest@4.1.6(@types/node@25.6.2)(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.10.0)(@types/node@25.6.2)(esbuild@0.27.7)(tsx@4.21.0)))
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -2196,14 +2196,13 @@ packages:
   eventemitter3@5.0.4:
     resolution: {integrity: sha512-mlsTRyGaPBjPedk6Bvw+aqbsXDtoAyAzm5MO7JgU+yVRyMQ5O8bD4Kcci7BS85f93veegeCPkL8R4GLClnjLFw==}
 
-  executable-stories-formatters@0.7.14:
-    resolution: {integrity: sha512-FPEWHPIlBd7C+bntxvzldlUB73qJ2/W3CtvEW/6nwKJdW1MZ/RgX5bJLygKK3biB9SCGCnmatiU2IbA8153M0Q==}
+  executable-stories-formatters@0.9.0:
+    resolution: {integrity: sha512-fuUcxdCIUR4EWGQko4joOGRPDzB84pB+1o91Qu0r6HDRXqbrcjDDKSqpE+xvAX5OhxeHbv3lnapBFfOACEw7Hg==}
     engines: {node: '>=22'}
     hasBin: true
 
-  executable-stories-vitest@8.1.16:
-    resolution: {integrity: sha512-mClnJs/nW26XoPFD+t8ULkbN/yeekLifRIRFWazuzW8i64U3j2Q8ItVuT9rrDsrszzVHJsoxyKbMRP0Ry/gU4A==}
-    hasBin: true
+  executable-stories-vitest@8.1.20:
+    resolution: {integrity: sha512-0hw4/MY/VcwvyLiXzGBhvuM1A8l9vv+GWNR0OQuc/eQa+evOs8surxVo7EEBp1Ch+02rjAUMtRPF20pTIrZC8g==}
     peerDependencies:
       vitest: '>=4.1.5'
 
@@ -5936,15 +5935,15 @@ snapshots:
 
   eventemitter3@5.0.4: {}
 
-  executable-stories-formatters@0.7.14:
+  executable-stories-formatters@0.9.0:
     dependencies:
       '@cucumber/html-formatter': 23.1.0(@cucumber/messages@32.3.1)
       '@cucumber/messages': 32.3.1
       ajv: 8.20.0
 
-  executable-stories-vitest@8.1.16(vitest@4.1.6(@types/node@25.6.2)(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.10.0)(@types/node@25.6.2)(esbuild@0.27.7)(tsx@4.21.0))):
+  executable-stories-vitest@8.1.20(vitest@4.1.6(@types/node@25.6.2)(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.10.0)(@types/node@25.6.2)(esbuild@0.27.7)(tsx@4.21.0))):
     dependencies:
-      executable-stories-formatters: 0.7.14
+      executable-stories-formatters: 0.9.0
       fast-glob: 3.3.3
       picomatch: 4.0.4
       vitest: 4.1.6(@types/node@25.6.2)(vite@8.0.3(@emnapi/core@1.9.2)(@emnapi/runtime@1.10.0)(@types/node@25.6.2)(esbuild@0.27.7)(tsx@4.21.0))
