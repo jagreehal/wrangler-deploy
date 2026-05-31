@@ -39,7 +39,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260524.1",
-    "@types/node": "^25.6.2",
+    "@types/node": "^25.9.1",
     "wrangler-deploy": "workspace:*",
     "tsx": "^4.21.0",
     "wrangler": "^4.92.0"

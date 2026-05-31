@@ -39,7 +39,7 @@
     "workers-usage-guard-shared": "workspace:^"
   },
   "devDependencies": {
-    "@types/node": "^25.6.2",
+    "@types/node": "^25.9.1",
     "executable-stories-vitest": "^8.1.20",
     "typescript": "^6.0.3",
     "vitest": "^4.1.6"
