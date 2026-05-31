@@ -42,6 +42,6 @@
     "@types/node": "^25.9.1",
     "wrangler-deploy": "workspace:*",
     "tsx": "^4.21.0",
-    "wrangler": "^4.92.0"
+    "wrangler": "^4.95.0"
   }
 }
