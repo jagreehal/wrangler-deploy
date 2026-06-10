@@ -30,19 +30,19 @@
     "prepublishOnly": "pnpm build"
   },
   "peerDependencies": {
-    "wrangler": ">=3.91.0 <5"
+    "wrangler": "^3"
   },
   "dependencies": {
-    "@clack/prompts": "^1.5.0",
-    "@cloudflare/workers-types": "^4.20260524.1",
+    "@clack/prompts": "^1.5.1",
+    "@cloudflare/workers-types": "^4.20260607.1",
     "giget": "^3.2.0",
     "workers-usage-guard-shared": "workspace:^"
   },
   "devDependencies": {
-    "@types/node": "^25.9.1",
-    "executable-stories-vitest": "^8.1.20",
+    "@types/node": "^25.9.2",
+    "executable-stories-vitest": "^8.3.3",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.6"
+    "vitest": "^4.1.8"
   },
   "files": [
     "dist",
