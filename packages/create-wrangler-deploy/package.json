@@ -1,6 +1,6 @@
 {
   "name": "create-wrangler-deploy",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "Scaffold a new Cloudflare Workers project with wrangler-deploy. Run `npm create wrangler-deploy@latest my-app`.",
   "type": "module",
   "license": "MIT",
