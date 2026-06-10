@@ -57,13 +57,13 @@
     "deploy": "wrangler deploy"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260524.1",
-    "@faker-js/faker": "^9.0.0",
-    "@types/node": "^25.9.1",
-    "miniflare": "^4.20260526.0",
+    "@cloudflare/workers-types": "^4.20260607.1",
+    "@faker-js/faker": "^9.9.0",
+    "@types/node": "^25.9.2",
+    "miniflare": "^4.20260603.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.6",
-    "vitest-mock-extended": "^3.0.0",
-    "wrangler": "^4.95.0"
+    "vitest": "^4.1.8",
+    "vitest-mock-extended": "^3.1.1",
+    "wrangler": "^4.98.0"
   }
 }
