@@ -40,7 +40,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.9.2",
-    "executable-stories-vitest": "^8.3.3",
+    "executable-stories-vitest": "^8.4.3",
     "typescript": "^6.0.3",
     "vitest": "^4.1.8"
   },
