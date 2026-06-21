@@ -33,7 +33,7 @@
     "wrangler": "^3"
   },
   "dependencies": {
-    "@clack/prompts": "^1.5.1",
+    "@clack/prompts": "^1.6.0",
     "@cloudflare/workers-types": "^4.20260621.1",
     "giget": "^3.3.0",
     "workers-usage-guard-shared": "workspace:^"
