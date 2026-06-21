@@ -154,8 +154,8 @@ importers:
         specifier: ^25.9.3
         version: 25.9.3
       executable-stories-vitest:
-        specifier: ^8.4.3
-        version: 8.4.3(vitest@4.1.8(@types/node@25.9.3)(vite@8.0.16(@types/node@25.9.3)(esbuild@0.17.19)(tsx@4.22.4)(yaml@2.9.0)))
+        specifier: ^8.4.5
+        version: 8.4.5(vitest@4.1.8(@types/node@25.9.3)(vite@8.0.16(@types/node@25.9.3)(esbuild@0.17.19)(tsx@4.22.4)(yaml@2.9.0)))
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -2634,13 +2634,13 @@ packages:
   eventemitter3@5.0.4:
     resolution: {integrity: sha512-mlsTRyGaPBjPedk6Bvw+aqbsXDtoAyAzm5MO7JgU+yVRyMQ5O8bD4Kcci7BS85f93veegeCPkL8R4GLClnjLFw==}
 
-  executable-stories-formatters@0.15.0:
-    resolution: {integrity: sha512-+uiqGy/haVEsdkjiPigEPUlxJNLJ5k1zS6x/pkUEOpSxNJILADyJIN0nYMui8a7Dfh0OytzwoK5EzCGatHhD8g==}
+  executable-stories-formatters@0.16.0:
+    resolution: {integrity: sha512-C53sIeA8cOThaJshJHCFxnwZQQr+texh2Ux9OjMa7ZurS/FEmbKly5Q7WRgbREklEoQb7KzkXB+zhXsgAf9Vvw==}
     engines: {node: '>=22'}
     hasBin: true
 
-  executable-stories-vitest@8.4.3:
-    resolution: {integrity: sha512-Tmna8KJKYt819l5EOLMwRP3wxrFmRVpttFN/0If+jrr8B12RDQ2K0Al9B37g5OmaaVOpZiuyPiQ6zzr4L5EE/w==}
+  executable-stories-vitest@8.4.5:
+    resolution: {integrity: sha512-1jpQIH5i/qOxiSBKYyT8YmjXFkaI57Xz2DBNUFw4Lyw7RfOCxunROmJlr1Bfj3MGI6aiqcDWDx9g+uMvZcoMow==}
     peerDependencies:
       vitest: '>=4.1.5'
 
@@ -6678,7 +6678,7 @@ snapshots:
 
   eventemitter3@5.0.4: {}
 
-  executable-stories-formatters@0.15.0:
+  executable-stories-formatters@0.16.0:
     dependencies:
       '@cucumber/html-formatter': 23.1.0(@cucumber/messages@32.3.1)
       '@cucumber/messages': 32.3.1
@@ -6686,9 +6686,9 @@ snapshots:
       github-slugger: 2.0.0
       yaml: 2.9.0
 
-  executable-stories-vitest@8.4.3(vitest@4.1.8(@types/node@25.9.3)(vite@8.0.16(@types/node@25.9.3)(esbuild@0.17.19)(tsx@4.22.4)(yaml@2.9.0))):
+  executable-stories-vitest@8.4.5(vitest@4.1.8(@types/node@25.9.3)(vite@8.0.16(@types/node@25.9.3)(esbuild@0.17.19)(tsx@4.22.4)(yaml@2.9.0))):
     dependencies:
-      executable-stories-formatters: 0.15.0
+      executable-stories-formatters: 0.16.0
       fast-glob: 3.3.3
       picomatch: 4.0.4
       vitest: 4.1.8(@types/node@25.9.3)(vite@8.0.16(@types/node@25.9.3)(esbuild@0.17.19)(tsx@4.22.4)(yaml@2.9.0))
