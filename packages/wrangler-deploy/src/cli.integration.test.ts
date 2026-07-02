@@ -193,4 +193,29 @@ describe("CLI integration (dist)", () => {
     expect(payload.manifest.flags).toContain("--verify");
     expect(payload.examples.length).toBeGreaterThan(0);
   });
+
+  it("`wd init --preset monorepo` discovers real workers instead of emitting placeholders", () => {
+    const repo = makeRepo();
+    mkdirSync(join(repo, "packages", "backend"), { recursive: true });
+    writeFileSync(
+      join(repo, "packages", "backend", "wrangler.jsonc"),
+      JSON.stringify({ name: "my-backend", main: "src/index.ts" }),
+    );
+
+    const result = runCli(repo, ["init", "--preset", "monorepo", "--dry-run", "--json"]);
+    expect(result.status).toBe(0);
+    const payload = JSON.parse(result.stdout) as { preview: string };
+    // Discovered the real worker dir, not the "apps/api" scaffold placeholder.
+    expect(payload.preview).toContain('"packages/backend"');
+    expect(payload.preview).not.toContain("apps/api");
+  });
+
+  it("`wd init --preset monorepo` falls back to the skeleton in a greenfield repo", () => {
+    const repo = makeRepo();
+    const result = runCli(repo, ["init", "--preset", "monorepo", "--dry-run", "--json"]);
+    expect(result.status).toBe(0);
+    const payload = JSON.parse(result.stdout) as { preview: string };
+    // No wrangler configs to discover — keep the scaffold placeholders.
+    expect(payload.preview).toContain("apps/api");
+  });
 });

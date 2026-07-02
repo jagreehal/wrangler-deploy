@@ -1222,7 +1222,14 @@ export default defineConfig({
 });
 `;
       } else if (preset === "monorepo") {
-        output = `import { defineConfig } from "wrangler-deploy";
+        // Prefer real discovery. If the repo already has wrangler.jsonc files,
+        // scanning them (workers, resources, service bindings) beats a scaffold
+        // with placeholder paths the user must hand-edit. Fall back to the
+        // skeleton only for a greenfield monorepo with no configs yet.
+        try {
+          output = generateConfig(rootDir);
+        } catch {
+          output = `import { defineConfig } from "wrangler-deploy";
 
 export default defineConfig({
   version: 1,
@@ -1231,6 +1238,7 @@ export default defineConfig({
   stages: { dev: { protected: false }, staging: { protected: true }, production: { protected: true } },
 });
 `;
+        }
       } else {
         output = generateConfig(rootDir);
       }
